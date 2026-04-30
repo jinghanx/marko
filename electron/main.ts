@@ -225,6 +225,11 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+Y',
           click: () => sendToRenderer('menu:process-viewer'),
         },
+        {
+          label: 'Keyboard Shortcuts',
+          accelerator: 'CmdOrCtrl+?',
+          click: () => sendToRenderer('menu:show-shortcuts'),
+        },
         { type: 'separator' },
         { role: 'reload' },
         { role: 'toggleDevTools' },

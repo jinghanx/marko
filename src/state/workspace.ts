@@ -182,34 +182,38 @@ function sameLeafSet(a: LeafNode[], b: LeafNode[]): boolean {
   return b.every((l) => ids.has(l.id));
 }
 
-function hsplit(left: PaneTree, right: PaneTree): SplitNode {
+function hsplit(left: PaneTree, right: PaneTree, ratio = 0.5): SplitNode {
   return {
     kind: 'split',
     id: newNodeId('split'),
     direction: 'horizontal',
-    ratio: 0.5,
+    ratio,
     children: [left, right],
   };
 }
 
-function vsplit(top: PaneTree, bottom: PaneTree): SplitNode {
+function vsplit(top: PaneTree, bottom: PaneTree, ratio = 0.5): SplitNode {
   return {
     kind: 'split',
     id: newNodeId('split'),
     direction: 'vertical',
-    ratio: 0.5,
+    ratio,
     children: [top, bottom],
   };
 }
 
-// Right-leaning chain of horizontal splits — N leaves side-by-side.
+// Right-leaning chain of N leaves with equal-width slots: each split's ratio
+// is 1 / (count of leaves still to its right + 1) so every leaf ends up at
+// 1/N of the container width.
 function chainHorizontal(leaves: LeafNode[]): PaneTree {
-  if (leaves.length === 1) return leaves[0];
-  return hsplit(leaves[0], chainHorizontal(leaves.slice(1)));
+  const n = leaves.length;
+  if (n === 1) return leaves[0];
+  return hsplit(leaves[0], chainHorizontal(leaves.slice(1)), 1 / n);
 }
 function chainVertical(leaves: LeafNode[]): PaneTree {
-  if (leaves.length === 1) return leaves[0];
-  return vsplit(leaves[0], chainVertical(leaves.slice(1)));
+  const n = leaves.length;
+  if (n === 1) return leaves[0];
+  return vsplit(leaves[0], chainVertical(leaves.slice(1)), 1 / n);
 }
 
 // Generate a curated set of layouts for the given leaves. Returned trees use
@@ -225,39 +229,43 @@ function generateLayouts(leaves: LeafNode[]): PaneTree[] {
     ];
   }
 
+  // For "1 + (N-1)" layouts (main + stacked, top + columns), the outer split
+  // ratio must be 1/N so each leaf ends up with equal area.
+  const outer = 1 / n;
+
   if (n === 3) {
     return [
-      // 3 columns
+      // 3 columns — each 1/3
       chainHorizontal(leaves),
-      // main on left, two stacked on right
-      hsplit(leaves[0], vsplit(leaves[1], leaves[2])),
-      // top row, two columns below
-      vsplit(leaves[0], hsplit(leaves[1], leaves[2])),
-      // 3 rows
+      // main on left, two stacked on right — each 1/3
+      hsplit(leaves[0], chainVertical(leaves.slice(1)), outer),
+      // top row, two columns below — each 1/3
+      vsplit(leaves[0], chainHorizontal(leaves.slice(1)), outer),
+      // 3 rows — each 1/3
       chainVertical(leaves),
     ];
   }
 
   if (n === 4) {
     return [
-      // 2x2 grid
+      // 2x2 grid — each 1/4
       hsplit(vsplit(leaves[0], leaves[1]), vsplit(leaves[2], leaves[3])),
-      // 4 columns
+      // 4 columns — each 1/4
       chainHorizontal(leaves),
-      // main + 3 stacked sidebars
-      hsplit(leaves[0], chainVertical(leaves.slice(1))),
-      // top row + 3 columns below
-      vsplit(leaves[0], chainHorizontal(leaves.slice(1))),
-      // 4 rows
+      // main + 3 stacked — each 1/4
+      hsplit(leaves[0], chainVertical(leaves.slice(1)), outer),
+      // top row + 3 columns below — each 1/4
+      vsplit(leaves[0], chainHorizontal(leaves.slice(1)), outer),
+      // 4 rows — each 1/4
       chainVertical(leaves),
     ];
   }
 
-  // 5+: a smaller curated set.
+  // 5+: compact set with even sizes.
   return [
     chainHorizontal(leaves),
-    hsplit(leaves[0], chainVertical(leaves.slice(1))),
-    vsplit(leaves[0], chainHorizontal(leaves.slice(1))),
+    hsplit(leaves[0], chainVertical(leaves.slice(1)), outer),
+    vsplit(leaves[0], chainHorizontal(leaves.slice(1)), outer),
     chainVertical(leaves),
   ];
 }

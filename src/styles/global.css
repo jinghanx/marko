@@ -845,30 +845,13 @@ button {
   color: var(--text-muted);
   letter-spacing: 0.02em;
 }
-.welcome-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 18px 24px;
-  width: 100%;
-  max-width: 920px;
-  margin-top: 12px;
-}
-.welcome-section {
+.welcome-actions {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.welcome-section-title {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
-  padding: 2px 0 6px 0;
-  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 30%, transparent);
-  margin-bottom: 4px;
+  gap: 2px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 16px;
 }
 .welcome-row {
   display: grid;
@@ -2467,6 +2450,86 @@ button {
 .settings-modal {
   width: 560px;
   max-width: 100%;
+}
+
+.shortcuts-modal {
+  width: 760px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+.shortcuts-search {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.shortcuts-search input {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.shortcuts-search input:focus {
+  border-color: var(--accent);
+}
+.shortcuts-body {
+  padding: 16px 18px 22px;
+}
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px 28px;
+}
+.shortcuts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.shortcuts-section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-bottom: 6px;
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 30%, transparent);
+  margin-bottom: 4px;
+}
+.shortcuts-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--text);
+  padding: 3px 0;
+}
+.shortcuts-keys {
+  display: inline-block;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+.shortcuts-label {
+  color: var(--text-muted);
+}
+.shortcuts-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px;
+  font-size: 13px;
 }
 
 .modal-header {

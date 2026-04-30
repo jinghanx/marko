@@ -3,6 +3,8 @@ type UIEvent =
   | 'open-settings'
   | 'open-process-viewer'
   | 'open-new-file'
+  | 'open-path'
+  | 'open-shortcuts'
   | 'focus-address';
 
 const listeners = new Map<UIEvent, Set<() => void>>();

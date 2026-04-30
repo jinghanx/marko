@@ -8,6 +8,7 @@ import { FilePalette } from './components/FilePalette';
 import { ProcessViewer } from './components/ProcessViewer';
 import { NewFilePicker } from './components/NewFilePicker';
 import { PathInput } from './components/PathInput';
+import { ShortcutsModal } from './components/ShortcutsModal';
 import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab } from './lib/actions';
 import { uiBus } from './lib/uiBus';
 
@@ -18,7 +19,8 @@ type Modal =
   | { kind: 'path'; replace: boolean }
   | { kind: 'settings' }
   | { kind: 'procViewer' }
-  | { kind: 'newFile' };
+  | { kind: 'newFile' }
+  | { kind: 'shortcuts' };
 
 export function App() {
   const sidebarVisible = useWorkspace((s) => s.sidebarVisible);
@@ -60,6 +62,8 @@ export function App() {
       uiBus.on('open-settings', () => setModal({ kind: 'settings' })),
       uiBus.on('open-process-viewer', () => setModal({ kind: 'procViewer' })),
       uiBus.on('open-new-file', () => setModal({ kind: 'newFile' })),
+      uiBus.on('open-path', () => setModal({ kind: 'path', replace: false })),
+      uiBus.on('open-shortcuts', () => setModal({ kind: 'shortcuts' })),
       window.marko.onMenu('menu:new', () => setModal({ kind: 'newFile' })),
       window.marko.onMenu('menu:open-file', () => void openFileViaDialog()),
       window.marko.onMenu('menu:open-folder', () => void openFolderViaDialog()),
@@ -79,6 +83,7 @@ export function App() {
       window.marko.onMenu('menu:new-terminal', () => openTerminalTab()),
       window.marko.onMenu('menu:focus-address', () => uiBus.emit('focus-address')),
       window.marko.onMenu('menu:process-viewer', () => setModal({ kind: 'procViewer' })),
+      window.marko.onMenu('menu:show-shortcuts', () => setModal({ kind: 'shortcuts' })),
       window.marko.onMenu('menu:split-right', () => workspace.splitFocused('horizontal')),
       window.marko.onMenu('menu:split-down', () => workspace.splitFocused('vertical')),
       window.marko.onMenu('menu:close-pane', () => workspace.closePane(workspace.getState().focusedLeafId)),
@@ -134,6 +139,7 @@ export function App() {
         replace={modal?.kind === 'path' ? modal.replace : false}
         onClose={close}
       />
+      <ShortcutsModal open={modal?.kind === 'shortcuts'} onClose={close} />
     </div>
   );
 }

@@ -54,6 +54,7 @@ const SECTIONS: Section[] = [
       { keys: '⌘\\', label: 'split right', run: () => workspace.splitFocused('horizontal') },
       { keys: '⌘=', label: 'split down', run: () => workspace.splitFocused('vertical') },
       { keys: '⌘⌥W', label: 'close pane' },
+      { keys: '⌘⇧␣', label: 'cycle layouts' },
       { keys: '⌘`', label: 'next pane' },
       { keys: '⌘⇧`', label: 'previous pane' },
     ],
@@ -63,6 +64,7 @@ const SECTIONS: Section[] = [
     items: [
       { keys: '⌘E', label: 'toggle sidebar', run: () => workspace.toggleSidebar() },
       { keys: '⌘⇧\\', label: 'toggle outline', run: () => workspace.toggleOutline() },
+      { keys: '⌘⇧M', label: 'toggle md raw / rendered', run: () => workspace.toggleMarkdownViewMode() },
       { keys: '⌘L', label: 'focus web address bar' },
       { keys: '⌘Y', label: 'process viewer', run: () => uiBus.emit('open-process-viewer') },
       { keys: '⌘,', label: 'preferences', run: () => uiBus.emit('open-settings') },

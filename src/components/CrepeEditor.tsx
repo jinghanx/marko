@@ -3,6 +3,10 @@ import { Crepe } from '@milkdown/crepe';
 import { editorViewCtx } from '@milkdown/kit/core';
 import { workspace, useWorkspace, findLeaf } from '../state/workspace';
 import { attachBlockDragPreview } from '../lib/blockDragPreview';
+import { installSlashMenuFix } from '../lib/slashMenuFix';
+
+// Module-level: install the slash-menu fix once for the whole app.
+installSlashMenuFix();
 
 import '@milkdown/crepe/theme/common/style.css';
 
@@ -48,6 +52,20 @@ export function CrepeEditor({ tabId, initialValue }: Props) {
       .then(() => {
         if (disposed) return;
         detachDragPreview = attachBlockDragPreview(host);
+        // If this editor's tab is the active one in the focused pane at
+        // mount time (e.g., just opened via ⌘P / ⌘O / ⌘T), give it the cursor.
+        // The `seenToken` effect can't handle this — its ref initializes to
+        // the current token, so a mount-time bump is missed.
+        const focused = workspace.getFocusedLeaf();
+        if (focused.activeTabId === tabId && !host.contains(document.activeElement)) {
+          try {
+            crepe.editor.action((ctx) => {
+              ctx.get(editorViewCtx).focus();
+            });
+          } catch {
+            // editor may not be fully initialized yet
+          }
+        }
       })
       .catch((err) => {
         console.error('Failed to create Crepe editor', err);
@@ -59,7 +77,11 @@ export function CrepeEditor({ tabId, initialValue }: Props) {
       void crepe.destroy();
       crepeRef.current = null;
     };
-  }, [tabId, initialValue]);
+    // initialValue is intentionally captured once at mount — Crepe owns the
+    // document state after that. Updating savedContent (e.g., via rebase or
+    // ⌘S) must NOT recreate the editor and steal focus from the user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabId]);
 
   const focusToken = useWorkspace((s) => s.focusToken);
   const isActive = useWorkspace((s) => {
@@ -72,6 +94,10 @@ export function CrepeEditor({ tabId, initialValue }: Props) {
     if (focusToken === seenToken.current) return;
     seenToken.current = focusToken;
     if (!isActive) return;
+    // Don't steal focus from the user if this editor already has it
+    // (or if any input is currently focused — typing in modals etc.).
+    const host = hostRef.current;
+    if (host?.contains(document.activeElement)) return;
     const crepe = crepeRef.current;
     if (!crepe) return;
     try {

@@ -184,6 +184,11 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+Shift+\\',
           click: () => sendToRenderer('menu:toggle-outline'),
         },
+        {
+          label: 'Toggle Markdown View Mode',
+          accelerator: 'CmdOrCtrl+Shift+M',
+          click: () => sendToRenderer('menu:toggle-markdown-mode'),
+        },
         { type: 'separator' },
         {
           label: 'Split Right',
@@ -199,6 +204,11 @@ function buildMenu() {
           label: 'Close Pane',
           accelerator: 'CmdOrCtrl+Alt+W',
           click: () => sendToRenderer('menu:close-pane'),
+        },
+        {
+          label: 'Cycle Pane Layout',
+          accelerator: 'CmdOrCtrl+Shift+Space',
+          click: () => sendToRenderer('menu:cycle-layout'),
         },
         {
           label: 'Next Pane',
@@ -410,6 +420,28 @@ ipcMain.handle('dir:list', async (_e, dirPath: string): Promise<DirEntry[]> => {
 ipcMain.handle('path:basename', async (_e, p: string) => path.basename(p));
 
 ipcMain.handle('path:home', async () => os.homedir());
+
+/** ~/.marko is Marko's per-user config/data directory. We use it for the
+ *  global notes file and any future user-specific persisted state. */
+async function ensureMarkoDir(): Promise<string> {
+  const dir = path.join(os.homedir(), '.marko');
+  await fs.mkdir(dir, { recursive: true });
+  return dir;
+}
+
+ipcMain.handle('marko:config-dir', async () => ensureMarkoDir());
+
+ipcMain.handle('marko:notes-path', async (): Promise<string> => {
+  const dir = await ensureMarkoDir();
+  const file = path.join(dir, 'notes.txt');
+  try {
+    // Create the file with an empty body if it doesn't exist; preserve content otherwise.
+    await fs.writeFile(file, '', { flag: 'wx' });
+  } catch {
+    // File already exists — leave it alone.
+  }
+  return file;
+});
 
 ipcMain.handle('file:create', async (_e, filePath: string): Promise<{ ok: boolean; error?: string }> => {
   try {

@@ -61,6 +61,15 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
     });
     viewRef.current = view;
 
+    // Auto-focus on mount if this tab is active in the focused pane.
+    const focusedLeaf = workspace.getFocusedLeaf();
+    if (
+      focusedLeaf.activeTabId === tabId &&
+      !host.contains(document.activeElement)
+    ) {
+      view.focus();
+    }
+
     const lang = filePath
       ? findLanguage(filePath)
       : language
@@ -99,6 +108,7 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
     if (focusToken === seenToken.current) return;
     seenToken.current = focusToken;
     if (!isActive) return;
+    if (hostRef.current?.contains(document.activeElement)) return;
     viewRef.current?.focus();
   }, [focusToken, isActive]);
 

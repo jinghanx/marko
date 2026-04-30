@@ -23,6 +23,14 @@ const COMMANDS: Command[] = [
     label: 'Open Terminal',
     run: () => openTerminalTab(),
   },
+  {
+    keywords: ['notes', 'note', 'scratchpad'],
+    label: 'Open Notes (~/.marko/notes.txt)',
+    run: async () => {
+      const file = await window.marko.notesPath();
+      await openFileFromPath(file, { focus: true });
+    },
+  },
 ];
 
 function matchCommand(input: string): { cmd: Command; completion: string } | null {

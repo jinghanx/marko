@@ -567,7 +567,12 @@ button {
   background: var(--tab-bg);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-app-region: no-drag;
+  scrollbar-width: none;
+}
+.tabbar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -751,6 +756,18 @@ button {
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
+  flex: 0 0 auto;
+}
+.tab-mode-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   flex: 0 0 auto;
 }
 
@@ -939,11 +956,176 @@ button {
   justify-content: center;
 }
 
+/* Markdown mode toggle (rendered / split / raw) — top-right of the editor area. */
+.md-mode-toggle {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 4;
+  display: inline-flex;
+  background: color-mix(in srgb, var(--bg-elev) 90%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 1px;
+  box-shadow: var(--shadow);
+}
+.md-mode-btn {
+  width: 26px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.md-mode-btn:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.md-mode-btn--active {
+  background: var(--accent);
+  color: white;
+}
+.md-mode-btn--active:hover {
+  background: var(--accent);
+  color: white;
+}
+
+/* Split markdown view: CodeMirror (left) | Preview (right) */
+.md-split {
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  min-width: 0;
+  min-height: 0;
+}
+.md-split-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.md-split-pane--preview {
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+}
+.md-split-divider {
+  flex: 0 0 4px;
+  background: var(--border);
+  cursor: col-resize;
+  user-select: none;
+  transition: background-color 0.12s;
+}
+.md-split-divider:hover,
+.md-split-divider:active {
+  background: var(--accent);
+}
+
+/* Markdown preview pane (also reused inside split). */
+.md-preview {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg);
+  color: var(--text);
+}
+.md-preview-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px clamp(20px, 5%, 56px) 120px;
+  font-family: var(--font-content);
+  font-size: var(--editor-font-size);
+  line-height: 1.7;
+}
+.md-preview-inner h1,
+.md-preview-inner h2,
+.md-preview-inner h3,
+.md-preview-inner h4,
+.md-preview-inner h5,
+.md-preview-inner h6 {
+  font-family: var(--font-ui);
+  letter-spacing: -0.01em;
+  margin-top: 1.6em;
+  margin-bottom: 0.6em;
+}
+.md-preview-inner h1 {
+  font-size: 2em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.3em;
+}
+.md-preview-inner h2 { font-size: 1.5em; }
+.md-preview-inner h3 { font-size: 1.2em; }
+.md-preview-inner p { margin: 0.8em 0; }
+.md-preview-inner pre {
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  line-height: 1.5;
+}
+.md-preview-inner :not(pre) > code {
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--code-border);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  white-space: nowrap;
+}
+.md-preview-inner blockquote {
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-muted);
+  padding-left: 1em;
+  margin-left: 0;
+}
+.md-preview-inner a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.md-preview-inner img {
+  max-width: 100%;
+}
+.md-preview-inner table {
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+.md-preview-inner th,
+.md-preview-inner td {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+}
+.md-preview-inner th {
+  background: var(--bg-muted);
+  font-weight: 600;
+}
+.md-preview-inner ul,
+.md-preview-inner ol {
+  padding-left: 1.6em;
+}
+.md-preview-inner hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.5em 0;
+}
+
 /* Crepe content area styling — tighten to feel like Typora */
 .milkdown {
   width: 100%;
   max-width: var(--editor-max-width);
-  padding: 48px clamp(24px, 8vw, 140px) 200px;
+  /* Side padding scales with the editor pane (not the viewport) so split
+     panes don't end up with huge empty margins. */
+  padding: 48px clamp(20px, 5%, 72px) 200px;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-content);
@@ -1003,6 +1185,34 @@ button {
   background: var(--bg-elev) !important;
   border: 1px solid var(--border-strong);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18) !important;
+}
+/* Slash-menu keyboard-selected item gets `.hover`. `.active` is only added
+   briefly during a pointer click. Style both for redundancy. */
+.milkdown-slash-menu .menu-groups .menu-group li.hover,
+.milkdown-slash-menu .menu-groups .menu-group li.active {
+  background: color-mix(in srgb, var(--accent) 28%, transparent) !important;
+  position: relative;
+}
+.milkdown-slash-menu .menu-groups .menu-group li.hover::before,
+.milkdown-slash-menu .menu-groups .menu-group li.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+}
+.milkdown-slash-menu .menu-groups .menu-group li.hover h6,
+.milkdown-slash-menu .menu-groups .menu-group li.hover span,
+.milkdown-slash-menu .menu-groups .menu-group li.active h6,
+.milkdown-slash-menu .menu-groups .menu-group li.active span {
+  color: var(--text) !important;
+}
+/* Active section tab in the top bar (Text / List / Advanced). */
+.milkdown-slash-menu .tab-group ul li.selected {
+  color: var(--accent) !important;
+  border-bottom: 2px solid var(--accent) !important;
 }
 
 /* Caret — make Crepe's virtual cursor obvious */
@@ -2568,7 +2778,7 @@ button {
   --crepe-color-inline-area: var(--code-bg);
   --crepe-color-error: #d33;
   --crepe-color-hover: var(--bg-elev);
-  --crepe-color-selected: var(--bg-elev);
+  --crepe-color-selected: color-mix(in srgb, var(--accent) 22%, transparent);
   --crepe-color-shadow: rgba(0, 0, 0, 0.1);
   --crepe-color-scrollbar: var(--border-strong);
   --crepe-shadow-1: 0 1px 2px var(--crepe-color-shadow);

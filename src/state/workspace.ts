@@ -9,6 +9,8 @@ export interface Tab {
   kind: TabKind;
   language?: string;
   ext?: string;
+  /** Markdown tabs only: 'rendered' (Crepe WYSIWYG), 'raw' (CodeMirror), or 'split' (raw + preview). Default 'rendered'. */
+  viewMode?: 'rendered' | 'raw' | 'split';
   content: string;
   savedContent: string;
   dirty: boolean;
@@ -53,6 +55,8 @@ interface WorkspaceState {
   revealPath: string | null;
   revealToken: number;
   folderSelection: FolderSelectionInfo | null;
+  /** Active layout-cycle session — saved original tree + current step index. */
+  layoutCycle: { originalRoot: PaneTree; index: number } | null;
 }
 
 let nextTabId = 1;
@@ -80,6 +84,7 @@ let state: WorkspaceState = {
   revealPath: null,
   revealToken: 0,
   folderSelection: null,
+  layoutCycle: null,
 };
 
 const setState = (next: Partial<WorkspaceState> | ((prev: WorkspaceState) => Partial<WorkspaceState>)) => {
@@ -167,6 +172,94 @@ function setSplitRatio(node: PaneTree, splitId: string, ratio: number): PaneTree
   const c0 = setSplitRatio(node.children[0], splitId, ratio);
   const c1 = setSplitRatio(node.children[1], splitId, ratio);
   return c0 === node.children[0] && c1 === node.children[1] ? node : { ...node, children: [c0, c1] };
+}
+
+// ---------- Layout cycling ----------
+
+function sameLeafSet(a: LeafNode[], b: LeafNode[]): boolean {
+  if (a.length !== b.length) return false;
+  const ids = new Set(a.map((l) => l.id));
+  return b.every((l) => ids.has(l.id));
+}
+
+function hsplit(left: PaneTree, right: PaneTree): SplitNode {
+  return {
+    kind: 'split',
+    id: newNodeId('split'),
+    direction: 'horizontal',
+    ratio: 0.5,
+    children: [left, right],
+  };
+}
+
+function vsplit(top: PaneTree, bottom: PaneTree): SplitNode {
+  return {
+    kind: 'split',
+    id: newNodeId('split'),
+    direction: 'vertical',
+    ratio: 0.5,
+    children: [top, bottom],
+  };
+}
+
+// Right-leaning chain of horizontal splits — N leaves side-by-side.
+function chainHorizontal(leaves: LeafNode[]): PaneTree {
+  if (leaves.length === 1) return leaves[0];
+  return hsplit(leaves[0], chainHorizontal(leaves.slice(1)));
+}
+function chainVertical(leaves: LeafNode[]): PaneTree {
+  if (leaves.length === 1) return leaves[0];
+  return vsplit(leaves[0], chainVertical(leaves.slice(1)));
+}
+
+// Generate a curated set of layouts for the given leaves. Returned trees use
+// the original LeafNode objects, so tab content is preserved exactly.
+function generateLayouts(leaves: LeafNode[]): PaneTree[] {
+  const n = leaves.length;
+  if (n < 2) return [];
+
+  if (n === 2) {
+    return [
+      hsplit(leaves[0], leaves[1]), // side-by-side
+      vsplit(leaves[0], leaves[1]), // stacked
+    ];
+  }
+
+  if (n === 3) {
+    return [
+      // 3 columns
+      chainHorizontal(leaves),
+      // main on left, two stacked on right
+      hsplit(leaves[0], vsplit(leaves[1], leaves[2])),
+      // top row, two columns below
+      vsplit(leaves[0], hsplit(leaves[1], leaves[2])),
+      // 3 rows
+      chainVertical(leaves),
+    ];
+  }
+
+  if (n === 4) {
+    return [
+      // 2x2 grid
+      hsplit(vsplit(leaves[0], leaves[1]), vsplit(leaves[2], leaves[3])),
+      // 4 columns
+      chainHorizontal(leaves),
+      // main + 3 stacked sidebars
+      hsplit(leaves[0], chainVertical(leaves.slice(1))),
+      // top row + 3 columns below
+      vsplit(leaves[0], chainHorizontal(leaves.slice(1))),
+      // 4 rows
+      chainVertical(leaves),
+    ];
+  }
+
+  // 5+: a smaller curated set.
+  return [
+    chainHorizontal(leaves),
+    hsplit(leaves[0], chainVertical(leaves.slice(1))),
+    vsplit(leaves[0], chainHorizontal(leaves.slice(1))),
+    chainVertical(leaves),
+  ];
 }
 
 // Garbage-collect tabs that are not referenced by any leaf.
@@ -408,6 +501,32 @@ export const workspace = {
     setState((prev) => ({ root: setSplitRatio(prev.root, splitId, ratio) }));
   },
 
+  cycleLayout() {
+    setState((prev) => {
+      const leaves = getAllLeaves(prev.root);
+      if (leaves.length < 2) return prev;
+      const layouts = generateLayouts(leaves);
+      if (layouts.length === 0) return prev;
+
+      // Start a new cycle session if not in one (or if external changes
+      // invalidated the session — detected by leaf-set mismatch).
+      let session = prev.layoutCycle;
+      if (!session || !sameLeafSet(getAllLeaves(session.originalRoot), leaves)) {
+        session = { originalRoot: prev.root, index: -1 };
+      }
+
+      const nextIndex = session.index + 1;
+      if (nextIndex >= layouts.length) {
+        // Cycled past the last suggestion — restore the original layout.
+        return { root: session.originalRoot, layoutCycle: null };
+      }
+      return {
+        root: layouts[nextIndex],
+        layoutCycle: { originalRoot: session.originalRoot, index: nextIndex },
+      };
+    });
+  },
+
   // ---------- Tab content ----------
 
   updateContent(id: string, content: string) {
@@ -415,6 +534,24 @@ export const workspace = {
       tabs: prev.tabs.map((t) =>
         t.id === id ? { ...t, content, dirty: content !== t.savedContent } : t,
       ),
+    }));
+  },
+
+  setMarkdownViewMode(tabId: string, mode: 'rendered' | 'raw' | 'split') {
+    setState((prev) => ({
+      tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, viewMode: mode } : t)),
+    }));
+  },
+
+  toggleMarkdownViewMode() {
+    const tab = workspace.getActiveTab();
+    if (!tab || tab.kind !== 'markdown') return;
+    // Cycle: rendered → split → raw → rendered
+    const order: Array<'rendered' | 'split' | 'raw'> = ['rendered', 'split', 'raw'];
+    const cur = tab.viewMode ?? 'rendered';
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    setState((prev) => ({
+      tabs: prev.tabs.map((t) => (t.id === tab.id ? { ...t, viewMode: next } : t)),
     }));
   },
 

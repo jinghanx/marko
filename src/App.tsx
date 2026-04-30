@@ -70,6 +70,7 @@ export function App() {
       window.marko.onMenu('menu:next-tab', () => workspace.cycleTab(1)),
       window.marko.onMenu('menu:toggle-sidebar', () => workspace.toggleSidebar()),
       window.marko.onMenu('menu:toggle-outline', () => workspace.toggleOutline()),
+      window.marko.onMenu('menu:toggle-markdown-mode', () => workspace.toggleMarkdownViewMode()),
       window.marko.onMenu('menu:preferences', () => setModal({ kind: 'settings' })),
       window.marko.onMenu('menu:quick-open', () => setModal({ kind: 'palette', replace: false })),
       window.marko.onMenu('menu:quick-open-replace', () => setModal({ kind: 'palette', replace: true })),
@@ -81,6 +82,7 @@ export function App() {
       window.marko.onMenu('menu:split-right', () => workspace.splitFocused('horizontal')),
       window.marko.onMenu('menu:split-down', () => workspace.splitFocused('vertical')),
       window.marko.onMenu('menu:close-pane', () => workspace.closePane(workspace.getState().focusedLeafId)),
+      window.marko.onMenu('menu:cycle-layout', () => workspace.cycleLayout()),
       window.marko.onMenu('menu:focus-pane-next', () => {
         const s = workspace.getState();
         const leaves = getAllLeaves(s.root);

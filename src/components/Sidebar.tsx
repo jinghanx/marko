@@ -40,6 +40,15 @@ export function Sidebar() {
   const [error, setError] = useState<string | null>(null);
 
   const treeRef = useRef<HTMLDivElement | null>(null);
+  // Held single-click action; cleared if a double-click arrives within ~220ms.
+  const pendingClickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPendingClick = () => {
+    if (pendingClickRef.current) {
+      clearTimeout(pendingClickRef.current);
+      pendingClickRef.current = null;
+    }
+  };
+  useEffect(() => () => cancelPendingClick(), []);
 
   // When rootDir changes, reset state and load root.
   useEffect(() => {
@@ -388,13 +397,19 @@ export function Sidebar() {
               onClick={() => {
                 setSelected(node.path);
                 if (node.isDirectory) {
-                  toggleExpand(node.path);
-                  void openFolderInEditor(node.path, { focus: false });
+                  // Defer the toggle so a double-click can cancel it.
+                  // Click the chevron for instant toggling without delay.
+                  cancelPendingClick();
+                  pendingClickRef.current = setTimeout(() => {
+                    toggleExpand(node.path);
+                    pendingClickRef.current = null;
+                  }, 220);
                 } else {
                   void openFileFromPath(node.path, { focus: false });
                 }
               }}
               onDoubleClick={() => {
+                cancelPendingClick();
                 if (node.isDirectory) {
                   void openFolderInEditor(node.path, { focus: true });
                 } else {

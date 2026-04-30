@@ -39,6 +39,8 @@ export interface MarkoApi {
   listDir(dirPath: string): Promise<DirEntry[]>;
   basename(p: string): Promise<string>;
   homeDir(): Promise<string>;
+  configDir(): Promise<string>;
+  notesPath(): Promise<string>;
   createFile(filePath: string): Promise<{ ok: boolean; error?: string }>;
   createDir(dirPath: string): Promise<{ ok: boolean; error?: string }>;
   rename(oldPath: string, newPath: string): Promise<{ ok: boolean; error?: string }>;

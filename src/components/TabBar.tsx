@@ -77,6 +77,12 @@ export function TabBar({ paneId }: TabBarProps) {
               <KindIcon kind={tab.kind} />
             </span>
             <span className="tab-title">{tab.title}</span>
+            {tab.kind === 'markdown' && tab.viewMode === 'raw' && (
+              <span className="tab-mode-badge" title="Raw markdown (⌘⇧M cycles)">RAW</span>
+            )}
+            {tab.kind === 'markdown' && tab.viewMode === 'split' && (
+              <span className="tab-mode-badge" title="Split markdown (⌘⇧M cycles)">SPLIT</span>
+            )}
             {tab.dirty && <span className="tab-dirty" aria-label="unsaved" />}
             <button
               className="tab-close"

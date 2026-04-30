@@ -54,11 +54,17 @@
           shell — all in one app, with recursive split panes and 15 hand-tuned color themes.
         </p>
         <div class="cta-row" id="download">
-          <a class="btn btn-primary" href="https://github.com/jinghanx/marko/releases/latest">
+          <a
+            id="primary-download"
+            class="btn btn-primary"
+            href="https://github.com/jinghanx/marko/releases/latest/download/Marko-0.1.0-arm64.dmg"
+            data-arm64-href="https://github.com/jinghanx/marko/releases/latest/download/Marko-0.1.0-arm64.dmg"
+            data-x64-href="https://github.com/jinghanx/marko/releases/latest/download/Marko-0.1.0.dmg"
+          >
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M8 1v9m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Download for macOS
+            <span id="primary-download-label">Download for Apple Silicon</span>
           </a>
           <a class="btn btn-ghost" href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">
             <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
@@ -67,7 +73,33 @@
             View on GitHub
           </a>
         </div>
-        <p class="hero-meta">macOS 12+ · Apple Silicon &amp; Intel · Free &amp; open source</p>
+        <p class="hero-meta" id="dl-meta">
+          macOS 12+ · <a id="alt-arch-link" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-0.1.0.dmg">Intel build</a> · Free &amp; open source
+        </p>
+        <script>
+          // Best-effort arch detection. UA Client Hints work on Chrome/Edge;
+          // Safari falls back to "Apple Silicon" since most modern Macs are arm64.
+          (async function () {
+            const btn = document.getElementById('primary-download');
+            const label = document.getElementById('primary-download-label');
+            const alt = document.getElementById('alt-arch-link');
+            if (!btn || !label || !alt) return;
+            let arch = 'arm';
+            try {
+              const ua = navigator.userAgentData;
+              if (ua && ua.getHighEntropyValues) {
+                const v = await ua.getHighEntropyValues(['architecture', 'bitness']);
+                if (v.architecture === 'x86' && v.bitness === '64') arch = 'x64';
+              }
+            } catch {}
+            if (arch === 'x64') {
+              btn.href = btn.dataset.x64Href;
+              label.textContent = 'Download for Intel';
+              alt.href = btn.dataset.arm64Href;
+              alt.textContent = 'Apple Silicon build';
+            }
+          })();
+        </script>
       </div>
     </header>
 
@@ -224,13 +256,14 @@
         <h2>Stop alt-tabbing.</h2>
         <p>Drop Marko into Applications and try it for an afternoon.</p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="https://github.com/jinghanx/marko/releases/latest">
+          <a class="btn btn-primary" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-0.1.0-arm64.dmg">
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M8 1v9m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Download .dmg
+            Apple Silicon
           </a>
-          <a class="btn btn-ghost" href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">View source</a>
+          <a class="btn btn-ghost" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-0.1.0.dmg">Intel</a>
+          <a class="btn btn-ghost" href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">Source</a>
         </div>
       </div>
     </section>

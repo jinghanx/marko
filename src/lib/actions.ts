@@ -1,8 +1,9 @@
-import { workspace, type TabKind } from '../state/workspace';
+import { workspace, getActiveSession, type TabKind } from '../state/workspace';
+import { settings } from '../state/settings';
 import { detectKind, looksBinary } from './fileType';
 
 function maybeRevealInTree(path: string) {
-  const root = workspace.getState().rootDir;
+  const root = getActiveSession().rootDir;
   if (!root) return;
   if (path === root || path.startsWith(root + '/')) {
     workspace.revealInTree(path);
@@ -11,8 +12,11 @@ function maybeRevealInTree(path: string) {
 
 function classify(filePath: string, content: string): { kind: TabKind; content: string } {
   const kind = detectKind(filePath);
-  if (kind === 'binary' || kind === 'image') return { kind, content: '' };
+  if (kind === 'binary' || kind === 'image' || kind === 'media' || kind === 'pdf') {
+    return { kind, content: '' };
+  }
   if (kind === 'code' && looksBinary(content)) return { kind: 'binary', content: '' };
+  // csv / json keep their content (the viewer parses it on every render).
   return { kind, content };
 }
 
@@ -24,11 +28,25 @@ export async function openFileViaDialog() {
   if (kindByExt === 'image') {
     const dataUrl = await window.marko.loadImage(result.filePath);
     workspace.openFileTab(result.filePath, dataUrl, title, 'image');
+    settings.pushRecentFile(result.filePath);
+    workspace.requestEditorFocus();
+    return;
+  }
+  if (kindByExt === 'media') {
+    workspace.openFileTab(result.filePath, '', title, 'media');
+    settings.pushRecentFile(result.filePath);
+    workspace.requestEditorFocus();
+    return;
+  }
+  if (kindByExt === 'pdf') {
+    workspace.openFileTab(result.filePath, '', title, 'pdf');
+    settings.pushRecentFile(result.filePath);
     workspace.requestEditorFocus();
     return;
   }
   const { kind, content } = classify(result.filePath, result.content);
   workspace.openFileTab(result.filePath, content, title, kind);
+  settings.pushRecentFile(result.filePath);
   workspace.requestEditorFocus();
 }
 
@@ -62,6 +80,31 @@ export async function withReplace(opener: () => Promise<unknown> | void) {
 export function openTerminalTab(opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? true;
   const tab = workspace.openNewTab({ kind: 'terminal', title: 'Terminal' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
+export function openProcessTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const tab = workspace.openNewTab({ kind: 'process', title: 'Activity' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
+export function openGitTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const tab = workspace.openNewTab({ kind: 'git', title: 'Git' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
+export function openExcalidrawTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const tab = workspace.openNewTab({
+    kind: 'excalidraw',
+    title: 'Whiteboard',
+    ext: '.excalidraw',
+  });
   if (focus) workspace.requestEditorFocus();
   return tab;
 }
@@ -100,12 +143,30 @@ export async function openFileFromPath(filePath: string, opts: { focus?: boolean
   const title = await window.marko.basename(filePath);
   if (kindByExt === 'binary') {
     workspace.openFileTab(filePath, '', title, 'binary');
+    settings.pushRecentFile(filePath);
     maybeRevealInTree(filePath);
     return;
   }
   if (kindByExt === 'image') {
     const dataUrl = await window.marko.loadImage(filePath);
     workspace.openFileTab(filePath, dataUrl, title, 'image');
+    settings.pushRecentFile(filePath);
+    maybeRevealInTree(filePath);
+    if (focus) workspace.requestEditorFocus();
+    return;
+  }
+  if (kindByExt === 'media') {
+    // No content to load — MediaViewer streams the file via marko-file://.
+    workspace.openFileTab(filePath, '', title, 'media');
+    settings.pushRecentFile(filePath);
+    maybeRevealInTree(filePath);
+    if (focus) workspace.requestEditorFocus();
+    return;
+  }
+  if (kindByExt === 'pdf') {
+    // Same story for PDFs — PdfViewer streams via marko-file://.
+    workspace.openFileTab(filePath, '', title, 'pdf');
+    settings.pushRecentFile(filePath);
     maybeRevealInTree(filePath);
     if (focus) workspace.requestEditorFocus();
     return;
@@ -113,6 +174,7 @@ export async function openFileFromPath(filePath: string, opts: { focus?: boolean
   const content = await window.marko.readFile(filePath);
   const { kind, content: c } = classify(filePath, content);
   workspace.openFileTab(filePath, c, title, kind);
+  settings.pushRecentFile(filePath);
   maybeRevealInTree(filePath);
   if (focus) workspace.requestEditorFocus();
 }
@@ -130,7 +192,13 @@ export async function saveActive() {
 export async function saveActiveAs() {
   const tab = workspace.getActiveTab();
   if (!tab || tab.kind === 'binary' || tab.kind === 'image') return;
-  const ext = tab.ext ?? (tab.kind === 'markdown' ? '.md' : '.txt');
+  const ext =
+    tab.ext ??
+    (tab.kind === 'markdown'
+      ? '.md'
+      : tab.kind === 'excalidraw'
+        ? '.excalidraw'
+        : '.txt');
   const baseTitle = tab.title || 'untitled';
   const suggested = tab.filePath ?? (baseTitle.endsWith(ext) ? baseTitle : `${baseTitle}${ext}`);
   const filePath = await window.marko.saveAsDialog(suggested);

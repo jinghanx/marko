@@ -2,17 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Fzf, type FzfResultItem } from 'fzf';
 import type { ProcInfo, SystemStats } from '../types/marko';
 
-interface Props {
-  open: boolean;
-  onClose: () => void;
-}
-
 type SortKey = 'cpu' | 'mem' | 'pid' | 'rss' | 'time' | 'command';
 
 const REFRESH_MS = 1500;
 const MAX_RESULTS = 500;
 
-export function ProcessViewer({ open, onClose }: Props) {
+/** Lives as a tab kind ('process'). Polls system stats every REFRESH_MS while
+ *  mounted; React unmounts when the user closes the tab, which cancels the
+ *  interval automatically. */
+export function ProcessViewer() {
   const [procs, setProcs] = useState<ProcInfo[]>([]);
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [query, setQuery] = useState('');
@@ -23,7 +21,6 @@ export function ProcessViewer({ open, onClose }: Props) {
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     const refresh = async () => {
       try {
@@ -46,12 +43,9 @@ export function ProcessViewer({ open, onClose }: Props) {
       cancelled = true;
       clearInterval(id);
     };
-  }, [open]);
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
-    setQuery('');
-    setActivePid(null);
     let tries = 0;
     const tryFocus = () => {
       const el = inputRef.current;
@@ -60,7 +54,7 @@ export function ProcessViewer({ open, onClose }: Props) {
       if (document.activeElement !== el && tries++ < 6) setTimeout(tryFocus, 30);
     };
     requestAnimationFrame(tryFocus);
-  }, [open]);
+  }, []);
 
   const fzf = useMemo(() => {
     if (procs.length === 0) return null;
@@ -133,8 +127,6 @@ export function ProcessViewer({ open, onClose }: Props) {
     el?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex]);
 
-  if (!open) return null;
-
   const moveBy = (delta: number) => {
     if (results.length === 0) return;
     const cur = activeIndex < 0 ? 0 : activeIndex;
@@ -165,9 +157,6 @@ export function ProcessViewer({ open, onClose }: Props) {
     } else if (e.key === 'ArrowUp' || (e.key === 'p' && e.ctrlKey)) {
       e.preventDefault();
       moveBy(-1);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
     } else if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       void killActive();
@@ -178,8 +167,8 @@ export function ProcessViewer({ open, onClose }: Props) {
   const runningCount = procs.filter((p) => p.state.startsWith('R')).length;
 
   return (
-    <div className="modal-backdrop palette-backdrop" onClick={onClose}>
-      <div className="palette procviewer" onClick={(e) => e.stopPropagation()}>
+    <div className="procviewer-pane">
+      <div className="procviewer">
         {stats && (
           <SystemSummary
             stats={stats}
@@ -231,7 +220,6 @@ export function ProcessViewer({ open, onClose }: Props) {
         <div className="proc-fkeys">
           <FKey n="↑↓" label="Nav" />
           <FKey n="⌘K" label="Kill" />
-          <FKey n="esc" label="Quit" />
           <span className="palette-count">{taskCount} tasks</span>
         </div>
       </div>

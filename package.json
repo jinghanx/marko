@@ -15,15 +15,19 @@
     "rename:dev-electron": "bash scripts/rename-dev-electron.sh"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
     "@milkdown/crepe": "^7.20.0",
     "@replit/codemirror-vim": "^6.3.0",
+    "@types/diff": "^7.0.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "diff": "^9.0.0",
     "fzf": "^0.5.2",
     "marked": "^18.0.2",
     "node-pty": "^1.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "simple-git": "^3.36.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

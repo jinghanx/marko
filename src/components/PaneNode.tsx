@@ -4,19 +4,23 @@ import { Pane } from './Pane';
 
 interface Props {
   node: PaneTree;
+  /** Owning session — threaded down so leaves resolve against the right tree
+   *  even when this session isn't currently the active one (we keep inactive
+   *  sessions mounted to preserve <webview> playback, terminal output, etc.). */
+  sessionId: string;
 }
 
-export function PaneNode({ node }: Props) {
+export function PaneNode({ node, sessionId }: Props) {
   if (node.kind === 'leaf') {
-    return <Pane leaf={node} />;
+    return <Pane leaf={node} sessionId={sessionId} />;
   }
   return (
     <SplitContainer
       id={node.id}
       direction={node.direction}
       ratio={node.ratio}
-      first={<PaneNode node={node.children[0]} />}
-      second={<PaneNode node={node.children[1]} />}
+      first={<PaneNode node={node.children[0]} sessionId={sessionId} />}
+      second={<PaneNode node={node.children[1]} sessionId={sessionId} />}
     />
   );
 }

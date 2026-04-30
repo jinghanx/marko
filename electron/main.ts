@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, protocol, net } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -7,6 +7,7 @@ import os from 'node:os';
 import { spawn } from 'node:child_process';
 import * as pty from 'node-pty';
 import type { IPty } from 'node-pty';
+import { simpleGit, type SimpleGit, type StatusResult } from 'simple-git';
 
 const require = createRequire(import.meta.url);
 
@@ -14,6 +15,23 @@ const require = createRequire(import.meta.url);
 // `app.name` everywhere. Without this we'd fall through to the bundled
 // Electron's "Electron" name in dev.
 app.setName('Marko');
+
+// Custom scheme used by the media viewer / image viewer to stream files from
+// disk directly into <video>/<audio>/<img>. Bypasses the renderer's IPC and
+// avoids huge base64 round-trips for large media. Privileged so the renderer
+// can fetch from it without CORS / mixed-content rejection.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'marko-file',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: true,
+    },
+  },
+]);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,6 +55,9 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
       webviewTag: true,
+      // Enable Chromium's built-in PDF viewer so the PdfViewer component can
+      // render PDFs in an <embed type="application/pdf">.
+      plugins: true,
     },
   });
 
@@ -156,6 +177,11 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+W',
           click: () => sendToRenderer('menu:close-tab'),
         },
+        { type: 'separator' },
+        {
+          label: 'Reset Workspace…',
+          click: () => sendToRenderer('menu:reset-workspace'),
+        },
         ...(isMac ? [] : ([{ role: 'quit' }] satisfies Electron.MenuItemConstructorOptions[])),
       ],
     },
@@ -247,6 +273,27 @@ function buildMenu() {
       label: 'Window',
       submenu: [
         {
+          label: 'New Session',
+          accelerator: 'CmdOrCtrl+Alt+N',
+          click: () => sendToRenderer('menu:new-session'),
+        },
+        {
+          label: 'Close Session',
+          accelerator: 'CmdOrCtrl+Shift+W',
+          click: () => sendToRenderer('menu:close-session'),
+        },
+        {
+          label: 'Previous Session',
+          accelerator: 'CmdOrCtrl+Shift+9',
+          click: () => sendToRenderer('menu:prev-session'),
+        },
+        {
+          label: 'Next Session',
+          accelerator: 'CmdOrCtrl+Shift+0',
+          click: () => sendToRenderer('menu:next-session'),
+        },
+        { type: 'separator' },
+        {
           label: 'Previous Tab',
           accelerator: 'CmdOrCtrl+Shift+[',
           click: () => sendToRenderer('menu:prev-tab'),
@@ -258,9 +305,7 @@ function buildMenu() {
         },
         { type: 'separator' },
         { role: 'minimize' },
-        // Close Window uses Shift+Cmd+W so it doesn't steal Cmd+W from
-        // File > Close Tab. Standard role still handles the action.
-        { label: 'Close Window', accelerator: 'CmdOrCtrl+Shift+W', role: 'close' },
+        { label: 'Close Window', role: 'close' },
       ],
     },
   ];
@@ -269,6 +314,14 @@ function buildMenu() {
 }
 
 app.whenReady().then(() => {
+  // Stream local files into the renderer through net.fetch — supports HTTP
+  // range requests so <video> seeking works without buffering the whole clip.
+  protocol.handle('marko-file', (req) => {
+    const u = new URL(req.url);
+    const filePath = decodeURIComponent(u.pathname);
+    return net.fetch(`file://${filePath}`);
+  });
+
   // Set the dock icon in dev (production builds get the icon from .icns).
   // Try a few candidate paths since __dirname differs between dev and prod.
   const candidates = [
@@ -447,6 +500,588 @@ ipcMain.handle('marko:notes-path', async (): Promise<string> => {
   }
   return file;
 });
+
+/** Persisted workspace snapshot at ~/.marko/state.json. Renderer owns the
+ *  schema; main just reads/writes/clears the blob. */
+async function statePath(): Promise<string> {
+  const dir = await ensureMarkoDir();
+  return path.join(dir, 'state.json');
+}
+
+ipcMain.handle('state:read', async (): Promise<string | null> => {
+  try {
+    return await fs.readFile(await statePath(), 'utf8');
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('state:write', async (_e, json: string): Promise<{ ok: boolean }> => {
+  try {
+    const file = await statePath();
+    // Atomic-ish write: write tmp then rename, so a crash mid-write doesn't
+    // leave a half-written file that breaks the next launch.
+    const tmp = file + '.tmp';
+    await fs.writeFile(tmp, json, 'utf8');
+    await fs.rename(tmp, file);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+});
+
+ipcMain.handle('state:reset', async (): Promise<{ ok: boolean }> => {
+  try {
+    await fs.rm(await statePath(), { force: true });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+});
+
+// ---------- Git ----------
+// Lightweight wrappers over simple-git. Each handler operates on a workspace
+// directory passed in by the renderer. We bail with `ok: false, error` rather
+// than throwing so the UI can render an error inline.
+
+interface GitFileEntry {
+  path: string;
+  index: string;
+  workingDir: string;
+  staged: boolean;
+}
+
+export interface GitStatusInfo {
+  isRepo: boolean;
+  branch: string | null;
+  tracking: string | null;
+  ahead: number;
+  behind: number;
+  files: GitFileEntry[];
+  error?: string;
+}
+
+function git(repoDir: string): SimpleGit {
+  return simpleGit({ baseDir: repoDir, binary: 'git' });
+}
+
+async function isInsideRepo(repoDir: string): Promise<boolean> {
+  try {
+    const out = await git(repoDir).revparse(['--is-inside-work-tree']);
+    return out.trim() === 'true';
+  } catch {
+    return false;
+  }
+}
+
+ipcMain.handle('git:status', async (_e, repoDir: string): Promise<GitStatusInfo> => {
+  if (!repoDir) return { isRepo: false, branch: null, tracking: null, ahead: 0, behind: 0, files: [] };
+  if (!(await isInsideRepo(repoDir))) {
+    return { isRepo: false, branch: null, tracking: null, ahead: 0, behind: 0, files: [] };
+  }
+  try {
+    const s: StatusResult = await git(repoDir).status();
+    const files: GitFileEntry[] = s.files.map((f) => ({
+      path: f.path,
+      index: f.index ?? ' ',
+      workingDir: f.working_dir ?? ' ',
+      // simple-git uses `index` for the staged column (' ' = unstaged).
+      staged: !!f.index && f.index !== ' ' && f.index !== '?',
+    }));
+    return {
+      isRepo: true,
+      branch: s.current ?? null,
+      tracking: s.tracking ?? null,
+      ahead: s.ahead,
+      behind: s.behind,
+      files,
+    };
+  } catch (err) {
+    return {
+      isRepo: true,
+      branch: null,
+      tracking: null,
+      ahead: 0,
+      behind: 0,
+      files: [],
+      error: (err as Error).message,
+    };
+  }
+});
+
+ipcMain.handle(
+  'git:diff',
+  async (
+    _e,
+    repoDir: string,
+    relPath: string,
+    staged: boolean,
+  ): Promise<{ ok: boolean; diff?: string; error?: string }> => {
+    try {
+      const args = staged ? ['--staged', '--', relPath] : ['--', relPath];
+      const out = await git(repoDir).diff(args);
+      return { ok: true, diff: out };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:stage',
+  async (_e, repoDir: string, paths: string[]): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).add(paths);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:unstage',
+  async (_e, repoDir: string, paths: string[]): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).reset(['HEAD', '--', ...paths]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:discard',
+  async (_e, repoDir: string, paths: string[]): Promise<{ ok: boolean; error?: string }> => {
+    // Restore working-tree files to HEAD. Untracked files aren't affected by
+    // checkout; the renderer should call `git:trash-untracked` for those (or
+    // route them through fs.trash). We only handle tracked here.
+    try {
+      await git(repoDir).checkout(['--', ...paths]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:commit',
+  async (_e, repoDir: string, message: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!message.trim()) return { ok: false, error: 'Empty commit message' };
+    try {
+      await git(repoDir).commit(message);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+// ---------- Native rich confirm dialog ----------
+// `window.confirm()` wraps long content awkwardly (single-column, narrow,
+// breaks mid-word). Electron's native message box handles a separate `detail`
+// field cleanly, and we can mark the action as destructive on macOS.
+
+ipcMain.handle(
+  'app:confirm',
+  async (
+    _e,
+    opts: {
+      message: string;
+      detail?: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+      dangerous?: boolean;
+    },
+  ): Promise<boolean> => {
+    const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
+    if (!win) return false;
+    const result = await dialog.showMessageBox(win, {
+      type: opts.dangerous ? 'warning' : 'question',
+      message: opts.message,
+      detail: opts.detail,
+      buttons: [opts.confirmLabel ?? 'OK', opts.cancelLabel ?? 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    return result.response === 0;
+  },
+);
+
+// ---------- Branches ----------
+
+export interface GitBranchInfo {
+  current: string;
+  local: string[];
+  remote: string[];
+}
+
+ipcMain.handle(
+  'git:branches',
+  async (_e, repoDir: string): Promise<{ ok: boolean; data?: GitBranchInfo; error?: string }> => {
+    try {
+      const localBr = await git(repoDir).branchLocal();
+      const allBr = await git(repoDir).branch(['-a']);
+      const remote = allBr.all
+        .filter((n) => n.startsWith('remotes/') && !n.includes('/HEAD'))
+        .map((n) => n.replace(/^remotes\//, ''));
+      return { ok: true, data: { current: localBr.current, local: localBr.all, remote } };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:checkout',
+  async (_e, repoDir: string, branch: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).checkout(branch);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:deleteBranch',
+  async (_e, repoDir: string, name: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      // -D forces deletion even if not merged. Caller is expected to confirm.
+      await git(repoDir).raw(['branch', '-D', name]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:rebase',
+  async (_e, repoDir: string, target: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).rebase([target]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:merge',
+  async (_e, repoDir: string, target: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).merge([target]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+// ---------- Remote ops ----------
+
+ipcMain.handle(
+  'git:fetch',
+  async (_e, repoDir: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).fetch();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:pull',
+  async (_e, repoDir: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).pull();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:push',
+  async (_e, repoDir: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).push();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+// ---------- Stash ----------
+
+export interface GitStashEntry {
+  ref: string; // e.g. stash@{0}
+  message: string;
+  date: string;
+}
+
+ipcMain.handle(
+  'git:stashList',
+  async (
+    _e,
+    repoDir: string,
+  ): Promise<{ ok: boolean; items?: GitStashEntry[]; error?: string }> => {
+    try {
+      const s = await git(repoDir).stashList();
+      const items: GitStashEntry[] = s.all.map((it) => ({
+        ref: `stash@{${s.all.indexOf(it)}}`,
+        message: it.message,
+        date: it.date,
+      }));
+      return { ok: true, items };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:stashSave',
+  async (_e, repoDir: string, message: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const args = ['push'];
+      if (message) args.push('-m', message);
+      await git(repoDir).stash(args);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:stashApply',
+  async (_e, repoDir: string, ref: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).stash(['apply', ref]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:stashPop',
+  async (_e, repoDir: string, ref: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).stash(['pop', ref]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:stashDrop',
+  async (_e, repoDir: string, ref: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).stash(['drop', ref]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:stashClear',
+  async (_e, repoDir: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).stash(['clear']);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+// ---------- Log / commit history ----------
+
+export interface GitLogEntry {
+  hash: string;
+  shortHash: string;
+  author: string;
+  email: string;
+  date: string; // ISO
+  subject: string;
+  parents: string[];
+}
+
+ipcMain.handle(
+  'git:log',
+  async (
+    _e,
+    repoDir: string,
+    opts: { limit?: number; ref?: string } = {},
+  ): Promise<{ ok: boolean; commits?: GitLogEntry[]; error?: string }> => {
+    const limit = opts.limit ?? 100;
+    return new Promise((resolve) => {
+      // Use a delimited custom format we can split safely (record sep \x1e,
+      // field sep \x1f). simple-git's parser is finicky for unusual chars in
+      // commit messages; raw spawn with format gives us full control.
+      const sep = '\x1e';
+      const fld = '\x1f';
+      const fmt = `%H${fld}%h${fld}%an${fld}%ae${fld}%aI${fld}%P${fld}%s${sep}`;
+      const args = ['log', `--max-count=${limit}`, `--format=${fmt}`];
+      if (opts.ref) args.push(opts.ref);
+      const proc = spawn('git', args, { cwd: repoDir });
+      let stdout = '';
+      let stderr = '';
+      proc.stdout.on('data', (d) => (stdout += d.toString()));
+      proc.stderr.on('data', (d) => (stderr += d.toString()));
+      proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          return resolve({ ok: false, error: stderr.trim() || `git log exit ${code}` });
+        }
+        const commits: GitLogEntry[] = stdout
+          .split(sep)
+          .map((rec) => rec.trim())
+          .filter(Boolean)
+          .map((rec) => {
+            const f = rec.split(fld);
+            return {
+              hash: f[0] ?? '',
+              shortHash: f[1] ?? '',
+              author: f[2] ?? '',
+              email: f[3] ?? '',
+              date: f[4] ?? '',
+              parents: (f[5] ?? '').split(' ').filter(Boolean),
+              subject: f[6] ?? '',
+            };
+          });
+        resolve({ ok: true, commits });
+      });
+    });
+  },
+);
+
+ipcMain.handle(
+  'git:show',
+  async (
+    _e,
+    repoDir: string,
+    hash: string,
+  ): Promise<{ ok: boolean; diff?: string; error?: string }> => {
+    try {
+      const out = await git(repoDir).show([hash]);
+      return { ok: true, diff: out };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:cherryPick',
+  async (_e, repoDir: string, hash: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).raw(['cherry-pick', hash]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+// ---------- Tags ----------
+
+ipcMain.handle(
+  'git:tags',
+  async (
+    _e,
+    repoDir: string,
+  ): Promise<{ ok: boolean; tags?: string[]; error?: string }> => {
+    try {
+      const t = await git(repoDir).tags();
+      return { ok: true, tags: t.all };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:createTag',
+  async (
+    _e,
+    repoDir: string,
+    name: string,
+    message: string,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      if (message) await git(repoDir).addAnnotatedTag(name, message);
+      else await git(repoDir).addTag(name);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'git:deleteTag',
+  async (_e, repoDir: string, name: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await git(repoDir).raw(['tag', '-d', name]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+// ---------- Apply patch (for hunk-level stage/unstage/discard) ----------
+// We pipe the patch via stdin to `git apply`. simple-git's API only takes
+// patch file paths, so we use spawn directly.
+
+ipcMain.handle(
+  'git:applyPatch',
+  async (
+    _e,
+    repoDir: string,
+    patch: string,
+    opts: { cached?: boolean; reverse?: boolean },
+  ): Promise<{ ok: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      const args = ['apply'];
+      if (opts.cached) args.push('--cached');
+      if (opts.reverse) args.push('--reverse');
+      // --whitespace=nowarn keeps stage/discard idempotent against typical
+      // editor-induced trailing-whitespace differences.
+      args.push('--whitespace=nowarn', '-');
+      const proc = spawn('git', args, { cwd: repoDir });
+      let stderr = '';
+      proc.stderr.on('data', (d) => {
+        stderr += d.toString();
+      });
+      proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+      proc.on('close', (code) => {
+        if (code === 0) resolve({ ok: true });
+        else resolve({ ok: false, error: stderr.trim() || `git apply exit ${code}` });
+      });
+      proc.stdin.write(patch);
+      proc.stdin.end();
+    });
+  },
+);
 
 ipcMain.handle('file:create', async (_e, filePath: string): Promise<{ ok: boolean; error?: string }> => {
   try {

@@ -1,5 +1,5 @@
 import { createElement, useEffect, useRef, useState } from 'react';
-import { useWorkspace, workspace, findLeaf } from '../state/workspace';
+import { useWorkspace, workspace, findLeaf, getActiveSession } from '../state/workspace';
 import { normalizeUrl } from '../lib/actions';
 import { uiBus } from '../lib/uiBus';
 
@@ -29,7 +29,8 @@ export function WebView({ tabId, url }: Props) {
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const addressRef = useRef<HTMLInputElement | null>(null);
   const isActive = useWorkspace((s) => {
-    const focused = findLeaf(s.root, s.focusedLeafId);
+    const session = getActiveSession(s);
+    const focused = findLeaf(session.root, session.focusedLeafId);
     return focused?.activeTabId === tabId;
   });
 
@@ -63,20 +64,27 @@ export function WebView({ tabId, url }: Props) {
       sync();
     };
     const onTitle = (e: any) => setPageTitle(e.title);
+    const onMediaPlay = () => workspace.setTabPlaying(tabId, true);
+    const onMediaPause = () => workspace.setTabPlaying(tabId, false);
 
     wv.addEventListener('did-start-loading', onStart);
     wv.addEventListener('did-stop-loading', onStop);
     wv.addEventListener('did-navigate', sync);
     wv.addEventListener('did-navigate-in-page', sync);
     wv.addEventListener('page-title-updated', onTitle);
+    wv.addEventListener('media-started-playing', onMediaPlay);
+    wv.addEventListener('media-paused', onMediaPause);
     return () => {
       wv.removeEventListener('did-start-loading', onStart);
       wv.removeEventListener('did-stop-loading', onStop);
       wv.removeEventListener('did-navigate', sync);
       wv.removeEventListener('did-navigate-in-page', sync);
       wv.removeEventListener('page-title-updated', onTitle);
+      wv.removeEventListener('media-started-playing', onMediaPlay);
+      wv.removeEventListener('media-paused', onMediaPause);
+      workspace.setTabPlaying(tabId, false);
     };
-  }, []);
+  }, [tabId]);
 
   // Sync the title back into the tab.
   useEffect(() => {

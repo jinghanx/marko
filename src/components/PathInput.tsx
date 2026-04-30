@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useWorkspace } from '../state/workspace';
+import { useWorkspace, getActiveSession } from '../state/workspace';
 import {
   openFileFromPath,
   openFolderInEditor,
@@ -7,6 +7,9 @@ import {
   normalizeUrl,
   openUrlInTab,
   openTerminalTab,
+  openProcessTab,
+  openGitTab,
+  openExcalidrawTab,
   withReplace,
 } from '../lib/actions';
 
@@ -22,6 +25,21 @@ const COMMANDS: Command[] = [
     keywords: ['terminal', 'term', 'shell', 'tty'],
     label: 'Open Terminal',
     run: () => openTerminalTab(),
+  },
+  {
+    keywords: ['activity', 'processes', 'process', 'top', 'htop'],
+    label: 'Open Activity (process viewer)',
+    run: () => openProcessTab(),
+  },
+  {
+    keywords: ['git', 'status', 'commit'],
+    label: 'Open Git (status / stage / commit)',
+    run: () => openGitTab(),
+  },
+  {
+    keywords: ['whiteboard', 'draw', 'excalidraw', 'sketch', 'canvas'],
+    label: 'Open Whiteboard (Excalidraw)',
+    run: () => openExcalidrawTab(),
   },
   {
     keywords: ['notes', 'note', 'scratchpad'],
@@ -46,6 +64,15 @@ function matchCommand(input: string): { cmd: Command; completion: string } | nul
   return null;
 }
 
+interface Suggestion {
+  name: string;
+  isDirectory: boolean;
+  /** Absolute filesystem path of the suggestion. */
+  absPath: string;
+}
+
+const MAX_SUGGESTIONS = 8;
+
 interface Props {
   open: boolean;
   replace?: boolean;
@@ -53,11 +80,12 @@ interface Props {
 }
 
 export function PathInput({ open, replace = false, onClose }: Props) {
-  const rootDir = useWorkspace((s) => s.rootDir);
+  const rootDir = useWorkspace((s) => getActiveSession(s).rootDir);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [completion, setCompletion] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const homeDirRef = useRef<string | null>(null);
 
@@ -66,41 +94,51 @@ export function PathInput({ open, replace = false, onClose }: Props) {
     setValue('');
     setError(null);
     setBusy(false);
-    setCompletion(null);
+    setSuggestions([]);
+    setActiveIndex(0);
     requestAnimationFrame(() => inputRef.current?.focus());
     if (!homeDirRef.current) {
       window.marko.homeDir().then((h) => (homeDirRef.current = h));
     }
   }, [open]);
 
-  // Live path autocompletion: list the resolved parent dir and find an entry
-  // whose name starts with the typed prefix.
+  // Resolve typed value to an absolute path.
+  const resolvePath = (input: string): string => {
+    let p = input.trim();
+    if (!p) return p;
+    if (p === '~') p = homeDirRef.current ?? p;
+    else if (p.startsWith('~/') && homeDirRef.current) {
+      p = homeDirRef.current + p.slice(1);
+    } else if (!p.startsWith('/')) {
+      const base = rootDir ?? homeDirRef.current ?? '';
+      p = base + (base.endsWith('/') ? '' : '/') + p;
+    }
+    return p;
+  };
+
+  // Live multi-suggestion autocomplete: list the resolved parent dir and find
+  // entries whose name starts with the typed prefix.
   useEffect(() => {
     if (!open) {
-      setCompletion(null);
+      setSuggestions([]);
       return;
     }
     const trimmed = value.trim();
     if (!trimmed) {
-      setCompletion(null);
+      setSuggestions([]);
+      setActiveIndex(0);
       return;
     }
     if (looksLikeUrl(trimmed) || matchCommand(trimmed)) {
-      setCompletion(null);
+      setSuggestions([]);
+      setActiveIndex(0);
       return;
     }
-    // Resolve the typed value to an absolute path so we can list its parent.
-    const resolved = (() => {
-      let p = value;
-      if (p === '~') return homeDirRef.current ?? p;
-      if (p.startsWith('~/') && homeDirRef.current) return homeDirRef.current + p.slice(1);
-      if (p.startsWith('/')) return p;
-      const base = rootDir ?? homeDirRef.current ?? '';
-      return base + (base.endsWith('/') ? '' : '/') + p;
-    })();
+    const resolved = resolvePath(value);
     const slash = resolved.lastIndexOf('/');
     if (slash < 0) {
-      setCompletion(null);
+      setSuggestions([]);
+      setActiveIndex(0);
       return;
     }
     const parent = resolved.slice(0, slash) || '/';
@@ -119,17 +157,24 @@ export function PathInput({ open, replace = false, onClose }: Props) {
         const considered = lc.startsWith('.')
           ? sorted
           : sorted.filter((e) => !e.name.startsWith('.'));
-        const match = considered.find(
-          (e) => e.name.toLowerCase().startsWith(lc) && e.name !== prefix,
-        );
-        if (match) {
-          const tail = match.name.slice(prefix.length);
-          setCompletion(tail + (match.isDirectory ? '/' : ''));
-        } else {
-          setCompletion(null);
-        }
+        const matches = considered
+          .filter((e) => e.name.toLowerCase().startsWith(lc))
+          .slice(0, MAX_SUGGESTIONS)
+          .map<Suggestion>((e) => ({
+            name: e.name,
+            isDirectory: e.isDirectory,
+            absPath: parent + (parent.endsWith('/') ? '' : '/') + e.name,
+          }));
+        // If the only match is exactly what's typed, hide it (nothing to add).
+        const filtered =
+          matches.length === 1 && matches[0].name === prefix ? [] : matches;
+        setSuggestions(filtered);
+        setActiveIndex(0);
       })
-      .catch(() => setCompletion(null));
+      .catch(() => {
+        setSuggestions([]);
+        setActiveIndex(0);
+      });
     return () => {
       cancelled = true;
     };
@@ -137,40 +182,33 @@ export function PathInput({ open, replace = false, onClose }: Props) {
 
   if (!open) return null;
 
-  const resolvePath = (input: string): string => {
-    let p = input.trim();
-    if (!p) return p;
-    if (p === '~') p = homeDirRef.current ?? p;
-    else if (p.startsWith('~/') && homeDirRef.current) {
-      p = homeDirRef.current + p.slice(1);
-    } else if (!p.startsWith('/')) {
-      const base = rootDir ?? homeDirRef.current ?? '';
-      p = base + (base.endsWith('/') ? '' : '/') + p;
-    }
-    return p;
+  /** Take the current input value and replace its trailing path segment with
+   *  the suggestion's name (preserving the parent the user already typed). */
+  const acceptSuggestion = (s: Suggestion): string => {
+    const slash = value.lastIndexOf('/');
+    const head = slash >= 0 ? value.slice(0, slash + 1) : '';
+    return head + s.name + (s.isDirectory ? '/' : '');
   };
 
-  const submit = async () => {
+  const submit = async (overridePath?: string) => {
     const trimmed = value.trim();
-    if (!trimmed) return;
-    // Command match takes priority — only when the input exactly matches a
-    // command's full keyword (so "term" autocompletes to "terminal" but doesn't
-    // immediately fire if the user might be typing a path that starts with
-    // those letters).
-    const cmd = matchCommand(trimmed);
-    if (cmd && cmd.completion === trimmed.toLowerCase()) {
-      onClose();
-      if (replace) await withReplace(() => cmd.cmd.run());
-      else cmd.cmd.run();
-      return;
+    if (!trimmed && !overridePath) return;
+    if (!overridePath) {
+      const cmd = matchCommand(trimmed);
+      if (cmd && cmd.completion === trimmed.toLowerCase()) {
+        onClose();
+        if (replace) await withReplace(() => cmd.cmd.run());
+        else cmd.cmd.run();
+        return;
+      }
+      if (looksLikeUrl(trimmed)) {
+        onClose();
+        if (replace) await withReplace(() => openUrlInTab(trimmed));
+        else openUrlInTab(trimmed);
+        return;
+      }
     }
-    if (looksLikeUrl(trimmed)) {
-      onClose();
-      if (replace) await withReplace(() => openUrlInTab(trimmed));
-      else openUrlInTab(trimmed);
-      return;
-    }
-    const resolved = resolvePath(trimmed);
+    const resolved = overridePath ?? resolvePath(trimmed);
     if (!resolved) return;
     setBusy(true);
     setError(null);
@@ -196,25 +234,47 @@ export function PathInput({ open, replace = false, onClose }: Props) {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      void submit();
+      // If the user has navigated to a suggestion and it differs from what's
+      // typed, treat Enter as "submit this suggestion." For directories, this
+      // opens the folder; the user can drill in further with Tab if they want.
+      const active = suggestions[activeIndex];
+      if (active) {
+        void submit(active.absPath);
+      } else {
+        void submit();
+      }
+    } else if (e.key === 'ArrowDown') {
+      if (suggestions.length === 0) return;
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      if (suggestions.length === 0) return;
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Tab') {
-      // Tab: command completion takes priority, then path completion.
+      // Tab: command completion takes priority (when a command keyword
+      // partially matches), then path completion via the active suggestion.
       const cmd = matchCommand(value);
       if (cmd && cmd.completion !== value.trim().toLowerCase()) {
         e.preventDefault();
         setValue(cmd.completion);
         return;
       }
-      if (completion) {
+      const active = suggestions[activeIndex];
+      if (active) {
         e.preventDefault();
-        setValue(value + completion);
-        setCompletion(null);
+        setValue(acceptSuggestion(active));
+        // After accepting, suggestions will refresh on the next value change.
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onClose();
     }
   };
+
+  const trimmed = value.trim();
+  const cmdMatch = matchCommand(trimmed);
+  const showSuggestions = suggestions.length > 0 && !cmdMatch && !looksLikeUrl(trimmed);
 
   return (
     <div className="modal-backdrop palette-backdrop" onClick={onClose}>
@@ -235,19 +295,35 @@ export function PathInput({ open, replace = false, onClose }: Props) {
           autoCapitalize="off"
           autoComplete="off"
         />
+        {showSuggestions && (
+          <div className="palette-results pathinput-suggestions">
+            {suggestions.map((s, i) => (
+              <div
+                key={s.absPath}
+                className={`palette-row pathinput-suggestion${i === activeIndex ? ' palette-row--active' : ''}`}
+                onMouseEnter={() => setActiveIndex(i)}
+                onClick={() => void submit(s.absPath)}
+              >
+                <span className="palette-row-name">
+                  {s.isDirectory ? '📁 ' : '📄 '}
+                  {s.name}
+                  {s.isDirectory && '/'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="pathinput-meta">
           {(() => {
             if (error) return <span className="pathinput-error">{error}</span>;
-            const trimmed = value.trim();
-            const cmd = matchCommand(trimmed);
-            if (cmd) {
-              const tail = cmd.completion.slice(trimmed.length);
+            if (cmdMatch) {
+              const tail = cmdMatch.completion.slice(trimmed.length);
               return (
                 <span className="pathinput-resolved">
                   ⌘ <strong>{trimmed}</strong>
                   {tail && <span className="pathinput-ghost">{tail}</span>}
                   {' — '}
-                  {cmd.cmd.label}
+                  {cmdMatch.cmd.label}
                   {tail && <span className="pathinput-tab-hint"> (Tab)</span>}
                 </span>
               );
@@ -260,11 +336,14 @@ export function PathInput({ open, replace = false, onClose }: Props) {
               );
             }
             if (value) {
+              const active = suggestions[activeIndex];
+              const target = active ? active.absPath : resolvePath(value);
               return (
-                <span className="pathinput-resolved" title={resolvePath(value)}>
-                  → {resolvePath(value)}
-                  {completion && <span className="pathinput-ghost">{completion}</span>}
-                  {completion && <span className="pathinput-tab-hint"> (Tab)</span>}
+                <span className="pathinput-resolved" title={target}>
+                  → {target}
+                  {showSuggestions && (
+                    <span className="pathinput-tab-hint"> (↑↓ to choose, Tab to extend)</span>
+                  )}
                 </span>
               );
             }
@@ -278,6 +357,8 @@ export function PathInput({ open, replace = false, onClose }: Props) {
         </div>
         <div className="palette-footer">
           <span><kbd>↵</kbd> open</span>
+          {showSuggestions && <span><kbd>↑↓</kbd> select</span>}
+          {showSuggestions && <span><kbd>Tab</kbd> extend</span>}
           <span><kbd>esc</kbd> cancel</span>
           {busy && <span>working…</span>}
         </div>

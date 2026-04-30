@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Fzf, byLengthAsc, type FzfResultItem } from 'fzf';
-import { useWorkspace } from '../state/workspace';
+import { useWorkspace, getActiveSession } from '../state/workspace';
+import { useSettings } from '../state/settings';
 import { openFileFromPath, withReplace } from '../lib/actions';
 
 interface Props {
@@ -16,9 +17,11 @@ interface Item {
 }
 
 const MAX_RESULTS = 60;
+const MAX_RECENTS_IN_PALETTE = 8;
 
 export function FilePalette({ open, replace = false, onClose }: Props) {
-  const rootDir = useWorkspace((s) => s.rootDir);
+  const rootDir = useWorkspace((s) => getActiveSession(s).rootDir);
+  const recentFiles = useSettings().recentFiles;
   const [items, setItems] = useState<Item[] | null>(null);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -88,22 +91,42 @@ export function FilePalette({ open, replace = false, onClose }: Props) {
     });
   }, [scopedItems]);
 
+  // Recents that exist in the current workspace, mapped to walked Items.
+  const scopedRecents: Item[] = useMemo(() => {
+    if (!scopedItems || !rootDir) return [];
+    const byPath = new Map(scopedItems.map((it) => [it.path, it]));
+    const out: Item[] = [];
+    for (const p of recentFiles) {
+      const it = byPath.get(p);
+      if (it) out.push(it);
+      if (out.length >= MAX_RECENTS_IN_PALETTE) break;
+    }
+    return out;
+  }, [scopedItems, recentFiles, rootDir]);
+
   const results: FzfResultItem<Item>[] = useMemo(() => {
     if (!fzf || !scopedItems) return [];
     if (!query) {
-      return scopedItems.slice(0, MAX_RESULTS).map(
-        (it) =>
-          ({
-            item: it,
-            positions: new Set<number>(),
-            start: 0,
-            end: 0,
-            score: 0,
-          } as FzfResultItem<Item>),
-      );
+      const empty = (it: Item): FzfResultItem<Item> =>
+        ({
+          item: it,
+          positions: new Set<number>(),
+          start: 0,
+          end: 0,
+          score: 0,
+        }) as FzfResultItem<Item>;
+      const recentPaths = new Set(scopedRecents.map((it) => it.path));
+      const rest = scopedItems
+        .filter((it) => !recentPaths.has(it.path))
+        .slice(0, MAX_RESULTS - scopedRecents.length);
+      return [...scopedRecents.map(empty), ...rest.map(empty)];
     }
     return fzf.find(query);
-  }, [fzf, scopedItems, query]);
+  }, [fzf, scopedItems, scopedRecents, query]);
+
+  /** Index of the first non-recent row, or -1 if there are no recents. Used
+   *  to render a divider between the two sections (only when query is empty). */
+  const dividerIndex = !query && scopedRecents.length > 0 ? scopedRecents.length : -1;
 
   // Keep activeIndex in bounds.
   useEffect(() => {
@@ -170,15 +193,22 @@ export function FilePalette({ open, replace = false, onClose }: Props) {
           )}
           {!loading &&
             results.map((r, i) => (
-              <PaletteRow
-                key={r.item.path}
-                item={r.item}
-                positions={r.positions}
-                index={i}
-                active={i === activeIndex}
-                onMouseEnter={() => setActiveIndex(i)}
-                onClick={() => choose(i)}
-              />
+              <div key={r.item.path}>
+                {i === 0 && dividerIndex > 0 && (
+                  <div className="palette-section">recent</div>
+                )}
+                {i === dividerIndex && (
+                  <div className="palette-section">all files</div>
+                )}
+                <PaletteRow
+                  item={r.item}
+                  positions={r.positions}
+                  index={i}
+                  active={i === activeIndex}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  onClick={() => choose(i)}
+                />
+              </div>
             ))}
         </div>
         <div className="palette-footer">

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
-import { EditorState, Compartment } from '@codemirror/state';
+import { EditorState, Compartment, Annotation } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { vim } from '@replit/codemirror-vim';
-import { workspace, useWorkspace, findLeaf } from '../state/workspace';
+import { workspace, useWorkspace, findLeaf, getActiveSession } from '../state/workspace';
 import { findLanguage } from '../lib/fileType';
 import { useSettings } from '../state/settings';
 import { installVimOverrides } from '../lib/vimSetup';
@@ -13,6 +13,33 @@ import { classHighlighter } from '@lezer/highlight';
 import { languages } from '@codemirror/language-data';
 
 installVimOverrides();
+
+/** Annotation marking a transaction that was dispatched to apply content from
+ *  another editor instance for the same tab. The local update listener uses
+ *  this to avoid re-broadcasting the change (which would loop). */
+const remoteSync = Annotation.define<boolean>();
+
+/** Minimal-change diff so a remote sync into this editor preserves the local
+ *  cursor / selection (CodeMirror remaps selection across `changes` ranges). */
+function diffRange(oldStr: string, newStr: string) {
+  if (oldStr === newStr) return null;
+  let prefix = 0;
+  const minLen = Math.min(oldStr.length, newStr.length);
+  while (prefix < minLen && oldStr.charCodeAt(prefix) === newStr.charCodeAt(prefix)) prefix++;
+  let suffix = 0;
+  while (
+    suffix < minLen - prefix &&
+    oldStr.charCodeAt(oldStr.length - 1 - suffix) ===
+      newStr.charCodeAt(newStr.length - 1 - suffix)
+  ) {
+    suffix++;
+  }
+  return {
+    from: prefix,
+    to: oldStr.length - suffix,
+    insert: newStr.slice(prefix, newStr.length - suffix),
+  };
+}
 
 interface Props {
   tabId: string;
@@ -51,9 +78,11 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
           EditorView.lineWrapping,
           langCompartment.of([]),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              workspace.updateContent(tabId, update.state.doc.toString());
-            }
+            if (!update.docChanged) return;
+            // Skip updates that originated from a remote sync — otherwise we
+            // re-broadcast the change and the two panes oscillate.
+            if (update.transactions.some((tr) => tr.annotation(remoteSync))) return;
+            workspace.updateContent(tabId, update.state.doc.toString());
           }),
         ],
       }),
@@ -98,9 +127,27 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
     });
   }, [vimMode]);
 
+  // Cross-pane sync: when the workspace tab.content changes from outside this
+  // editor (e.g., the same file open in another pane is being edited), pull
+  // the new content in. Annotated as `remoteSync` so the update listener
+  // doesn't re-broadcast it.
+  const tabContent = useWorkspace((s) => s.tabs.find((t) => t.id === tabId)?.content);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || tabContent === undefined) return;
+    const current = view.state.doc.toString();
+    const diff = diffRange(current, tabContent);
+    if (!diff) return;
+    view.dispatch({
+      changes: diff,
+      annotations: remoteSync.of(true),
+    });
+  }, [tabContent]);
+
   const focusToken = useWorkspace((s) => s.focusToken);
   const isActive = useWorkspace((s) => {
-    const focused = findLeaf(s.root, s.focusedLeafId);
+    const session = getActiveSession(s);
+    const focused = findLeaf(session.root, session.focusedLeafId);
     return focused?.activeTabId === tabId;
   });
   const seenToken = useRef(focusToken);

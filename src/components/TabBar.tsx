@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useWorkspace, workspace, findLeaf, type Tab } from '../state/workspace';
+import { useDragReorder } from '../lib/dragReorder';
 
 interface TabBarProps {
   paneId: string;
+  sessionId: string;
 }
 
-export function TabBar({ paneId }: TabBarProps) {
+export function TabBar({ paneId, sessionId }: TabBarProps) {
   const allTabs = useWorkspace((s) => s.tabs);
-  const leaf = useWorkspace((s) => findLeaf(s.root, paneId));
+  const leaf = useWorkspace((s) => {
+    const session = s.sessions.find((x) => x.id === sessionId);
+    return session ? findLeaf(session.root, paneId) : null;
+  });
   const tabs = useMemo(() => {
     if (!leaf) return [];
     const map = new Map(allTabs.map((t) => [t.id, t]));
@@ -32,7 +37,29 @@ export function TabBar({ paneId }: TabBarProps) {
     };
   }, [menu]);
 
-  if (tabs.length === 0) return null;
+  // All hooks must be called unconditionally — the empty-tabs early return
+  // below would skip useDragReorder otherwise and React throws "rendered
+  // fewer hooks than expected" when the last tab in a leaf is closed.
+  const { state: drag, handlers: dragHandlers } = useDragReorder((from, to) =>
+    workspace.reorderTabInLeaf(paneId, from, to),
+  );
+
+  // Render an empty bar with just the `+` button when the leaf has no tabs,
+  // so the pane stays visually anchored and the user always has a way to
+  // add a new tab (the WelcomeScreen below also has shortcuts).
+  if (tabs.length === 0) {
+    return (
+      <div className="tabbar tabbar--empty">
+        <button
+          className="tab-new"
+          onClick={() => workspace.openNewTab()}
+          aria-label="New tab"
+        >
+          +
+        </button>
+      </div>
+    );
+  }
 
   const closeWithDirtyCheck = (toClose: Tab[]) => {
     const dirty = toClose.filter((t) => t.dirty);
@@ -48,12 +75,25 @@ export function TabBar({ paneId }: TabBarProps) {
 
   return (
     <div className="tabbar">
-      {tabs.map((tab) => {
+      {tabs.map((tab, i) => {
         const active = tab.id === activeTabId;
+        const isDragging = drag.dragIdx === i;
+        const insertSide =
+          drag.dragIdx !== null && drag.overIdx === i ? drag.overSide : null;
         return (
           <div
             key={tab.id}
-            className={`tab tab--${tab.kind} ${active ? 'tab--active' : ''}`}
+            className={
+              `tab tab--${tab.kind} ${active ? 'tab--active' : ''}` +
+              (isDragging ? ' tab--dragging' : '') +
+              (insertSide === 'before' ? ' tab--drop-before' : '') +
+              (insertSide === 'after' ? ' tab--drop-after' : '')
+            }
+            draggable
+            onDragStart={dragHandlers.onDragStart(i)}
+            onDragOver={dragHandlers.onDragOver(i)}
+            onDrop={dragHandlers.onDrop(i)}
+            onDragEnd={dragHandlers.onDragEnd}
             onClick={() => {
               workspace.setActiveTab(tab.id);
               workspace.requestEditorFocus();
@@ -86,6 +126,7 @@ export function TabBar({ paneId }: TabBarProps) {
             {tab.dirty && <span className="tab-dirty" aria-label="unsaved" />}
             <button
               className="tab-close"
+              draggable={false}
               onClick={(e) => {
                 e.stopPropagation();
                 closeWithDirtyCheck([tab]);
@@ -131,10 +172,26 @@ function KindIcon({ kind }: { kind: Tab['kind'] }) {
       return <MarkdownGlyph />;
     case 'image':
       return <ImageGlyph />;
+    case 'media':
+      return <MediaGlyph />;
+    case 'pdf':
+      return <PdfGlyph />;
+    case 'csv':
+      return <TableGlyph />;
+    case 'json':
+      return <JsonGlyph />;
+    case 'diff':
+      return <DiffGlyph />;
     case 'binary':
       return <BinaryGlyph />;
     case 'terminal':
       return <TerminalGlyph />;
+    case 'process':
+      return <ProcessGlyph />;
+    case 'git':
+      return <GitGlyph />;
+    case 'excalidraw':
+      return <DrawGlyph />;
     case 'code':
     default:
       return <CodeGlyph />;
@@ -146,6 +203,101 @@ function TerminalGlyph() {
     <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
       <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
       <path d="M4.5 6.5 L7 8 L4.5 9.5 M8.5 10 H11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TableGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden>
+      <FileBase />
+      <path d="M4 8 H12 M4 11 H12 M8 5 V13" stroke="currentColor" strokeWidth="1" fill="none" />
+    </svg>
+  );
+}
+
+function JsonGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden>
+      <FileBase />
+      <path
+        d="M6.5 6 q-1 0 -1 1 v1 q0 0.6 -0.6 0.6 q0.6 0 0.6 0.6 v1 q0 1 1 1 M9.5 6 q1 0 1 1 v1 q0 0.6 0.6 0.6 q-0.6 0 -0.6 0.6 v1 q0 1 -1 1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="0.9"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function DiffGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <path d="M3 4 H7 M5 2 V6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M9 11 H13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M3 9 L13 9" stroke="currentColor" strokeWidth="0.8" strokeDasharray="2 1.5" opacity="0.6" />
+    </svg>
+  );
+}
+
+function PdfGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden>
+      <FileBase />
+      <text
+        x="8"
+        y="11.6"
+        textAnchor="middle"
+        fontSize="4"
+        fontWeight="700"
+        fontFamily="-apple-system, sans-serif"
+        fill="currentColor"
+      >
+        PDF
+      </text>
+    </svg>
+  );
+}
+
+function MediaGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden>
+      <FileBase />
+      <path d="M6 8 L11 5 L11 11 Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function ProcessGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <path d="M2 12 L5 8 L8 10 L11 5 L14 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function DrawGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <path
+        d="M3 13 L3 11 L10.5 3.5 L12.5 5.5 L5 13 Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 4.5 L11.5 6.5" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function GitGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <circle cx="4" cy="3" r="1.4" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="4" cy="13" r="1.4" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="12" cy="3" r="1.4" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M4 4.4 V11.6 M4 6 q0 4 8 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }

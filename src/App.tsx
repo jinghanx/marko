@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useWorkspace, workspace, getAllLeaves } from './state/workspace';
+import { useWorkspace, workspace, getActiveSession, getAllLeaves } from './state/workspace';
 import { Sidebar } from './components/Sidebar';
 import { PaneNode } from './components/PaneNode';
 import { Outline } from './components/Outline';
 import { SettingsModal } from './components/SettingsModal';
 import { FilePalette } from './components/FilePalette';
-import { ProcessViewer } from './components/ProcessViewer';
 import { NewFilePicker } from './components/NewFilePicker';
 import { PathInput } from './components/PathInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
-import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab } from './lib/actions';
+import { SessionStrip } from './components/SessionStrip';
+import { NowPlaying } from './components/NowPlaying';
+import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab } from './lib/actions';
 import { uiBus } from './lib/uiBus';
+import { resetWorkspaceAndReload } from './lib/persistence';
 
 // One modal at a time. Opening any modal automatically closes the others.
 type Modal =
@@ -18,15 +20,15 @@ type Modal =
   | { kind: 'palette'; replace: boolean }
   | { kind: 'path'; replace: boolean }
   | { kind: 'settings' }
-  | { kind: 'procViewer' }
   | { kind: 'newFile' }
   | { kind: 'shortcuts' };
 
 export function App() {
   const sidebarVisible = useWorkspace((s) => s.sidebarVisible);
   const outlineVisible = useWorkspace((s) => s.outlineVisible);
-  const rootDir = useWorkspace((s) => s.rootDir);
-  const root = useWorkspace((s) => s.root);
+  const rootDir = useWorkspace((s) => getActiveSession(s).rootDir);
+  const sessions = useWorkspace((s) => s.sessions);
+  const activeSessionId = useWorkspace((s) => s.activeSessionId);
   const [modal, setModal] = useState<Modal>(null);
   const close = () => setModal(null);
 
@@ -47,7 +49,7 @@ export function App() {
         // ignore
       }
       if (!chosen) chosen = await window.marko.homeDir();
-      if (!cancelled && workspace.getState().rootDir == null) {
+      if (!cancelled && getActiveSession().rootDir == null) {
         workspace.setRootDir(chosen);
       }
     })();
@@ -60,7 +62,7 @@ export function App() {
     const offs = [
       uiBus.on('open-palette', () => setModal({ kind: 'palette', replace: false })),
       uiBus.on('open-settings', () => setModal({ kind: 'settings' })),
-      uiBus.on('open-process-viewer', () => setModal({ kind: 'procViewer' })),
+      uiBus.on('open-process-viewer', () => openProcessTab()),
       uiBus.on('open-new-file', () => setModal({ kind: 'newFile' })),
       uiBus.on('open-path', () => setModal({ kind: 'path', replace: false })),
       uiBus.on('open-shortcuts', () => setModal({ kind: 'shortcuts' })),
@@ -82,25 +84,41 @@ export function App() {
       window.marko.onMenu('menu:goto-path-replace', () => setModal({ kind: 'path', replace: true })),
       window.marko.onMenu('menu:new-terminal', () => openTerminalTab()),
       window.marko.onMenu('menu:focus-address', () => uiBus.emit('focus-address')),
-      window.marko.onMenu('menu:process-viewer', () => setModal({ kind: 'procViewer' })),
+      window.marko.onMenu('menu:process-viewer', () => openProcessTab()),
       window.marko.onMenu('menu:show-shortcuts', () => setModal({ kind: 'shortcuts' })),
       window.marko.onMenu('menu:split-right', () => workspace.splitFocused('horizontal')),
       window.marko.onMenu('menu:split-down', () => workspace.splitFocused('vertical')),
-      window.marko.onMenu('menu:close-pane', () => workspace.closePane(workspace.getState().focusedLeafId)),
+      window.marko.onMenu('menu:close-pane', () => workspace.closePane(workspace.getFocusedLeaf().id)),
       window.marko.onMenu('menu:cycle-layout', () => workspace.cycleLayout()),
+      window.marko.onMenu('menu:new-session', () => workspace.newSession()),
+      window.marko.onMenu('menu:close-session', () => {
+        const id = workspace.getState().activeSessionId;
+        workspace.closeSession(id);
+      }),
+      window.marko.onMenu('menu:next-session', () => workspace.cycleSession(1)),
+      window.marko.onMenu('menu:prev-session', () => workspace.cycleSession(-1)),
+      window.marko.onMenu('menu:reset-workspace', () => {
+        const ok = window.confirm(
+          'Reset workspace?\n\nThis closes all open tabs and removes every session. ' +
+            'Your saved files, settings, and recent-files list are NOT touched.',
+        );
+        if (ok) void resetWorkspaceAndReload();
+      }),
       window.marko.onMenu('menu:focus-pane-next', () => {
         const s = workspace.getState();
-        const leaves = getAllLeaves(s.root);
+        const session = getActiveSession(s);
+        const leaves = getAllLeaves(session.root);
         if (leaves.length < 2) return;
-        const idx = leaves.findIndex((l) => l.id === s.focusedLeafId);
+        const idx = leaves.findIndex((l) => l.id === session.focusedLeafId);
         const next = (idx + 1) % leaves.length;
         workspace.setFocusedPane(leaves[next].id);
       }),
       window.marko.onMenu('menu:focus-pane-prev', () => {
         const s = workspace.getState();
-        const leaves = getAllLeaves(s.root);
+        const session = getActiveSession(s);
+        const leaves = getAllLeaves(session.root);
         if (leaves.length < 2) return;
-        const idx = leaves.findIndex((l) => l.id === s.focusedLeafId);
+        const idx = leaves.findIndex((l) => l.id === session.focusedLeafId);
         const prev = (idx - 1 + leaves.length) % leaves.length;
         workspace.setFocusedPane(leaves[prev].id);
       }),
@@ -112,13 +130,25 @@ export function App() {
 
   return (
     <div className="app">
-      <div className="titlebar" />
+      <div className="titlebar">
+        <NowPlaying />
+      </div>
+      <SessionStrip />
       <div className="app-body">
         <aside className={`sidebar ${sidebarVisible ? '' : 'sidebar--hidden'}`}>
           <Sidebar />
         </aside>
         <div className="panes">
-          <PaneNode node={root} />
+          {sessions.map((session) => (
+            <div
+              key={session.id}
+              className="session-stack"
+              data-session-id={session.id}
+              style={{ display: session.id === activeSessionId ? 'flex' : 'none' }}
+            >
+              <PaneNode node={session.root} sessionId={session.id} />
+            </div>
+          ))}
         </div>
         {outlineVisible && (
           <aside className="outline">
@@ -132,7 +162,6 @@ export function App() {
         replace={modal?.kind === 'palette' ? modal.replace : false}
         onClose={close}
       />
-      <ProcessViewer open={modal?.kind === 'procViewer'} onClose={close} />
       <NewFilePicker open={modal?.kind === 'newFile'} onClose={close} />
       <PathInput
         open={modal?.kind === 'path'}

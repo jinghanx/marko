@@ -8,6 +8,10 @@
   --text: #1f1f1e;
   --text-muted: #6b6b67;
   --accent: #2d6cdf;
+  /* Distinct accent for the session strip so it visually contrasts with the
+   *  per-pane file tab accent (which uses --accent). Not theme-overridden —
+   *  this orange reads cleanly in both light and dark modes. */
+  --session-accent: #d97757;
   --tab-bg: #f3f3f1;
   --tab-active-bg: #ffffff;
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
@@ -127,13 +131,230 @@ button {
   overflow: hidden;
 }
 
+/* Top-level error boundary — replaces the React tree when something throws
+ *  during render so the user sees an actionable message instead of a blank
+ *  window. */
+.errorboundary {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 1000;
+  padding: 24px;
+}
+.errorboundary-card {
+  max-width: 720px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 24px;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+.errorboundary-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.errorboundary-msg {
+  color: #d1383b;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.errorboundary-stack {
+  background: var(--bg-muted);
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  overflow: auto;
+  max-height: 320px;
+  white-space: pre-wrap;
+  margin-bottom: 16px;
+}
+.errorboundary-actions {
+  display: flex;
+  gap: 8px;
+}
+.errorboundary-btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.errorboundary-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+}
+
 .titlebar {
   height: var(--titlebar-h);
   flex: 0 0 auto;
   background: var(--bg);
   -webkit-app-region: drag;
   border-bottom: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  /* Leave space for the macOS traffic-light buttons on the left. */
+  padding: 0 12px 0 84px;
+  gap: 8px;
 }
+
+/* Now-playing pill(s) live in the titlebar's right side. The titlebar is
+ *  itself a drag region; we re-enable clicks for the pills. */
+.now-playing {
+  display: flex;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}
+.now-playing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  cursor: pointer;
+  max-width: 240px;
+  user-select: none;
+}
+.now-playing-pill:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg));
+}
+.now-playing-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.now-playing-bars {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+/* Animated bars to convey "live" — three bars bouncing out of phase. */
+.np-bar {
+  fill: currentColor;
+  transform-origin: center;
+  animation: np-bounce 1s infinite ease-in-out;
+}
+.np-bar--1 { animation-delay: -0.2s; }
+.np-bar--2 { animation-delay: -0.4s; }
+.np-bar--3 { animation-delay: -0.6s; }
+@keyframes np-bounce {
+  0%, 100% { transform: scaleY(0.55); }
+  50% { transform: scaleY(1.05); }
+}
+
+/* Session strip — top-level tab bar for tmux-style sessions. */
+.session-strip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-muted);
+  border-bottom: 1px solid var(--border);
+  padding: 0 6px 0 0;
+  height: 30px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-app-region: no-drag;
+}
+.session-strip::-webkit-scrollbar { display: none; }
+
+.session-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  border-right: 1px solid var(--border);
+  min-width: 80px;
+  max-width: 200px;
+}
+.session-tab:hover { color: var(--text); }
+.session-tab--active {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  position: relative;
+}
+.session-tab--active::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--session-accent);
+}
+.session-tab-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.session-tab-close {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+}
+.session-tab-close:hover {
+  background: var(--border);
+  color: var(--text);
+}
+.session-tab-rename {
+  flex: 1;
+  font-family: inherit;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 6px;
+  outline: none;
+  min-width: 0;
+}
+.session-tab-new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  font-size: 14px;
+  color: var(--text-muted);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.session-tab-new:hover { color: var(--text); }
+
+/* Drag-reorder feedback for session tabs. The dragged tab dims; the drop
+ *  position is shown by an orange bar on the closest edge of the hover target. */
+.session-tab--dragging { opacity: 0.4; }
+.session-tab--drop-before { box-shadow: inset 2px 0 0 var(--session-accent); }
+.session-tab--drop-after { box-shadow: inset -2px 0 0 var(--session-accent); }
 
 .app-body {
   flex: 1;
@@ -507,6 +728,16 @@ button {
   min-width: 0;
   min-height: 0;
 }
+/* One stack per session. All sessions stay mounted (so <webview> media keeps
+ *  playing, terminals don't reset, etc.); only the active one is shown via
+ *  inline style. Inactive stacks have display:none — no layout cost, but DOM
+ *  is preserved. */
+.session-stack {
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 .split {
   flex: 1;
   display: flex;
@@ -521,6 +752,12 @@ button {
 }
 
 .pane {
+  /* Both `flex: 1` and `height: 100%` so the pane fills both flex parents
+   *  (split-child / session-stack are flex columns) and any non-flex
+   *  ancestor. Without `flex: 1`, an empty leaf with no tabs collapsed to
+   *  zero height because `.welcome` has no intrinsic height when nothing
+   *  forces stretch in the flex column. */
+  flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -601,8 +838,21 @@ button {
 .tab-icon--markdown { color: #d97757; }
 .tab-icon--code { color: #6c7da6; }
 .tab-icon--image { color: #c25aa3; }
+.tab-icon--media { color: #b06ed1; }
+.tab-icon--pdf { color: #d1383b; }
+.tab-icon--csv { color: #3a8b56; }
+.tab-icon--json { color: #d4a300; }
+.tab-icon--diff { color: #6c7da6; }
 .tab-icon--binary { color: var(--text-muted); }
 .tab-icon--terminal { color: #4caf6d; }
+.tab-icon--process { color: #c25aa3; }
+.tab-icon--git { color: #f0883e; }
+.tab-icon--excalidraw { color: #6c63ff; }
+
+/* Drag-reorder feedback for file tabs. */
+.tab--dragging { opacity: 0.4; }
+.tab--drop-before { box-shadow: inset 2px 0 0 var(--accent); }
+.tab--drop-after { box-shadow: inset -2px 0 0 var(--accent); }
 
 .tab--terminal {
   background: color-mix(in srgb, #4caf6d 8%, transparent);
@@ -1262,6 +1512,21 @@ button {
   color: var(--text-muted);
   font-size: 13px;
 }
+.palette-section {
+  padding: 8px 16px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  background: var(--bg-muted);
+}
+/* First section header sits flush with the input — no top border or extra bg. */
+.palette-results > div:first-child > .palette-section:first-child {
+  border-top: 0;
+  background: transparent;
+}
 .palette-row {
   padding: 6px 16px;
   display: flex;
@@ -1322,6 +1587,14 @@ button {
   font-size: 10px;
   color: var(--text-muted);
   margin-left: 6px;
+}
+.pathinput-suggestions {
+  max-height: 280px;
+  border-top: 1px solid var(--border);
+}
+.pathinput-suggestion .palette-row-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
 }
 .pathinput-hint code {
   background: var(--bg-muted);
@@ -1385,7 +1658,15 @@ button {
   color: var(--text-muted);
 }
 
-/* Process viewer (⌘Y) — htop terminal aesthetic, theme-aware */
+/* Process viewer (⌘Y) — htop terminal aesthetic, theme-aware. Lives as a
+ *  tab kind ('process') so it fills the pane instead of overlaying the app. */
+.procviewer-pane {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
 .procviewer {
   /* Map terminal tokens onto the app's current theme. Bar/state colors are
      deliberately vivid in both light and dark modes (the htop palette). */
@@ -1403,15 +1684,15 @@ button {
   --tt-blue: #2d6cdf;
   --tt-on-accent: #0d1117; /* dark text on bright green/cyan accent bgs */
 
-  width: min(1080px, calc(100% - 48px));
-  max-height: calc(100vh - 80px);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   font-family: var(--font-mono);
   background: var(--tt-bg);
   color: var(--tt-fg);
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.28);
 }
 
 :root[data-theme='dark'] .procviewer,
@@ -1580,6 +1861,9 @@ button {
   color: var(--tt-fg);
   font-feature-settings: "tnum" 1;
   padding: 4px 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .proc-row {
   border: 0;
@@ -1883,6 +2167,12 @@ button {
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
 }
+.folder-icon-slider {
+  width: 100px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+  cursor: ew-resize;
+}
 
 .folder-sort {
   position: relative;
@@ -1969,7 +2259,12 @@ button {
   overflow-y: auto;
   padding: 18px 24px 28px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  /* Column width tracks the icon size with a fixed label gutter on each side
+   *  (so names wrap consistently as the slider moves). */
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(calc(var(--folder-icon-size, 72px) + 36px), 1fr)
+  );
   gap: 8px 4px;
   align-content: start;
 }
@@ -2029,6 +2324,13 @@ button {
 .folder-item--cut {
   opacity: 0.45;
 }
+/* Drop target while another folder item is being dragged over this one. */
+.folder-item--drop-target,
+.folder-item--drop-target:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 .folder-grid:focus { outline: none; }
 .folder-drag-rect {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
@@ -2037,25 +2339,25 @@ button {
   z-index: 50;
 }
 .folder-item-icon {
-  width: 72px;
-  height: 72px;
+  width: var(--folder-icon-size, 72px);
+  height: var(--folder-icon-size, 72px);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent);
 }
+/* Inline width/height attrs on the SVG would otherwise pin it at 56px — let
+ *  the container drive scaling so the SVG grows with the slider. */
+.folder-item-icon > svg {
+  width: 80%;
+  height: 80%;
+}
 .folder-item-thumb {
-  width: 72px;
-  height: 72px;
+  width: var(--folder-icon-size, 72px);
+  height: var(--folder-icon-size, 72px);
   border-radius: 6px;
   overflow: hidden;
-  background:
-    linear-gradient(45deg, var(--bg-muted) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--bg-muted) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--bg-muted) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--bg-muted) 75%);
-  background-size: 12px 12px;
-  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  background: var(--bg-muted);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -2071,7 +2373,7 @@ button {
   color: var(--text-muted);
 }
 .folder-item-name {
-  font-size: 12px;
+  font-size: clamp(10px, calc(var(--folder-icon-size, 72px) / 6), 14px);
   line-height: 1.3;
   word-break: break-word;
   max-width: 100%;
@@ -2131,14 +2433,995 @@ button {
   min-height: 0;
   position: relative;
   overflow: auto;
-  background:
-    linear-gradient(45deg, var(--bg-muted) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--bg-muted) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--bg-muted) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--bg-muted) 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  background: var(--bg-muted);
 }
+
+/* CSV / TSV table viewer */
+.csv-viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  position: relative;
+}
+.csv-table-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.csv-raw-pane {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.csv-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.csv-split-pane { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.csv-split-pane--table { border-left: 1px solid var(--border); }
+.csv-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.csv-meta { font-variant-numeric: tabular-nums; }
+.csv-kind {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  font-size: 10.5px;
+}
+.csv-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.csv-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.csv-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.csv-th {
+  background: var(--bg-muted);
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-strong);
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.csv-th--sorted { color: var(--accent); }
+.csv-th--num {
+  width: 48px;
+  cursor: default;
+  background: var(--bg-muted);
+}
+.csv-th-name { margin-right: 4px; }
+.csv-sort-arrow { font-size: 9px; opacity: 0.85; }
+.csv-num {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  text-align: right;
+  padding: 4px 12px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  left: 0;
+  font-size: 11px;
+}
+.csv-cell {
+  padding: 4px 12px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.csv-table tbody tr:nth-child(even) td { background: var(--bg-muted); }
+.csv-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+}
+
+/* JSON viewer */
+.json-viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  position: relative;
+}
+.json-tree-pane {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.json-tree-pane--error {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #d1383b;
+}
+.json-tree-error-tag {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+.json-tree-error-msg { color: var(--text); }
+.json-row { padding-left: 0; }
+.json-row--container { display: flex; flex-wrap: wrap; align-items: flex-start; }
+.json-toggle {
+  display: inline-block;
+  width: 14px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-muted);
+}
+.json-toggle:hover { color: var(--accent); }
+.json-key { color: var(--text-muted); }
+.json-string { color: #2ea043; }
+.json-number { color: #2d6cdf; }
+.json-bool { color: #d97757; }
+.json-null { color: #9ca3a3; font-style: italic; }
+.json-bracket { color: var(--text-muted); }
+.json-bracket--close { display: inline-block; margin-top: 0; }
+.json-summary {
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0 4px;
+}
+.json-children {
+  flex: 1 1 100%;
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
+  margin-left: 4px;
+}
+.json-raw-pane {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.json-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.json-split-pane { flex: 1; min-width: 0; min-height: 0; position: relative; }
+.json-split-pane--tree { border-left: 1px solid var(--border); }
+
+/* Diff viewer */
+.diff-viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.diff-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.diff-side {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diff-side--left {
+  background: color-mix(in srgb, #d1383b 8%, var(--bg-muted));
+  border-right: 1px solid var(--border);
+}
+.diff-side--right {
+  background: color-mix(in srgb, #2ea043 8%, var(--bg-muted));
+}
+.diff-side-marker {
+  font-weight: 700;
+  color: var(--text);
+}
+.diff-side--left .diff-side-marker { color: #d1383b; }
+.diff-side--right .diff-side-marker { color: #2ea043; }
+.diff-error {
+  padding: 12px 14px;
+  color: #d1383b;
+  font-size: 12px;
+}
+.diff-loading {
+  padding: 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.diff-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.diff-line {
+  display: grid;
+  grid-template-columns: 56px 56px 18px 1fr;
+  align-items: baseline;
+  white-space: pre;
+}
+.diff-line--added { background: color-mix(in srgb, #2ea043 14%, transparent); }
+.diff-line--removed { background: color-mix(in srgb, #d1383b 14%, transparent); }
+.diff-num {
+  color: var(--text-muted);
+  text-align: right;
+  padding: 0 8px;
+  user-select: none;
+  border-right: 1px solid var(--border);
+}
+.diff-marker {
+  text-align: center;
+  font-weight: 700;
+  user-select: none;
+}
+.diff-line--added .diff-marker { color: #2ea043; }
+.diff-line--removed .diff-marker { color: #d1383b; }
+.diff-text {
+  padding-left: 8px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Git tab — status / diff / stage / commit. Single-pane layout: toolbar at
+ *  top, two-column body (file list + diff), commit footer at bottom. */
+.git-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12.5px;
+}
+.git-view--empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
+}
+.git-empty-title { font-size: 14px; color: var(--text); margin-bottom: 6px; }
+.git-empty-sub { font-family: var(--font-mono); font-size: 11.5px; }
+.git-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+  gap: 12px;
+}
+.git-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+  min-width: 0;
+}
+.git-branch strong { font-weight: 600; }
+.git-tracking { color: var(--text-muted); }
+.git-ahead-behind {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 4px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.git-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Status / History view-mode toggle. */
+.git-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.git-view-btn {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 3px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.git-view-btn:hover { color: var(--text); }
+.git-view-btn--active {
+  background: var(--accent);
+  color: #fff;
+}
+.git-busy { font-size: 11px; color: var(--text-muted); }
+.git-btn {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: background-color 0.08s, border-color 0.08s;
+}
+.git-btn:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-strong));
+}
+.git-btn:active { transform: translateY(0.5px); }
+.git-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+.git-btn:disabled:hover {
+  background: var(--bg);
+  border-color: var(--border-strong);
+}
+/* Icon-only variant for the refresh glyph — keeps a square hit target. */
+.git-btn--icon {
+  width: 24px;
+  padding: 0;
+  font-size: 14px;
+}
+.git-error {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  background: color-mix(in srgb, #d1383b 10%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, #d1383b 30%, var(--border));
+  color: #d1383b;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+}
+.git-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.git-list {
+  width: 320px;
+  flex: 0 0 auto;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+.git-clean {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.git-section {
+  border-bottom: 1px solid var(--border);
+}
+.git-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-muted);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--text-muted);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.git-section-title { flex: 0 0 auto; }
+.git-section-count {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 10px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.git-section-action {
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0 2px;
+}
+.git-section-action:hover { text-decoration: underline; }
+.git-section-action--danger { color: #d1383b; }
+.git-section-action--danger:hover { color: #d1383b; }
+.git-section-files { padding: 2px 0; }
+.git-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.git-file:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.git-file--active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.git-file-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.git-file-name {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-file-dir {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  /* Right-truncate so the trailing path segment (closest to the file) stays
+   *  visible. We flip with direction:rtl + bidi unicode embedding so the text
+   *  itself reads left-to-right but ellipsis falls on the LEFT. */
+  direction: rtl;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+.git-file-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+  opacity: 0;
+}
+.git-file:hover .git-file-actions,
+.git-file--active .git-file-actions,
+.git-branch-row:hover .git-branch-actions,
+.git-stash:hover .git-branch-actions,
+.git-tag-row:hover .git-branch-actions {
+  opacity: 1;
+}
+.git-branch-actions { opacity: 0; transition: opacity 0.1s; }
+.git-branch-row--current .git-branch-actions { opacity: 0 !important; }
+.git-file-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.git-file-btn:hover { background: color-mix(in srgb, var(--accent) 14%, var(--bg)); }
+.git-file-btn--danger:hover {
+  background: color-mix(in srgb, #d1383b 18%, var(--bg));
+  border-color: #d1383b;
+  color: #d1383b;
+}
+.git-badge {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+}
+.git-badge--modified { background: color-mix(in srgb, #d4a300 30%, transparent); color: #b88200; }
+.git-badge--added { background: color-mix(in srgb, #2ea043 30%, transparent); color: #2ea043; }
+.git-badge--deleted { background: color-mix(in srgb, #d1383b 30%, transparent); color: #d1383b; }
+.git-badge--renamed { background: color-mix(in srgb, #2d6cdf 30%, transparent); color: #2d6cdf; }
+.git-badge--untracked { background: color-mix(in srgb, var(--text-muted) 30%, transparent); color: var(--text-muted); }
+.git-badge--other { background: var(--bg-muted); color: var(--text-muted); }
+
+.git-diff-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.git-diff-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.git-diff-tag {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  font-size: 10px;
+}
+.git-diff-path {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.git-diff-placeholder,
+.git-diff-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.git-diff-pre {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 0;
+  background: var(--bg);
+}
+.git-diff-line {
+  padding: 0 14px;
+  white-space: pre;
+  color: var(--text);
+}
+.git-diff-line--added { background: color-mix(in srgb, #2ea043 14%, transparent); }
+.git-diff-line--removed { background: color-mix(in srgb, #d1383b 14%, transparent); }
+.git-diff-line--hunk { color: #2d6cdf; background: color-mix(in srgb, #2d6cdf 8%, transparent); }
+.git-diff-line--meta { color: var(--text-muted); }
+
+/* Diff lines: clickable change lines for line-level staging. */
+.git-diff-line--clickable {
+  cursor: pointer;
+}
+.git-diff-line--clickable:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+/* Selected: opaque accent-tinted bg (mixed against page bg, not transparent)
+ *  so the +/- green/red row tint doesn't bleed through. The leading +/- char
+ *  is still visible in the line text, which is enough to convey direction. */
+.git-diff-line--selected,
+.git-diff-line--added.git-diff-line--selected,
+.git-diff-line--removed.git-diff-line--selected {
+  background: color-mix(in srgb, var(--accent) 28%, var(--bg)) !important;
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--text);
+}
+
+/* Hunk-level actions in the diff pane. */
+.git-hunk {
+  border-top: 1px solid var(--border);
+}
+.git-hunk:first-child { border-top: 0; }
+.git-hunk-header-row {
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, #2d6cdf 8%, transparent);
+}
+.git-hunk-header {
+  flex: 1;
+  min-width: 0;
+  background: transparent !important;
+}
+.git-hunk-actions {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.git-hunk:hover .git-hunk-actions { opacity: 1; }
+.git-hunk-btn {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.git-hunk-btn:hover { background: color-mix(in srgb, var(--accent) 14%, var(--bg)); }
+.git-hunk-btn--danger:hover {
+  background: color-mix(in srgb, #d1383b 18%, var(--bg));
+  border-color: #d1383b;
+  color: #d1383b;
+}
+
+/* Branch & stash sections in the sidebar. */
+.git-section-header--toggle { cursor: pointer; }
+.git-section-arrow {
+  font-size: 8px;
+  color: var(--text-muted);
+  margin-right: 2px;
+  user-select: none;
+}
+.git-branch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  position: relative;
+}
+.git-branch-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.git-branch-row--current {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.git-branch-marker {
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+  color: var(--accent);
+  font-size: 10px;
+}
+.git-branch-row--current .git-branch-marker { color: #2ea043; }
+.git-branch-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-branch-actions {
+  position: relative;
+  flex: 0 0 auto;
+}
+.git-branch-menu {
+  position: absolute;
+  right: 0;
+  top: 22px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.git-branch-menu-item {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 6px 12px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.git-branch-menu-item:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.git-stash {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text);
+}
+.git-stash:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.git-stash-msg {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.git-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.git-tag-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.git-tag-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* History view: commit list (left) + commit diff (right). */
+.git-history-list {
+  width: 380px;
+}
+.git-commit-row {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.git-commit-row:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.git-commit-row--active,
+.git-commit-row--active:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.git-commit-row-line1 {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+.git-commit-hash {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  background: var(--bg-muted);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.git-commit-subject {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-size: 12.5px;
+}
+.git-commit-row-line2 {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.git-commit-author {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-commit-date {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.git-commit-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.git-commit {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-muted);
+}
+.git-commit-msg {
+  flex: 1;
+  min-height: 36px;
+  resize: vertical;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.git-commit-msg:focus { border-color: var(--accent); }
+.git-commit-btn {
+  flex: 0 0 auto;
+  align-self: stretch;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+.git-commit-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 90%, black);
+}
+.git-commit-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Excalidraw whiteboard tab — the library renders its own toolbar/canvas;
+ *  we just give it a flex container that fills the pane. */
+.excalidraw-pane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+.excalidraw-pane .excalidraw {
+  height: 100%;
+}
+
+/* PDF viewer — Chromium's built-in PDF plugin renders inside the embed. */
+.pdf-viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.pdf-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.pdf-name {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pdf-kind {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+.pdf-canvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.pdf-canvas embed {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* Media (audio/video) viewer */
+.media-viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.media-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.media-name {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.media-kind {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+.media-canvas {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #000;
+}
+.media-viewer--audio .media-canvas {
+  background: var(--bg-muted);
+  padding: 40px 24px;
+}
+.media-canvas video {
+  max-width: 100%;
+  max-height: 100%;
+  outline: none;
+}
+.media-canvas audio {
+  width: min(640px, 100%);
+}
+
 .image-canvas img {
   display: block;
   user-select: none;

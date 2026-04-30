@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Crepe } from '@milkdown/crepe';
 import { editorViewCtx } from '@milkdown/kit/core';
-import { workspace, useWorkspace, findLeaf } from '../state/workspace';
+import { workspace, useWorkspace, findLeaf, getActiveSession } from '../state/workspace';
 import { attachBlockDragPreview } from '../lib/blockDragPreview';
 import { installSlashMenuFix } from '../lib/slashMenuFix';
 
@@ -85,7 +85,8 @@ export function CrepeEditor({ tabId, initialValue }: Props) {
 
   const focusToken = useWorkspace((s) => s.focusToken);
   const isActive = useWorkspace((s) => {
-    const focused = findLeaf(s.root, s.focusedLeafId);
+    const session = getActiveSession(s);
+    const focused = findLeaf(session.root, session.focusedLeafId);
     return focused?.activeTabId === tabId;
   });
   const seenToken = useRef(focusToken);

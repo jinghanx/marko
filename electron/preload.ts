@@ -70,6 +70,72 @@ const api = {
     ipcRenderer.invoke('ps:kill', pid, signal),
   systemStats: (): Promise<SystemStats> => ipcRenderer.invoke('system:stats'),
 
+  // ---------- Persisted workspace state (~/.marko/state.json) ----------
+  stateRead: (): Promise<string | null> => ipcRenderer.invoke('state:read'),
+  stateWrite: (json: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('state:write', json),
+  stateReset: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('state:reset'),
+
+  /** Native rich confirm dialog (formats long content properly). */
+  confirm: (opts: {
+    message: string;
+    detail?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    dangerous?: boolean;
+  }): Promise<boolean> => ipcRenderer.invoke('app:confirm', opts),
+
+  // ---------- Git ----------
+  gitStatus: (repoDir: string) => ipcRenderer.invoke('git:status', repoDir),
+  gitDiff: (repoDir: string, relPath: string, staged: boolean) =>
+    ipcRenderer.invoke('git:diff', repoDir, relPath, staged),
+  gitStage: (repoDir: string, paths: string[]) =>
+    ipcRenderer.invoke('git:stage', repoDir, paths),
+  gitUnstage: (repoDir: string, paths: string[]) =>
+    ipcRenderer.invoke('git:unstage', repoDir, paths),
+  gitDiscard: (repoDir: string, paths: string[]) =>
+    ipcRenderer.invoke('git:discard', repoDir, paths),
+  gitCommit: (repoDir: string, message: string) =>
+    ipcRenderer.invoke('git:commit', repoDir, message),
+  gitBranches: (repoDir: string) => ipcRenderer.invoke('git:branches', repoDir),
+  gitCheckout: (repoDir: string, branch: string) =>
+    ipcRenderer.invoke('git:checkout', repoDir, branch),
+  gitRebase: (repoDir: string, target: string) =>
+    ipcRenderer.invoke('git:rebase', repoDir, target),
+  gitMerge: (repoDir: string, target: string) =>
+    ipcRenderer.invoke('git:merge', repoDir, target),
+  gitFetch: (repoDir: string) => ipcRenderer.invoke('git:fetch', repoDir),
+  gitPull: (repoDir: string) => ipcRenderer.invoke('git:pull', repoDir),
+  gitPush: (repoDir: string) => ipcRenderer.invoke('git:push', repoDir),
+  gitStashList: (repoDir: string) => ipcRenderer.invoke('git:stashList', repoDir),
+  gitStashSave: (repoDir: string, message: string) =>
+    ipcRenderer.invoke('git:stashSave', repoDir, message),
+  gitStashApply: (repoDir: string, ref: string) =>
+    ipcRenderer.invoke('git:stashApply', repoDir, ref),
+  gitStashPop: (repoDir: string, ref: string) =>
+    ipcRenderer.invoke('git:stashPop', repoDir, ref),
+  gitStashDrop: (repoDir: string, ref: string) =>
+    ipcRenderer.invoke('git:stashDrop', repoDir, ref),
+  gitStashClear: (repoDir: string) => ipcRenderer.invoke('git:stashClear', repoDir),
+  gitDeleteBranch: (repoDir: string, name: string) =>
+    ipcRenderer.invoke('git:deleteBranch', repoDir, name),
+  gitApplyPatch: (
+    repoDir: string,
+    patch: string,
+    opts: { cached?: boolean; reverse?: boolean },
+  ) => ipcRenderer.invoke('git:applyPatch', repoDir, patch, opts),
+  gitLog: (repoDir: string, opts?: { limit?: number; ref?: string }) =>
+    ipcRenderer.invoke('git:log', repoDir, opts ?? {}),
+  gitShow: (repoDir: string, hash: string) =>
+    ipcRenderer.invoke('git:show', repoDir, hash),
+  gitCherryPick: (repoDir: string, hash: string) =>
+    ipcRenderer.invoke('git:cherryPick', repoDir, hash),
+  gitTags: (repoDir: string) => ipcRenderer.invoke('git:tags', repoDir),
+  gitCreateTag: (repoDir: string, name: string, message: string) =>
+    ipcRenderer.invoke('git:createTag', repoDir, name, message),
+  gitDeleteTag: (repoDir: string, name: string) =>
+    ipcRenderer.invoke('git:deleteTag', repoDir, name),
+
   onMenu: (channel: string, handler: () => void) => {
     const listener = () => handler();
     ipcRenderer.on(channel, listener);

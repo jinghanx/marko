@@ -32,9 +32,15 @@ export interface Settings {
   maxContentWidth: number; // 0 = no cap
   vimMode: boolean;
   folderSort: FolderSort;
+  /** Icon size for the finder/folder grid, in px (square). */
+  folderIconSize: number;
   showHiddenFiles: boolean;
   workspaceBookmarks: WorkspaceBookmark[];
+  /** Most-recently-opened file paths, newest first. Capped at MAX_RECENT_FILES. */
+  recentFiles: string[];
 }
+
+export const MAX_RECENT_FILES = 30;
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
@@ -48,8 +54,10 @@ export const DEFAULT_SETTINGS: Settings = {
   maxContentWidth: 0,
   vimMode: false,
   folderSort: { key: 'name', direction: 'asc', foldersFirst: true },
+  folderIconSize: 72,
   showHiddenFiles: false,
   workspaceBookmarks: [],
+  recentFiles: [],
 };
 
 const STORAGE_KEY = 'marko:settings';
@@ -102,6 +110,7 @@ function applyToDom(s: Settings) {
   root.style.setProperty('--font-mono', s.codeFont);
   root.style.setProperty('--editor-font-size', `${s.fontSize}px`);
   root.style.setProperty('--editor-max-width', s.maxContentWidth > 0 ? `${s.maxContentWidth}px` : 'none');
+  root.style.setProperty('--folder-icon-size', `${s.folderIconSize}px`);
   applyEditorTheme(s.editorTheme, s.theme);
 }
 
@@ -129,6 +138,18 @@ export const settings = {
     state = DEFAULT_SETTINGS;
     persist(state);
     applyToDom(state);
+    listeners.forEach((fn) => fn());
+  },
+
+  /** Move `filePath` to the front of recentFiles (deduped, capped). */
+  pushRecentFile(filePath: string) {
+    if (!filePath) return;
+    const next = [filePath, ...state.recentFiles.filter((p) => p !== filePath)].slice(
+      0,
+      MAX_RECENT_FILES,
+    );
+    state = { ...state, recentFiles: next };
+    persist(state);
     listeners.forEach((fn) => fn());
   },
 

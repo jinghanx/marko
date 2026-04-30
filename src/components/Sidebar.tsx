@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useWorkspace, workspace } from '../state/workspace';
+import { useWorkspace, workspace, getActiveSession } from '../state/workspace';
 import { openFolderViaDialog, openFileFromPath, openFolderInEditor } from '../lib/actions';
 import { settings, useSettings } from '../state/settings';
 import type { DirEntry } from '../types/marko';
@@ -27,7 +27,7 @@ interface VisibleNode {
 const ROW_HEIGHT = 24;
 
 export function Sidebar() {
-  const rootDir = useWorkspace((s) => s.rootDir);
+  const rootDir = useWorkspace((s) => getActiveSession(s).rootDir);
   const revealPath = useWorkspace((s) => s.revealPath);
   const revealToken = useWorkspace((s) => s.revealToken);
   const showHidden = useSettings().showHiddenFiles;

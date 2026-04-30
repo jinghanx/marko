@@ -30,9 +30,17 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
     title: 'Tabs',
     items: [
       { keys: '⌘W', label: 'close tab' },
-      { keys: '⌘⇧W', label: 'close window' },
       { keys: '⌘⇧[', label: 'previous tab' },
       { keys: '⌘⇧]', label: 'next tab' },
+    ],
+  },
+  {
+    title: 'Sessions',
+    items: [
+      { keys: '⌘⌥N', label: 'new session' },
+      { keys: '⌘⇧W', label: 'close session' },
+      { keys: '⌘⇧9', label: 'previous session' },
+      { keys: '⌘⇧0', label: 'next session' },
     ],
   },
   {

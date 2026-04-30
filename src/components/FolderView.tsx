@@ -29,7 +29,18 @@ interface ItemProps {
   onContextMenu: (e: React.MouseEvent) => void;
   selected: boolean;
   cut: boolean;
+  /** True while this folder item is the active drop target. */
+  dropTarget: boolean;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragEnter: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
 }
+
+/** Custom MIME used for in-app drags. We piggyback `text/plain` for compat
+ *  with native drop targets (Finder, terminals) but only consume our own. */
+const MARKO_FILES_MIME = 'application/x-marko-files';
 
 const PREVIEWABLE_IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']);
 
@@ -99,6 +110,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
   const settingsState = useSettings();
   const sort = settingsState.folderSort;
   const showHidden = settingsState.showHiddenFiles;
+  const iconSize = settingsState.folderIconSize;
   const filteredEntries = useMemo(
     () => (entries ? (showHidden ? entries : entries.filter((e) => !e.name.startsWith('.'))) : null),
     [entries, showHidden],
@@ -116,6 +128,13 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
   const [lastClicked, setLastClicked] = useState<string | null>(null);
   const [dragRect, setDragRect] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null);
+  const [bgMenu, setBgMenu] = useState<{ x: number; y: number } | null>(null);
+  /** Path of the directory item currently highlighted as a drop target. */
+  const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  /** Tracks the drag operation's payload for drop handlers — kept in a ref so
+   *  drop targets can read it even when dataTransfer is empty (which Chromium
+   *  enforces during dragover for security). */
+  const dragPayloadRef = useRef<string[]>([]);
   const gridRef = useRef<HTMLDivElement | null>(null);
   // True if a drag-select actually moved (so the trailing click should be ignored).
   const dragHappenedRef = useRef(false);
@@ -147,6 +166,23 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
       document.removeEventListener('keydown', onKey, true);
     };
   }, [menu]);
+
+  // Same behavior for the empty-space (background) menu.
+  useEffect(() => {
+    if (!bgMenu) return;
+    const onMouse = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest('.ctx-menu')) return;
+      setBgMenu(null);
+    };
+    const onKey = () => setBgMenu(null);
+    document.addEventListener('mousedown', onMouse, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onMouse, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [bgMenu]);
 
   const refreshCurrent = async () => {
     try {
@@ -184,6 +220,129 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
       if (r.ok) void refreshCurrent();
       else window.alert(r.error ?? 'trash failed');
     });
+  };
+
+  /** "Compare With…" — picks a second file via the open dialog and opens
+   *  a diff tab against the chosen entry. */
+  const doCompare = async (entry: DirEntry) => {
+    const result = await window.marko.openFileDialog();
+    if (!result) return;
+    if (result.filePath === entry.path) return;
+    workspace.openDiffTab(entry.path, result.filePath);
+  };
+
+  const doNewFolder = async () => {
+    const name = window.prompt('New folder name:', 'New Folder');
+    if (!name) return;
+    const dest = await uniqueDest(currentPath, name);
+    const r = await window.marko.createDir(dest);
+    if (!r.ok) {
+      window.alert(r.error ?? 'create folder failed');
+      return;
+    }
+    await refreshCurrent();
+    setSelected(new Set([dest]));
+    setLastClicked(dest);
+  };
+
+  /** Move the given source paths into `destDir`, holding Option for copy. */
+  const doDropMove = async (sources: string[], destDir: string, copy: boolean) => {
+    for (const src of sources) {
+      const name = src.split('/').pop() ?? src;
+      const dest = await uniqueDest(destDir, name);
+      if (src === dest) continue;
+      // Don't drop a folder into itself or a descendant.
+      if (destDir === src || destDir.startsWith(src + '/')) continue;
+      const r = copy
+        ? await window.marko.copy(src, dest)
+        : await window.marko.rename(src, dest);
+      if (!r.ok) {
+        window.alert(`${copy ? 'copy' : 'move'} failed: ${r.error}`);
+        break;
+      }
+    }
+    await refreshCurrent();
+  };
+
+  const onItemDragStart = (e: React.DragEvent, entry: DirEntry) => {
+    // If dragging an item that isn't part of the current selection, drag just
+    // that one (and replace selection so the visual matches).
+    let paths: string[];
+    if (selected.has(entry.path) && selected.size > 1) {
+      paths = [...selected];
+    } else {
+      paths = [entry.path];
+      setSelected(new Set([entry.path]));
+      setLastClicked(entry.path);
+    }
+    dragPayloadRef.current = paths;
+    try {
+      e.dataTransfer.setData(MARKO_FILES_MIME, JSON.stringify(paths));
+      // Plain text fallback so native targets still see something useful.
+      e.dataTransfer.setData('text/plain', paths.join('\n'));
+    } catch {
+      // ignore
+    }
+    e.dataTransfer.effectAllowed = 'copyMove';
+  };
+
+  const onItemDragEnter = (e: React.DragEvent, entry: DirEntry) => {
+    if (!entry.isDirectory) return;
+    if (dragPayloadRef.current.length === 0) return;
+    // Disallow dropping onto a source path or into a descendant of a source.
+    if (
+      dragPayloadRef.current.some(
+        (src) => entry.path === src || entry.path.startsWith(src + '/'),
+      )
+    ) {
+      return;
+    }
+    e.preventDefault();
+    setDropTargetPath(entry.path);
+  };
+
+  const onItemDragOver = (e: React.DragEvent, entry: DirEntry) => {
+    if (!entry.isDirectory) return;
+    if (dragPayloadRef.current.length === 0) return;
+    if (
+      dragPayloadRef.current.some(
+        (src) => entry.path === src || entry.path.startsWith(src + '/'),
+      )
+    ) {
+      return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+  };
+
+  const onItemDragLeave = (_e: React.DragEvent, entry: DirEntry) => {
+    setDropTargetPath((cur) => (cur === entry.path ? null : cur));
+  };
+
+  const onItemDrop = (e: React.DragEvent, entry: DirEntry) => {
+    if (!entry.isDirectory) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const sources = dragPayloadRef.current;
+    dragPayloadRef.current = [];
+    setDropTargetPath(null);
+    if (sources.length === 0) return;
+    void doDropMove(sources, entry.path, e.altKey);
+  };
+
+  const doNewFile = async () => {
+    const name = window.prompt('New file name:', 'untitled.md');
+    if (!name) return;
+    const dest = await uniqueDest(currentPath, name);
+    const r = await window.marko.createFile(dest);
+    if (!r.ok) {
+      window.alert(r.error ?? 'create file failed');
+      return;
+    }
+    await refreshCurrent();
+    setSelected(new Set([dest]));
+    setLastClicked(dest);
+    void openFileFromPath(dest, { focus: true });
   };
 
   // Reset selection on path change.
@@ -352,11 +511,6 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
   const doTrashSelected = async () => {
     if (selected.size === 0) return;
     const paths = [...selected];
-    const msg =
-      paths.length === 1
-        ? `Move "${paths[0].split('/').pop()}" to Trash?`
-        : `Move ${paths.length} items to Trash?`;
-    if (!window.confirm(msg)) return;
     for (const p of paths) {
       const r = await window.marko.trash(p);
       if (!r.ok) {
@@ -440,6 +594,17 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
         </div>
         <Breadcrumb segments={segments} folderPath={currentPath} onNavigate={navigate} />
         <SortMenu sort={sort} onChange={(s) => settings.update({ folderSort: s })} />
+        <input
+          className="folder-icon-slider"
+          type="range"
+          min={32}
+          max={160}
+          step={4}
+          value={iconSize}
+          onChange={(e) => settings.update({ folderIconSize: parseInt(e.target.value, 10) })}
+          title={`Icon size: ${iconSize}px`}
+          aria-label="Icon size"
+        />
         <span className="folder-count">
           {entries ? `${entries.length} item${entries.length === 1 ? '' : 's'}` : ''}
         </span>
@@ -449,6 +614,20 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
         ref={gridRef}
         tabIndex={0}
         onKeyDown={onGridKeyDown}
+        onDragEnd={() => {
+          dragPayloadRef.current = [];
+          setDropTargetPath(null);
+        }}
+        onContextMenu={(e) => {
+          const target = e.target as Element;
+          // Item right-clicks are handled inline by FolderItem — only fire
+          // the background menu when the target is truly empty space.
+          if (target.closest('.folder-item')) return;
+          e.preventDefault();
+          setSelected(new Set());
+          setLastClicked(null);
+          setBgMenu({ x: e.clientX, y: e.clientY });
+        }}
         onClick={(e) => {
           const target = e.target as Element;
           if (target.closest('.folder-item')) return;
@@ -516,6 +695,12 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
             onContextMenuItem={onItemContextMenu}
             selected={selected}
             cutSet={cutSet}
+            dropTargetPath={dropTargetPath}
+            onItemDragStart={onItemDragStart}
+            onItemDragEnter={onItemDragEnter}
+            onItemDragOver={onItemDragOver}
+            onItemDragLeave={onItemDragLeave}
+            onItemDrop={onItemDrop}
           />
         ))}
         {dragRect && (
@@ -556,7 +741,22 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
           onCopyName={() => void navigator.clipboard.writeText(menu.entry.name)}
           onReveal={() => void window.marko.revealInFinder(menu.entry.path)}
           onRename={() => doRename(menu.entry)}
+          onCompare={() => void doCompare(menu.entry)}
           onTrash={() => doTrash(menu.entry)}
+        />
+      )}
+      {bgMenu && (
+        <FolderBgContextMenu
+          x={bgMenu.x}
+          y={bgMenu.y}
+          canPaste={!!clipboard && clipboard.paths.length > 0}
+          onClose={() => setBgMenu(null)}
+          onNewFile={() => void doNewFile()}
+          onNewFolder={() => void doNewFolder()}
+          onPaste={() => void doPaste()}
+          onReveal={() => void window.marko.revealInFinder(currentPath)}
+          onRefresh={() => void refreshCurrent()}
+          onOpenAsWorkspace={() => workspace.setRootDir(currentPath)}
         />
       )}
     </div>
@@ -599,6 +799,12 @@ function FolderSection({
   onContextMenuItem,
   selected,
   cutSet,
+  dropTargetPath,
+  onItemDragStart,
+  onItemDragEnter,
+  onItemDragOver,
+  onItemDragLeave,
+  onItemDrop,
 }: {
   label: string;
   entries: DirEntry[];
@@ -607,6 +813,12 @@ function FolderSection({
   onContextMenuItem: (e: React.MouseEvent, entry: DirEntry) => void;
   selected: Set<string>;
   cutSet: Set<string>;
+  dropTargetPath: string | null;
+  onItemDragStart: (e: React.DragEvent, entry: DirEntry) => void;
+  onItemDragEnter: (e: React.DragEvent, entry: DirEntry) => void;
+  onItemDragOver: (e: React.DragEvent, entry: DirEntry) => void;
+  onItemDragLeave: (e: React.DragEvent, entry: DirEntry) => void;
+  onItemDrop: (e: React.DragEvent, entry: DirEntry) => void;
 }) {
   return (
     <>
@@ -617,9 +829,15 @@ function FolderSection({
           entry={e}
           selected={selected.has(e.path)}
           cut={cutSet.has(e.path)}
+          dropTarget={dropTargetPath === e.path}
           onClick={(ev) => onClickItem(e, ev)}
           onDoubleClick={() => onDoubleClickItem(e)}
           onContextMenu={(ev) => onContextMenuItem(ev, e)}
+          onDragStart={(ev) => onItemDragStart(ev, e)}
+          onDragEnter={(ev) => onItemDragEnter(ev, e)}
+          onDragOver={(ev) => onItemDragOver(ev, e)}
+          onDragLeave={(ev) => onItemDragLeave(ev, e)}
+          onDrop={(ev) => onItemDrop(ev, e)}
         />
       ))}
     </>
@@ -868,14 +1086,37 @@ function Breadcrumb({
   );
 }
 
-function FolderItem({ entry, onClick, onDoubleClick, onContextMenu, selected, cut }: ItemProps) {
+function FolderItem({
+  entry,
+  onClick,
+  onDoubleClick,
+  onContextMenu,
+  selected,
+  cut,
+  dropTarget,
+  onDragStart,
+  onDragEnter,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}: ItemProps) {
   return (
     <button
       data-path={entry.path}
-      className={`folder-item ${selected ? 'folder-item--selected' : ''} ${cut ? 'folder-item--cut' : ''}`}
+      className={
+        `folder-item${selected ? ' folder-item--selected' : ''}` +
+        (cut ? ' folder-item--cut' : '') +
+        (dropTarget ? ' folder-item--drop-target' : '')
+      }
+      draggable
       onClick={(e) => onClick(e)}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
+      onDragStart={onDragStart}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       title={entry.path}
     >
       <div className="folder-item-icon">
@@ -953,6 +1194,7 @@ function FolderContextMenu({
   onCopyName,
   onReveal,
   onRename,
+  onCompare,
   onTrash,
 }: {
   x: number;
@@ -968,6 +1210,7 @@ function FolderContextMenu({
   onCopyName: () => void;
   onReveal: () => void;
   onRename: () => void;
+  onCompare: () => void;
   onTrash: () => void;
 }) {
   const wrap = (fn: () => void) => () => {
@@ -1012,12 +1255,79 @@ function FolderContextMenu({
       <button className="ctx-menu-item" onClick={wrap(onReveal)}>
         Reveal in Finder
       </button>
+      {!entry.isDirectory && (
+        <button className="ctx-menu-item" onClick={wrap(onCompare)}>
+          Compare With…
+        </button>
+      )}
       <div className="ctx-menu-sep" />
       <button className="ctx-menu-item" onClick={wrap(onRename)}>
         Rename…
       </button>
       <button className="ctx-menu-item ctx-menu-item--danger" onClick={wrap(onTrash)}>
         Move to Trash
+      </button>
+    </div>
+  );
+}
+
+function FolderBgContextMenu({
+  x,
+  y,
+  canPaste,
+  onClose,
+  onNewFile,
+  onNewFolder,
+  onPaste,
+  onReveal,
+  onRefresh,
+  onOpenAsWorkspace,
+}: {
+  x: number;
+  y: number;
+  canPaste: boolean;
+  onClose: () => void;
+  onNewFile: () => void;
+  onNewFolder: () => void;
+  onPaste: () => void;
+  onReveal: () => void;
+  onRefresh: () => void;
+  onOpenAsWorkspace: () => void;
+}) {
+  const wrap = (fn: () => void) => () => {
+    onClose();
+    fn();
+  };
+  return (
+    <div
+      className="ctx-menu"
+      style={{ left: x, top: y }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button className="ctx-menu-item" onClick={wrap(onNewFolder)}>
+        New Folder…
+      </button>
+      <button className="ctx-menu-item" onClick={wrap(onNewFile)}>
+        New File…
+      </button>
+      <div className="ctx-menu-sep" />
+      <button
+        className="ctx-menu-item"
+        onClick={wrap(onPaste)}
+        disabled={!canPaste}
+        style={!canPaste ? { opacity: 0.4, cursor: 'default' } : undefined}
+      >
+        Paste <span className="ctx-menu-kbd">⌘V</span>
+      </button>
+      <div className="ctx-menu-sep" />
+      <button className="ctx-menu-item" onClick={wrap(onRefresh)}>
+        Refresh
+      </button>
+      <button className="ctx-menu-item" onClick={wrap(onReveal)}>
+        Reveal in Finder
+      </button>
+      <button className="ctx-menu-item" onClick={wrap(onOpenAsWorkspace)}>
+        Open as Workspace
       </button>
     </div>
   );

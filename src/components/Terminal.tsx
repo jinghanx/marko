@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { useWorkspace } from '../state/workspace';
+import { useWorkspace, getActiveSession } from '../state/workspace';
 import { useActiveTheme, useSettings } from '../state/settings';
 import { xtermThemeFor } from '../lib/themes';
 import '@xterm/xterm/css/xterm.css';
@@ -15,7 +15,7 @@ export function Terminal({ tabId }: Props) {
   const xtermRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
 
-  const rootDir = useWorkspace((s) => s.rootDir);
+  const rootDir = useWorkspace((s) => getActiveSession(s).rootDir);
   const codeFont = useSettings().codeFont;
   const activeTheme = useActiveTheme();
 

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useWorkspace, findLeaf } from '../state/workspace';
+import { useWorkspace, findLeaf, getActiveSession } from '../state/workspace';
 import { CodeMinimap } from './CodeMinimap';
 import { FolderPreview } from './FolderPreview';
 
@@ -30,7 +30,8 @@ function extractHeadings(markdown: string): Heading[] {
 
 export function Outline() {
   const activeTab = useWorkspace((s) => {
-    const focused = findLeaf(s.root, s.focusedLeafId);
+    const session = getActiveSession(s);
+    const focused = findLeaf(session.root, session.focusedLeafId);
     if (!focused?.activeTabId) return null;
     return s.tabs.find((t) => t.id === focused.activeTabId) ?? null;
   });

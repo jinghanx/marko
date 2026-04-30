@@ -1,7 +1,7 @@
 import { LanguageDescription } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 
-export type FileKind = 'markdown' | 'code' | 'image' | 'binary';
+export type FileKind = 'markdown' | 'code' | 'image' | 'media' | 'pdf' | 'csv' | 'json' | 'excalidraw' | 'binary';
 
 const MARKDOWN_EXT = new Set(['md', 'markdown', 'mdown', 'mkd', 'mdx']);
 
@@ -9,10 +9,11 @@ const IMAGE_EXT = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif', 'tiff',
 ]);
 
+const AUDIO_EXT = new Set(['mp3', 'wav', 'flac', 'ogg', 'oga', 'm4a', 'aac', 'opus']);
+const VIDEO_EXT = new Set(['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'ogv']);
+
 const BINARY_EXT = new Set([
-  'pdf', 'zip', 'tar', 'gz', 'tgz', 'rar', '7z',
-  'mp3', 'wav', 'flac', 'ogg', 'm4a',
-  'mp4', 'mov', 'mkv', 'webm', 'avi',
+  'zip', 'tar', 'gz', 'tgz', 'rar', '7z',
   'exe', 'dll', 'so', 'dylib', 'bin', 'class', 'jar', 'wasm',
   'woff', 'woff2', 'ttf', 'otf', 'eot',
   'sqlite', 'db',
@@ -29,8 +30,23 @@ export function detectKind(path: string): FileKind {
   const ext = getExt(path);
   if (MARKDOWN_EXT.has(ext)) return 'markdown';
   if (IMAGE_EXT.has(ext)) return 'image';
+  if (AUDIO_EXT.has(ext) || VIDEO_EXT.has(ext)) return 'media';
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'csv' || ext === 'tsv') return 'csv';
+  if (ext === 'excalidraw') return 'excalidraw';
+  if (ext === 'json') return 'json';
   if (BINARY_EXT.has(ext)) return 'binary';
   return 'code';
+}
+
+export function isTsvPath(path: string): boolean {
+  return getExt(path) === 'tsv';
+}
+
+/** True if a media path is video (so the viewer renders <video> rather than
+ *  <audio>). Cheap ext check — no IPC. */
+export function isVideoExt(path: string): boolean {
+  return VIDEO_EXT.has(getExt(path));
 }
 
 export function looksBinary(text: string): boolean {

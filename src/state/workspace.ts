@@ -1,6 +1,21 @@
 import { useSyncExternalStore } from 'react';
 
-export type TabKind = 'markdown' | 'code' | 'image' | 'binary' | 'folder' | 'web' | 'terminal';
+export type TabKind =
+  | 'markdown'
+  | 'code'
+  | 'image'
+  | 'media'
+  | 'pdf'
+  | 'csv'
+  | 'json'
+  | 'diff'
+  | 'binary'
+  | 'folder'
+  | 'web'
+  | 'terminal'
+  | 'process'
+  | 'git'
+  | 'excalidraw';
 
 export interface Tab {
   id: string;
@@ -9,8 +24,14 @@ export interface Tab {
   kind: TabKind;
   language?: string;
   ext?: string;
-  /** Markdown tabs only: 'rendered' (Crepe WYSIWYG), 'raw' (CodeMirror), or 'split' (raw + preview). Default 'rendered'. */
-  viewMode?: 'rendered' | 'raw' | 'split';
+  /** Markdown / JSON tabs: which alternate view mode is showing.
+   *   - markdown: 'rendered' (Crepe), 'raw' (CodeMirror), 'split'
+   *   - json: 'tree' (collapsible inspector), 'raw' (CodeMirror), 'split'
+   */
+  viewMode?: 'rendered' | 'raw' | 'split' | 'tree';
+  /** Diff tabs only — paths to the left/right files to compare. */
+  diffLeft?: string;
+  diffRight?: string;
   content: string;
   savedContent: string;
   dirty: boolean;
@@ -44,11 +65,25 @@ export interface FolderSelectionInfo {
   fileCount: number;
 }
 
-interface WorkspaceState {
-  tabs: Tab[];
+/** A "session" is an independent workspace within the same window — its own
+ *  pane tree, its own focused pane, its own remembered active tab per pane.
+ *  Tabs themselves live in the global `tabs` array and can be referenced by
+ *  any session's leaves (so opening the same file in two sessions shares
+ *  one buffer). */
+export interface Session {
+  id: string;
+  name: string;
   root: PaneTree;
   focusedLeafId: string;
+  /** Per-session workspace root directory. Each session is an independent
+   *  task context with its own sidebar / file palette / fuzzy search scope. */
   rootDir: string | null;
+}
+
+interface WorkspaceState {
+  tabs: Tab[];
+  sessions: Session[];
+  activeSessionId: string;
   sidebarVisible: boolean;
   outlineVisible: boolean;
   focusToken: number;
@@ -57,27 +92,42 @@ interface WorkspaceState {
   folderSelection: FolderSelectionInfo | null;
   /** Active layout-cycle session — saved original tree + current step index. */
   layoutCycle: { originalRoot: PaneTree; index: number } | null;
+  /** Tab IDs currently playing audio or video. The title-bar "now playing"
+   *  button reads this; tabs report their own state via `setTabPlaying`. */
+  playingTabIds: string[];
 }
 
 let nextTabId = 1;
 const newTabId = () => `tab-${nextTabId++}`;
 let nextNodeId = 1;
 const newNodeId = (kind: 'leaf' | 'split') => `${kind}-${nextNodeId++}`;
+let nextSessionId = 1;
+const newSessionId = () => `session-${nextSessionId++}`;
 
 const listeners = new Set<() => void>();
 
-const initialLeaf: LeafNode = {
-  kind: 'leaf',
-  id: newNodeId('leaf'),
-  tabIds: [],
-  activeTabId: null,
-};
+function makeFreshSession(name = 'Workspace', rootDir: string | null = null): Session {
+  const leaf: LeafNode = {
+    kind: 'leaf',
+    id: newNodeId('leaf'),
+    tabIds: [],
+    activeTabId: null,
+  };
+  return {
+    id: newSessionId(),
+    name,
+    root: leaf,
+    focusedLeafId: leaf.id,
+    rootDir,
+  };
+}
+
+const initialSession = makeFreshSession();
 
 let state: WorkspaceState = {
   tabs: [],
-  root: initialLeaf,
-  focusedLeafId: initialLeaf.id,
-  rootDir: null,
+  sessions: [initialSession],
+  activeSessionId: initialSession.id,
   sidebarVisible: true,
   outlineVisible: false,
   focusToken: 0,
@@ -85,6 +135,7 @@ let state: WorkspaceState = {
   revealToken: 0,
   folderSelection: null,
   layoutCycle: null,
+  playingTabIds: [],
 };
 
 const setState = (next: Partial<WorkspaceState> | ((prev: WorkspaceState) => Partial<WorkspaceState>)) => {
@@ -97,6 +148,8 @@ const subscribe = (fn: () => void) => {
   listeners.add(fn);
   return () => listeners.delete(fn);
 };
+
+export const subscribeWorkspace = subscribe;
 
 export function useWorkspace<T>(selector: (s: WorkspaceState) => T): T {
   return useSyncExternalStore(subscribe, () => selector(state), () => selector(state));
@@ -270,24 +323,52 @@ function generateLayouts(leaves: LeafNode[]): PaneTree[] {
   ];
 }
 
-// Garbage-collect tabs that are not referenced by any leaf.
+// ---------- Session helpers ----------
+
+/** Get the currently-active session (always exists — initialized in state). */
+export function getActiveSession(s?: WorkspaceState): Session {
+  const st = s ?? state;
+  return st.sessions.find((x) => x.id === st.activeSessionId) ?? st.sessions[0];
+}
+
+/** Update the active session with a partial patch. Returns a new sessions array. */
+function patchActiveSession(prev: WorkspaceState, patch: Partial<Session>): Session[] {
+  return prev.sessions.map((s) =>
+    s.id === prev.activeSessionId ? { ...s, ...patch } : s,
+  );
+}
+
+/** Update a specific session by id. */
+function patchSession(
+  prev: WorkspaceState,
+  sessionId: string,
+  patch: Partial<Session>,
+): Session[] {
+  return prev.sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s));
+}
+
+// Garbage-collect tabs that are not referenced by any session's leaves.
 function gcTabs(s: WorkspaceState): Tab[] {
   const referenced = new Set<string>();
-  for (const leaf of getAllLeaves(s.root)) for (const id of leaf.tabIds) referenced.add(id);
+  for (const session of s.sessions) {
+    for (const leaf of getAllLeaves(session.root)) {
+      for (const id of leaf.tabIds) referenced.add(id);
+    }
+  }
   return s.tabs.filter((t) => referenced.has(t.id));
 }
 
-/** If the focused pane's active tab is a real-fs file/folder under the
- *  current workspace root, request a reveal in the sidebar. */
+/** If the focused pane's active tab in the active session is a real-fs
+ *  file/folder under the active session's root, request a reveal in the sidebar. */
 function revealActiveTabInTree() {
-  const focused = findLeaf(state.root, state.focusedLeafId);
+  const session = getActiveSession();
+  const focused = findLeaf(session.root, session.focusedLeafId);
   if (!focused?.activeTabId) return;
   const tab = state.tabs.find((t) => t.id === focused.activeTabId);
   if (!tab || !tab.filePath || tab.kind === 'web' || tab.kind === 'terminal') return;
-  const root = state.rootDir;
+  const root = session.rootDir;
   if (!root) return;
   if (tab.filePath !== root && !tab.filePath.startsWith(root + '/')) return;
-  // Set revealPath/Token directly to avoid recursive method invocation.
   setState((prev) => ({
     revealPath: tab.filePath,
     revealToken: prev.revealToken + 1,
@@ -300,8 +381,11 @@ export const workspace = {
   getState: () => state,
   setState,
 
+  getActiveSession,
+
   getFocusedLeaf(): LeafNode {
-    return findLeaf(state.root, state.focusedLeafId) ?? getAllLeaves(state.root)[0];
+    const s = getActiveSession();
+    return findLeaf(s.root, s.focusedLeafId) ?? getAllLeaves(s.root)[0];
   },
 
   getActiveTab(): Tab | null {
@@ -322,27 +406,37 @@ export const workspace = {
       savedContent: '',
       dirty: false,
     };
-    setState((prev) => ({
-      tabs: [...prev.tabs, tab],
-      root: mapLeaf(prev.root, prev.focusedLeafId, (l) => ({
-        ...l,
-        tabIds: [...l.tabIds, tab.id],
-        activeTabId: tab.id,
-      })),
-    }));
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      return {
+        tabs: [...prev.tabs, tab],
+        sessions: patchActiveSession(prev, {
+          root: mapLeaf(active.root, active.focusedLeafId, (l) => ({
+            ...l,
+            tabIds: [...l.tabIds, tab.id],
+            activeTabId: tab.id,
+          })),
+        }),
+      };
+    });
     return tab;
   },
 
   openFileTab(filePath: string, content: string, title: string, kind: TabKind = 'markdown'): Tab {
     const existing = state.tabs.find((t) => t.filePath === filePath);
     if (existing) {
-      setState((prev) => ({
-        root: mapLeaf(prev.root, prev.focusedLeafId, (l) => ({
-          ...l,
-          tabIds: l.tabIds.includes(existing.id) ? l.tabIds : [...l.tabIds, existing.id],
-          activeTabId: existing.id,
-        })),
-      }));
+      setState((prev) => {
+        const active = getActiveSession(prev);
+        return {
+          sessions: patchActiveSession(prev, {
+            root: mapLeaf(active.root, active.focusedLeafId, (l) => ({
+              ...l,
+              tabIds: l.tabIds.includes(existing.id) ? l.tabIds : [...l.tabIds, existing.id],
+              activeTabId: existing.id,
+            })),
+          }),
+        };
+      });
       return existing;
     }
     const tab: Tab = {
@@ -354,66 +448,82 @@ export const workspace = {
       savedContent: content,
       dirty: false,
     };
-    setState((prev) => ({
-      tabs: [...prev.tabs, tab],
-      root: mapLeaf(prev.root, prev.focusedLeafId, (l) => ({
-        ...l,
-        tabIds: [...l.tabIds, tab.id],
-        activeTabId: tab.id,
-      })),
-    }));
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      return {
+        tabs: [...prev.tabs, tab],
+        sessions: patchActiveSession(prev, {
+          root: mapLeaf(active.root, active.focusedLeafId, (l) => ({
+            ...l,
+            tabIds: [...l.tabIds, tab.id],
+            activeTabId: tab.id,
+          })),
+        }),
+      };
+    });
     return tab;
   },
 
   setActiveTab(id: string) {
     setState((prev) => {
-      const leaf = findLeafByTabId(prev.root, id);
+      const active = getActiveSession(prev);
+      const leaf = findLeafByTabId(active.root, id);
       if (!leaf) return prev;
-      const root = mapLeaf(prev.root, leaf.id, (l) => ({ ...l, activeTabId: id }));
-      return { root, focusedLeafId: leaf.id, focusToken: prev.focusToken + 1 };
-    });
-    revealActiveTabInTree();
-  },
-
-  setFocusedPane(leafId: string) {
-    setState((prev) =>
-      findLeaf(prev.root, leafId)
-        ? { focusedLeafId: leafId, focusToken: prev.focusToken + 1 }
-        : prev,
-    );
-    revealActiveTabInTree();
-  },
-
-  cycleTab(delta: number) {
-    setState((prev) => {
-      const leaf = findLeaf(prev.root, prev.focusedLeafId);
-      if (!leaf || leaf.tabIds.length === 0) return prev;
-      const idx = leaf.tabIds.indexOf(leaf.activeTabId ?? '');
-      const len = leaf.tabIds.length;
-      const next = idx < 0 ? 0 : (idx + delta + len) % len;
       return {
-        root: mapLeaf(prev.root, leaf.id, (l) => ({ ...l, activeTabId: l.tabIds[next] })),
+        sessions: patchActiveSession(prev, {
+          root: mapLeaf(active.root, leaf.id, (l) => ({ ...l, activeTabId: id })),
+          focusedLeafId: leaf.id,
+        }),
         focusToken: prev.focusToken + 1,
       };
     });
     revealActiveTabInTree();
   },
 
-  /** Close a tab from a specific pane (leaf). Other panes that have the same
-   *  tab id keep showing it. */
+  setFocusedPane(leafId: string) {
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      if (!findLeaf(active.root, leafId)) return prev;
+      return {
+        sessions: patchActiveSession(prev, { focusedLeafId: leafId }),
+        focusToken: prev.focusToken + 1,
+      };
+    });
+    revealActiveTabInTree();
+  },
+
+  cycleTab(delta: number) {
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      const leaf = findLeaf(active.root, active.focusedLeafId);
+      if (!leaf || leaf.tabIds.length === 0) return prev;
+      const idx = leaf.tabIds.indexOf(leaf.activeTabId ?? '');
+      const len = leaf.tabIds.length;
+      const next = idx < 0 ? 0 : (idx + delta + len) % len;
+      return {
+        sessions: patchActiveSession(prev, {
+          root: mapLeaf(active.root, leaf.id, (l) => ({ ...l, activeTabId: l.tabIds[next] })),
+        }),
+        focusToken: prev.focusToken + 1,
+      };
+    });
+    revealActiveTabInTree();
+  },
+
+  /** Close a tab from a specific pane (leaf) within the active session. */
   closeTabInLeaf(leafId: string, id: string) {
     setState((prev) => {
-      const leaf = findLeaf(prev.root, leafId);
+      const active = getActiveSession(prev);
+      const leaf = findLeaf(active.root, leafId);
       if (!leaf || !leaf.tabIds.includes(id)) return prev;
       const idx = leaf.tabIds.indexOf(id);
       const tabIds = leaf.tabIds.filter((t) => t !== id);
       let activeTabId = leaf.activeTabId;
       if (activeTabId === id) activeTabId = tabIds[idx] ?? tabIds[idx - 1] ?? null;
 
-      let root = mapLeaf(prev.root, leaf.id, (l) => ({ ...l, tabIds, activeTabId }));
-      let focusedLeafId = prev.focusedLeafId;
+      let root = mapLeaf(active.root, leaf.id, (l) => ({ ...l, tabIds, activeTabId }));
+      let focusedLeafId = active.focusedLeafId;
 
-      // Collapse this leaf if empty and it has a parent (i.e., not the only pane).
       if (tabIds.length === 0) {
         const parentInfo = findParent(root, leaf.id);
         if (parentInfo) {
@@ -423,29 +533,31 @@ export const workspace = {
         }
       }
 
-      const tabs = gcTabs({ ...prev, root, tabs: prev.tabs });
-      return { root, tabs, focusedLeafId };
+      const sessions = patchActiveSession(prev, { root, focusedLeafId });
+      const tabs = gcTabs({ ...prev, sessions });
+      return { sessions, tabs };
     });
   },
 
   /** Close from the focused pane. */
   closeTab(id: string) {
-    workspace.closeTabInLeaf(state.focusedLeafId, id);
+    workspace.closeTabInLeaf(getActiveSession().focusedLeafId, id);
   },
 
-  /** Close multiple tabs from a specific pane. */
+  /** Close multiple tabs from a specific pane in the active session. */
   closeTabsInLeaf(leafId: string, ids: string[]) {
     if (ids.length === 0) return;
     const closeSet = new Set(ids);
     setState((prev) => {
-      const leaf = findLeaf(prev.root, leafId);
+      const active = getActiveSession(prev);
+      const leaf = findLeaf(active.root, leafId);
       if (!leaf) return prev;
       const tabIds = leaf.tabIds.filter((t) => !closeSet.has(t));
       let activeTabId = leaf.activeTabId;
       if (activeTabId && closeSet.has(activeTabId)) activeTabId = tabIds[0] ?? null;
 
-      let root = mapLeaf(prev.root, leaf.id, (l) => ({ ...l, tabIds, activeTabId }));
-      let focusedLeafId = prev.focusedLeafId;
+      let root = mapLeaf(active.root, leaf.id, (l) => ({ ...l, tabIds, activeTabId }));
+      let focusedLeafId = active.focusedLeafId;
 
       if (tabIds.length === 0) {
         const parentInfo = findParent(root, leaf.id);
@@ -456,20 +568,22 @@ export const workspace = {
         }
       }
 
-      const tabs = gcTabs({ ...prev, root, tabs: prev.tabs });
-      return { root, tabs, focusedLeafId };
+      const sessions = patchActiveSession(prev, { root, focusedLeafId });
+      const tabs = gcTabs({ ...prev, sessions });
+      return { sessions, tabs };
     });
   },
 
   closeTabs(ids: string[]) {
-    workspace.closeTabsInLeaf(state.focusedLeafId, ids);
+    workspace.closeTabsInLeaf(getActiveSession().focusedLeafId, ids);
   },
 
   // ---------- Splitting ----------
 
   splitFocused(direction: 'horizontal' | 'vertical') {
     setState((prev) => {
-      const leaf = findLeaf(prev.root, prev.focusedLeafId);
+      const active = getActiveSession(prev);
+      const leaf = findLeaf(active.root, active.focusedLeafId);
       if (!leaf) return prev;
       const cloneTabId = leaf.activeTabId;
       const newLeaf: LeafNode = {
@@ -485,52 +599,157 @@ export const workspace = {
         ratio: 0.5,
         children: [leaf, newLeaf],
       };
-      const root = replaceNode(prev.root, leaf, split);
-      return { root, focusedLeafId: newLeaf.id };
+      const root = replaceNode(active.root, leaf, split);
+      return {
+        sessions: patchActiveSession(prev, { root, focusedLeafId: newLeaf.id }),
+      };
     });
   },
 
   closePane(leafId: string) {
     setState((prev) => {
-      const leaf = findLeaf(prev.root, leafId);
+      const active = getActiveSession(prev);
+      const leaf = findLeaf(active.root, leafId);
       if (!leaf) return prev;
-      const parentInfo = findParent(prev.root, leafId);
-      if (!parentInfo) return prev; // last pane — refuse
+      const parentInfo = findParent(active.root, leafId);
+      if (!parentInfo) return prev; // last pane in session — refuse
       const sibling = parentInfo.parent.children[parentInfo.index === 0 ? 1 : 0];
-      const root = replaceNode(prev.root, parentInfo.parent, sibling);
+      const root = replaceNode(active.root, parentInfo.parent, sibling);
       const focusedLeafId =
-        prev.focusedLeafId === leafId ? getAllLeaves(sibling)[0].id : prev.focusedLeafId;
-      const tabs = gcTabs({ ...prev, root, tabs: prev.tabs });
-      return { root, tabs, focusedLeafId };
+        active.focusedLeafId === leafId ? getAllLeaves(sibling)[0].id : active.focusedLeafId;
+      const sessions = patchActiveSession(prev, { root, focusedLeafId });
+      const tabs = gcTabs({ ...prev, sessions });
+      return { sessions, tabs };
     });
   },
 
   setSplitRatio(splitId: string, ratio: number) {
-    setState((prev) => ({ root: setSplitRatio(prev.root, splitId, ratio) }));
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      return {
+        sessions: patchActiveSession(prev, {
+          root: setSplitRatio(active.root, splitId, ratio),
+        }),
+      };
+    });
   },
 
   cycleLayout() {
     setState((prev) => {
-      const leaves = getAllLeaves(prev.root);
+      const active = getActiveSession(prev);
+      const leaves = getAllLeaves(active.root);
       if (leaves.length < 2) return prev;
       const layouts = generateLayouts(leaves);
       if (layouts.length === 0) return prev;
 
-      // Start a new cycle session if not in one (or if external changes
-      // invalidated the session — detected by leaf-set mismatch).
-      let session = prev.layoutCycle;
-      if (!session || !sameLeafSet(getAllLeaves(session.originalRoot), leaves)) {
-        session = { originalRoot: prev.root, index: -1 };
+      let cycle = prev.layoutCycle;
+      if (!cycle || !sameLeafSet(getAllLeaves(cycle.originalRoot), leaves)) {
+        cycle = { originalRoot: active.root, index: -1 };
       }
 
-      const nextIndex = session.index + 1;
+      const nextIndex = cycle.index + 1;
       if (nextIndex >= layouts.length) {
-        // Cycled past the last suggestion — restore the original layout.
-        return { root: session.originalRoot, layoutCycle: null };
+        return {
+          sessions: patchActiveSession(prev, { root: cycle.originalRoot }),
+          layoutCycle: null,
+        };
       }
       return {
-        root: layouts[nextIndex],
-        layoutCycle: { originalRoot: session.originalRoot, index: nextIndex },
+        sessions: patchActiveSession(prev, { root: layouts[nextIndex] }),
+        layoutCycle: { originalRoot: cycle.originalRoot, index: nextIndex },
+      };
+    });
+  },
+
+  // ---------- Sessions ----------
+
+  newSession(opts: { name?: string; rootDir?: string | null } = {}) {
+    setState((prev) => {
+      const current = getActiveSession(prev);
+      // New sessions inherit the current session's rootDir by default —
+      // user can change it via the workspace dropdown.
+      const rootDir = opts.rootDir !== undefined ? opts.rootDir : current.rootDir;
+      const session = makeFreshSession(
+        opts.name ?? `Session ${prev.sessions.length + 1}`,
+        rootDir,
+      );
+      return {
+        sessions: [...prev.sessions, session],
+        activeSessionId: session.id,
+        focusToken: prev.focusToken + 1,
+      };
+    });
+  },
+
+  setActiveSession(sessionId: string) {
+    setState((prev) =>
+      prev.sessions.some((s) => s.id === sessionId)
+        ? { activeSessionId: sessionId, focusToken: prev.focusToken + 1 }
+        : prev,
+    );
+    revealActiveTabInTree();
+  },
+
+  cycleSession(delta: number) {
+    setState((prev) => {
+      if (prev.sessions.length < 2) return prev;
+      const idx = prev.sessions.findIndex((s) => s.id === prev.activeSessionId);
+      const len = prev.sessions.length;
+      const next = idx < 0 ? 0 : (idx + delta + len) % len;
+      return {
+        activeSessionId: prev.sessions[next].id,
+        focusToken: prev.focusToken + 1,
+      };
+    });
+    revealActiveTabInTree();
+  },
+
+  closeSession(sessionId: string) {
+    setState((prev) => {
+      if (prev.sessions.length <= 1) return prev; // can't close the last session
+      const sessions = prev.sessions.filter((s) => s.id !== sessionId);
+      const activeSessionId =
+        prev.activeSessionId === sessionId ? sessions[0].id : prev.activeSessionId;
+      const tabs = gcTabs({ ...prev, sessions });
+      return { sessions, activeSessionId, tabs };
+    });
+  },
+
+  renameSession(sessionId: string, name: string) {
+    setState((prev) => ({
+      sessions: patchSession(prev, sessionId, { name }),
+    }));
+  },
+
+  /** Move a session from one index to another. */
+  reorderSession(fromIdx: number, toIdx: number) {
+    setState((prev) => {
+      if (fromIdx === toIdx) return prev;
+      const len = prev.sessions.length;
+      if (fromIdx < 0 || fromIdx >= len || toIdx < 0 || toIdx > len) return prev;
+      const next = prev.sessions.slice();
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return { sessions: next };
+    });
+  },
+
+  /** Reorder a tab within a single pane (leaf) of the active session. */
+  reorderTabInLeaf(leafId: string, fromIdx: number, toIdx: number) {
+    setState((prev) => {
+      if (fromIdx === toIdx) return prev;
+      const active = getActiveSession(prev);
+      const leaf = findLeaf(active.root, leafId);
+      if (!leaf) return prev;
+      const len = leaf.tabIds.length;
+      if (fromIdx < 0 || fromIdx >= len || toIdx < 0 || toIdx > len) return prev;
+      const ids = leaf.tabIds.slice();
+      const [moved] = ids.splice(fromIdx, 1);
+      ids.splice(toIdx, 0, moved);
+      return {
+        sessions: patchActiveSession(prev, {
+          root: mapLeaf(active.root, leaf.id, (l) => ({ ...l, tabIds: ids })),
+        }),
       };
     });
   },
@@ -545,7 +764,7 @@ export const workspace = {
     }));
   },
 
-  setMarkdownViewMode(tabId: string, mode: 'rendered' | 'raw' | 'split') {
+  setMarkdownViewMode(tabId: string, mode: 'rendered' | 'raw' | 'split' | 'tree') {
     setState((prev) => ({
       tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, viewMode: mode } : t)),
     }));
@@ -553,10 +772,24 @@ export const workspace = {
 
   toggleMarkdownViewMode() {
     const tab = workspace.getActiveTab();
-    if (!tab || tab.kind !== 'markdown') return;
-    // Cycle: rendered → split → raw → rendered
-    const order: Array<'rendered' | 'split' | 'raw'> = ['rendered', 'split', 'raw'];
-    const cur = tab.viewMode ?? 'rendered';
+    if (!tab) return;
+    // Markdown: rendered → split → raw. JSON: tree → split → raw.
+    // CSV: rendered (table) → split → raw.
+    let order: Array<'rendered' | 'split' | 'raw' | 'tree'>;
+    let initial: 'rendered' | 'split' | 'raw' | 'tree';
+    if (tab.kind === 'markdown') {
+      order = ['rendered', 'split', 'raw'];
+      initial = 'rendered';
+    } else if (tab.kind === 'json') {
+      order = ['tree', 'split', 'raw'];
+      initial = 'tree';
+    } else if (tab.kind === 'csv') {
+      order = ['rendered', 'split', 'raw'];
+      initial = 'rendered';
+    } else {
+      return;
+    }
+    const cur = (tab.viewMode as typeof initial) ?? initial;
     const next = order[(order.indexOf(cur) + 1) % order.length];
     setState((prev) => ({
       tabs: prev.tabs.map((t) => (t.id === tab.id ? { ...t, viewMode: next } : t)),
@@ -582,7 +815,7 @@ export const workspace = {
   // ---------- Workspace UI ----------
 
   setRootDir(dir: string | null) {
-    setState({ rootDir: dir });
+    setState((prev) => ({ sessions: patchActiveSession(prev, { rootDir: dir }) }));
     // Remember it so we can restore on next launch.
     try {
       if (dir) localStorage.setItem('marko:lastWorkspace', dir);
@@ -612,4 +845,280 @@ export const workspace = {
   setFolderSelection(info: FolderSelectionInfo | null) {
     setState({ folderSelection: info });
   },
+
+  /** Mark a tab as currently playing audio/video (or stop). Called by the
+   *  media viewer and webview when their <audio>/<video> elements fire
+   *  play/pause events. */
+  setTabPlaying(tabId: string, playing: boolean) {
+    setState((prev) => {
+      const has = prev.playingTabIds.includes(tabId);
+      if (has === playing) return prev;
+      return {
+        playingTabIds: playing
+          ? [...prev.playingTabIds, tabId]
+          : prev.playingTabIds.filter((id) => id !== tabId),
+      };
+    });
+  },
+
+  /** Open a diff tab comparing two file paths. Reuses an existing diff tab
+   *  if one already compares the same pair (regardless of pane). */
+  openDiffTab(leftPath: string, rightPath: string) {
+    const existing = state.tabs.find(
+      (t) => t.kind === 'diff' && t.diffLeft === leftPath && t.diffRight === rightPath,
+    );
+    if (existing) {
+      // Reveal existing tab if it's referenced by any session, otherwise re-attach.
+      for (const session of state.sessions) {
+        if (findLeafByTabId(session.root, existing.id)) {
+          workspace.revealTab(existing.id);
+          return;
+        }
+      }
+    }
+    const leftName = leftPath.split('/').pop() ?? 'left';
+    const rightName = rightPath.split('/').pop() ?? 'right';
+    const tab: Tab = {
+      id: newTabId(),
+      filePath: null,
+      title: `${leftName} ↔ ${rightName}`,
+      kind: 'diff',
+      diffLeft: leftPath,
+      diffRight: rightPath,
+      content: '',
+      savedContent: '',
+      dirty: false,
+    };
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      return {
+        tabs: [...prev.tabs, tab],
+        sessions: patchActiveSession(prev, {
+          root: mapLeaf(active.root, active.focusedLeafId, (l) => ({
+            ...l,
+            tabIds: [...l.tabIds, tab.id],
+            activeTabId: tab.id,
+          })),
+        }),
+        focusToken: prev.focusToken + 1,
+      };
+    });
+  },
+
+  /** Switch to whichever session contains the given tab and focus it.
+   *  Used by the now-playing button in the titlebar. */
+  revealTab(tabId: string) {
+    setState((prev) => {
+      for (const session of prev.sessions) {
+        const leaf = findLeafByTabId(session.root, tabId);
+        if (!leaf) continue;
+        const sessions = patchSession(prev, session.id, {
+          focusedLeafId: leaf.id,
+          root: mapLeaf(session.root, leaf.id, (l) => ({ ...l, activeTabId: tabId })),
+        });
+        return {
+          sessions,
+          activeSessionId: session.id,
+          focusToken: prev.focusToken + 1,
+        };
+      }
+      return prev;
+    });
+  },
 };
+
+// ---------- Persistence ----------
+
+const SNAPSHOT_VERSION = 1;
+
+interface PersistedTab {
+  id: string;
+  filePath: string | null;
+  title: string;
+  kind: TabKind;
+  language?: string;
+  ext?: string;
+  viewMode?: 'rendered' | 'raw' | 'split' | 'tree';
+  diffLeft?: string;
+  diffRight?: string;
+  /** Only persisted for unsaved scratch tabs (no filePath). For tabs with a
+   *  filePath we re-read from disk on hydrate. */
+  scratchContent?: string;
+}
+
+interface Snapshot {
+  version: number;
+  tabs: PersistedTab[];
+  sessions: Session[];
+  activeSessionId: string;
+  sidebarVisible: boolean;
+  outlineVisible: boolean;
+}
+
+/** Build a JSON-safe snapshot of the current workspace. */
+export function serializeWorkspace(): Snapshot {
+  // Drop tabs we can't restore: terminal (PTY can't be revived).
+  const persistableTabs: PersistedTab[] = [];
+  const droppedTabIds = new Set<string>();
+  for (const tab of state.tabs) {
+    if (tab.kind === 'terminal') {
+      droppedTabIds.add(tab.id);
+      continue;
+    }
+    const persisted: PersistedTab = {
+      id: tab.id,
+      filePath: tab.filePath,
+      title: tab.title,
+      kind: tab.kind,
+      language: tab.language,
+      ext: tab.ext,
+      viewMode: tab.viewMode,
+      diffLeft: tab.diffLeft,
+      diffRight: tab.diffRight,
+    };
+    // Untitled scratch buffers: persist content directly so the user doesn't
+    // lose work. File-backed tabs re-read from disk on hydrate.
+    if (
+      !tab.filePath &&
+      (tab.kind === 'markdown' || tab.kind === 'code' || tab.kind === 'excalidraw')
+    ) {
+      persisted.scratchContent = tab.content;
+    }
+    persistableTabs.push(persisted);
+  }
+
+  // Strip dropped tab ids from any leaf in any session.
+  const stripLeaf = (l: LeafNode): LeafNode => {
+    if (droppedTabIds.size === 0) return l;
+    const tabIds = l.tabIds.filter((id) => !droppedTabIds.has(id));
+    let activeTabId = l.activeTabId;
+    if (activeTabId && droppedTabIds.has(activeTabId)) {
+      activeTabId = tabIds[0] ?? null;
+    }
+    return { ...l, tabIds, activeTabId };
+  };
+  const sessions: Session[] = state.sessions.map((sess) => ({
+    ...sess,
+    root: mapAllLeaves(sess.root, stripLeaf),
+  }));
+
+  return {
+    version: SNAPSHOT_VERSION,
+    tabs: persistableTabs,
+    sessions,
+    activeSessionId: state.activeSessionId,
+    sidebarVisible: state.sidebarVisible,
+    outlineVisible: state.outlineVisible,
+  };
+}
+
+/** Pull the largest numeric suffix out of an id like "tab-12" or "leaf-7". */
+function maxIdSuffix(prefix: string, ids: string[]): number {
+  let max = 0;
+  const re = new RegExp(`^${prefix}-(\\d+)$`);
+  for (const id of ids) {
+    const m = re.exec(id);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return max;
+}
+
+/** Apply a snapshot. File-backed tabs are loaded asynchronously: each tab
+ *  shows the title immediately and gets its content populated as `readFile`
+ *  resolves. Image tabs re-load from disk into a data URL. */
+export async function hydrateFromSnapshot(snapshot: Snapshot): Promise<void> {
+  if (!snapshot || snapshot.version !== SNAPSHOT_VERSION) return;
+  if (!snapshot.sessions || snapshot.sessions.length === 0) return;
+
+  // Stub all tabs first so the UI can render with placeholders, then fill in
+  // content per tab as its async load resolves.
+  const stubTabs: Tab[] = snapshot.tabs.map((p) => ({
+    id: p.id,
+    filePath: p.filePath,
+    title: p.title,
+    kind: p.kind,
+    language: p.language,
+    ext: p.ext,
+    viewMode: p.viewMode,
+    diffLeft: p.diffLeft,
+    diffRight: p.diffRight,
+    content: p.scratchContent ?? '',
+    savedContent: p.scratchContent ?? '',
+    dirty: false,
+  }));
+
+  // Advance id counters past anything in the snapshot so new ids don't clash.
+  const allTabIds = stubTabs.map((t) => t.id);
+  const allNodeIds: string[] = [];
+  for (const s of snapshot.sessions) {
+    const visit = (n: PaneTree) => {
+      allNodeIds.push(n.id);
+      if (n.kind === 'split') {
+        visit(n.children[0]);
+        visit(n.children[1]);
+      }
+    };
+    visit(s.root);
+  }
+  const allSessionIds = snapshot.sessions.map((s) => s.id);
+  nextTabId = Math.max(nextTabId, maxIdSuffix('tab', allTabIds) + 1);
+  nextNodeId = Math.max(
+    nextNodeId,
+    maxIdSuffix('leaf', allNodeIds) + 1,
+    maxIdSuffix('split', allNodeIds) + 1,
+  );
+  nextSessionId = Math.max(nextSessionId, maxIdSuffix('session', allSessionIds) + 1);
+
+  // Apply the stub state synchronously so the window paints immediately.
+  setState({
+    tabs: stubTabs,
+    sessions: snapshot.sessions,
+    activeSessionId: snapshot.activeSessionId,
+    sidebarVisible: snapshot.sidebarVisible,
+    outlineVisible: snapshot.outlineVisible,
+    layoutCycle: null,
+    folderSelection: null,
+    revealPath: null,
+  });
+
+  // Lazy-load each tab's content. Done concurrently; failures (file moved/
+  // deleted) leave the stub in place with a placeholder title hint.
+  await Promise.all(
+    snapshot.tabs.map(async (p) => {
+      if (!p.filePath) return; // scratch already filled in via stubTabs
+      try {
+        if (p.kind === 'image') {
+          const dataUrl = await window.marko.loadImage(p.filePath);
+          setState((prev) => ({
+            tabs: prev.tabs.map((t) =>
+              t.id === p.id ? { ...t, content: dataUrl, savedContent: dataUrl } : t,
+            ),
+          }));
+        } else if (
+          p.kind === 'binary' ||
+          p.kind === 'folder' ||
+          p.kind === 'web' ||
+          p.kind === 'media' ||
+          p.kind === 'pdf' ||
+          p.kind === 'diff'
+        ) {
+          // Nothing to load — these have no editable content.
+        } else {
+          const content = await window.marko.readFile(p.filePath);
+          setState((prev) => ({
+            tabs: prev.tabs.map((t) =>
+              t.id === p.id ? { ...t, content, savedContent: content, dirty: false } : t,
+            ),
+          }));
+        }
+      } catch {
+        // File gone / unreadable. Mark with a small hint so the user notices.
+        setState((prev) => ({
+          tabs: prev.tabs.map((t) =>
+            t.id === p.id ? { ...t, title: `${t.title} (missing)` } : t,
+          ),
+        }));
+      }
+    }),
+  );
+}

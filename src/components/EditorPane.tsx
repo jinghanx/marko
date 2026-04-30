@@ -3,19 +3,31 @@ import { useWorkspace, workspace, findLeaf, type Tab } from '../state/workspace'
 import { CrepeEditor } from './CrepeEditor';
 import { CodeEditor } from './CodeEditor';
 import { ImageViewer } from './ImageViewer';
+import { MediaViewer } from './MediaViewer';
+import { PdfViewer } from './PdfViewer';
+import { CsvViewer } from './CsvViewer';
+import { JsonViewer } from './JsonViewer';
+import { DiffViewer } from './DiffViewer';
+import { ExcalidrawViewer } from './ExcalidrawViewer';
 import { FolderView } from './FolderView';
 import { WebView } from './WebView';
 import { Terminal } from './Terminal';
+import { ProcessViewer } from './ProcessViewer';
+import { GitView } from './GitView';
 import { MarkdownSplitView } from './MarkdownSplitView';
 import { WelcomeScreen } from './WelcomeScreen';
 
 interface EditorPaneProps {
   paneId: string;
+  sessionId: string;
 }
 
-export function EditorPane({ paneId }: EditorPaneProps) {
+export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
   const allTabs = useWorkspace((s) => s.tabs);
-  const leaf = useWorkspace((s) => findLeaf(s.root, paneId));
+  const leaf = useWorkspace((s) => {
+    const session = s.sessions.find((x) => x.id === sessionId);
+    return session ? findLeaf(session.root, paneId) : null;
+  });
   const tabs = useMemo(() => {
     if (!leaf) return [];
     const map = new Map(allTabs.map((t) => [t.id, t]));
@@ -41,7 +53,10 @@ export function EditorPane({ paneId }: EditorPaneProps) {
         >
           {tab.kind === 'markdown' && (
             <>
-              <MarkdownModeToggle tabId={tab.id} mode={tab.viewMode ?? 'rendered'} />
+              <MarkdownModeToggle
+                tabId={tab.id}
+                mode={(tab.viewMode === 'tree' ? 'rendered' : tab.viewMode) ?? 'rendered'}
+              />
               {(tab.viewMode ?? 'rendered') === 'rendered' && (
                 <CrepeEditor key="rendered" tabId={tab.id} initialValue={tab.content} />
               )}
@@ -75,6 +90,36 @@ export function EditorPane({ paneId }: EditorPaneProps) {
           {tab.kind === 'image' && (
             <ImageViewer src={tab.savedContent} filePath={tab.filePath} title={tab.title} />
           )}
+          {tab.kind === 'media' && tab.filePath && (
+            <MediaViewer tabId={tab.id} filePath={tab.filePath} title={tab.title} />
+          )}
+          {tab.kind === 'pdf' && tab.filePath && (
+            <PdfViewer filePath={tab.filePath} title={tab.title} />
+          )}
+          {tab.kind === 'csv' && (
+            <CsvViewer
+              tabId={tab.id}
+              filePath={tab.filePath}
+              initialValue={tab.content}
+            />
+          )}
+          {tab.kind === 'json' && (
+            <JsonViewer
+              tabId={tab.id}
+              filePath={tab.filePath}
+              initialValue={tab.content}
+            />
+          )}
+          {tab.kind === 'diff' && tab.diffLeft && tab.diffRight && (
+            <DiffViewer leftPath={tab.diffLeft} rightPath={tab.diffRight} />
+          )}
+          {tab.kind === 'excalidraw' && (
+            <ExcalidrawViewer
+              tabId={tab.id}
+              initialValue={tab.content}
+              filePath={tab.filePath}
+            />
+          )}
           {tab.kind === 'folder' && tab.filePath && (
             <FolderView folderPath={tab.filePath} tabId={tab.id} />
           )}
@@ -82,6 +127,8 @@ export function EditorPane({ paneId }: EditorPaneProps) {
             <WebView tabId={tab.id} url={tab.filePath} />
           )}
           {tab.kind === 'terminal' && <Terminal tabId={tab.id} />}
+          {tab.kind === 'process' && <ProcessViewer />}
+          {tab.kind === 'git' && <GitView />}
           {tab.kind === 'binary' && (
             <div className="binary-hint">
               <div className="binary-icon">⌬</div>

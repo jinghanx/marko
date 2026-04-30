@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
+import { builtinModules } from 'node:module';
 
 export default defineConfig({
   define: {
@@ -16,7 +17,16 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['node-pty', 'electron'],
+              // Anything pulling Node built-ins via CJS `require` (e.g.
+              // simple-git) must be external so its internal calls resolve
+              // at runtime instead of being bundled into ESM.
+              external: [
+                'node-pty',
+                'electron',
+                'simple-git',
+                ...builtinModules,
+                ...builtinModules.map((m) => `node:${m}`),
+              ],
             },
           },
         },

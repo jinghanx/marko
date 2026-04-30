@@ -1,6 +1,14 @@
 import { workspace, type TabKind } from '../state/workspace';
 import { detectKind, looksBinary } from './fileType';
 
+function maybeRevealInTree(path: string) {
+  const root = workspace.getState().rootDir;
+  if (!root) return;
+  if (path === root || path.startsWith(root + '/')) {
+    workspace.revealInTree(path);
+  }
+}
+
 function classify(filePath: string, content: string): { kind: TabKind; content: string } {
   const kind = detectKind(filePath);
   if (kind === 'binary' || kind === 'image') return { kind, content: '' };
@@ -39,6 +47,25 @@ export function normalizeUrl(input: string): string {
   return `https://${s}`;
 }
 
+/** Run an opener so that whatever tab it lands on replaces the currently
+ *  active tab in the focused pane (the prior tab is closed if a different
+ *  tab was created/activated). */
+export async function withReplace(opener: () => Promise<unknown> | void) {
+  const prevId = workspace.getFocusedLeaf().activeTabId;
+  await Promise.resolve(opener());
+  const next = workspace.getActiveTab();
+  if (prevId && next && next.id !== prevId) {
+    workspace.closeTab(prevId);
+  }
+}
+
+export function openTerminalTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const tab = workspace.openNewTab({ kind: 'terminal', title: 'Terminal' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
 export function openUrlInTab(rawUrl: string, opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? true;
   const url = normalizeUrl(rawUrl);
@@ -56,6 +83,7 @@ export async function openFolderInEditor(folderPath: string, opts: { focus?: boo
   const focus = opts.focus ?? false;
   const title = await window.marko.basename(folderPath);
   workspace.openFileTab(folderPath, '', title || folderPath, 'folder');
+  maybeRevealInTree(folderPath);
   if (focus) workspace.requestEditorFocus();
 }
 
@@ -72,17 +100,20 @@ export async function openFileFromPath(filePath: string, opts: { focus?: boolean
   const title = await window.marko.basename(filePath);
   if (kindByExt === 'binary') {
     workspace.openFileTab(filePath, '', title, 'binary');
+    maybeRevealInTree(filePath);
     return;
   }
   if (kindByExt === 'image') {
     const dataUrl = await window.marko.loadImage(filePath);
     workspace.openFileTab(filePath, dataUrl, title, 'image');
+    maybeRevealInTree(filePath);
     if (focus) workspace.requestEditorFocus();
     return;
   }
   const content = await window.marko.readFile(filePath);
   const { kind, content: c } = classify(filePath, content);
   workspace.openFileTab(filePath, c, title, kind);
+  maybeRevealInTree(filePath);
   if (focus) workspace.requestEditorFocus();
 }
 

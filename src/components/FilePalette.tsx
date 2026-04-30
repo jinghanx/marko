@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Fzf, byLengthAsc, type FzfResultItem } from 'fzf';
 import { useWorkspace } from '../state/workspace';
-import { openFileFromPath } from '../lib/actions';
+import { openFileFromPath, withReplace } from '../lib/actions';
 
 interface Props {
   open: boolean;
+  replace?: boolean;
   onClose: () => void;
 }
 
@@ -16,7 +17,7 @@ interface Item {
 
 const MAX_RESULTS = 60;
 
-export function FilePalette({ open, onClose }: Props) {
+export function FilePalette({ open, replace = false, onClose }: Props) {
   const rootDir = useWorkspace((s) => s.rootDir);
   const [items, setItems] = useState<Item[] | null>(null);
   const [query, setQuery] = useState('');
@@ -69,28 +70,40 @@ export function FilePalette({ open, onClose }: Props) {
     requestAnimationFrame(() => inputRef.current?.focus());
   }, [open]);
 
+  // Hard-filter to the current workspace. Belt-and-suspenders: walkDir only
+  // returns paths under rootDir, but if a workspace switch races with an
+  // in-flight walk we never want a stale path to surface in suggestions.
+  const scopedItems = useMemo(() => {
+    if (!items || !rootDir) return null;
+    const prefix = rootDir.endsWith('/') ? rootDir : rootDir + '/';
+    return items.filter((it) => it.path === rootDir || it.path.startsWith(prefix));
+  }, [items, rootDir]);
+
   const fzf = useMemo(() => {
-    if (!items) return null;
-    return new Fzf(items, {
+    if (!scopedItems) return null;
+    return new Fzf(scopedItems, {
       selector: (it) => it.rel,
       tiebreakers: [byLengthAsc],
       limit: MAX_RESULTS,
     });
-  }, [items]);
+  }, [scopedItems]);
 
   const results: FzfResultItem<Item>[] = useMemo(() => {
-    if (!fzf || !items) return [];
+    if (!fzf || !scopedItems) return [];
     if (!query) {
-      return items.slice(0, MAX_RESULTS).map((it) => ({
-        item: it,
-        positions: new Set<number>(),
-        start: 0,
-        end: 0,
-        score: 0,
-      } as FzfResultItem<Item>));
+      return scopedItems.slice(0, MAX_RESULTS).map(
+        (it) =>
+          ({
+            item: it,
+            positions: new Set<number>(),
+            start: 0,
+            end: 0,
+            score: 0,
+          } as FzfResultItem<Item>),
+      );
     }
     return fzf.find(query);
-  }, [fzf, items, query]);
+  }, [fzf, scopedItems, query]);
 
   // Keep activeIndex in bounds.
   useEffect(() => {
@@ -109,7 +122,8 @@ export function FilePalette({ open, onClose }: Props) {
     const item = results[idx]?.item;
     if (!item) return;
     onClose();
-    void openFileFromPath(item.path);
+    if (replace) void withReplace(() => openFileFromPath(item.path));
+    else void openFileFromPath(item.path);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -135,7 +149,13 @@ export function FilePalette({ open, onClose }: Props) {
           ref={inputRef}
           className="palette-input"
           value={query}
-          placeholder={rootDir ? 'Search files…' : 'No folder open. Open one with ⌘⇧O.'}
+          placeholder={
+            rootDir
+              ? replace
+                ? 'Search files — replaces current tab…'
+                : 'Search files…'
+              : 'No folder open. Open one with ⌘⇧O.'
+          }
           disabled={!rootDir}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -165,7 +185,7 @@ export function FilePalette({ open, onClose }: Props) {
           <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
           <span><kbd>↵</kbd> open</span>
           <span><kbd>esc</kbd> close</span>
-          {items && <span className="palette-count">{items.length} files</span>}
+          {scopedItems && <span className="palette-count">{scopedItems.length} files</span>}
         </div>
       </div>
     </div>

@@ -1,9 +1,14 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage } from 'electron';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import * as pty from 'node-pty';
+import type { IPty } from 'node-pty';
+
+const require = createRequire(import.meta.url);
 
 // Pin the user-visible name early — affects app menu, dock label, and
 // `app.name` everywhere. Without this we'd fall through to the bundled
@@ -111,9 +116,23 @@ function buildMenu() {
           click: () => sendToRenderer('menu:quick-open'),
         },
         {
+          label: 'Quick Open (Replace)…',
+          accelerator: 'CmdOrCtrl+Shift+P',
+          click: () => sendToRenderer('menu:quick-open-replace'),
+        },
+        {
           label: 'Go to Path…',
           accelerator: 'CmdOrCtrl+T',
           click: () => sendToRenderer('menu:goto-path'),
+        },
+        {
+          label: 'Go to Path (Replace)…',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: () => sendToRenderer('menu:goto-path-replace'),
+        },
+        {
+          label: 'New Terminal',
+          click: () => sendToRenderer('menu:new-terminal'),
         },
         {
           label: 'Focus Address Bar',
@@ -165,6 +184,32 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+Shift+\\',
           click: () => sendToRenderer('menu:toggle-outline'),
         },
+        { type: 'separator' },
+        {
+          label: 'Split Right',
+          accelerator: 'CmdOrCtrl+\\',
+          click: () => sendToRenderer('menu:split-right'),
+        },
+        {
+          label: 'Split Down',
+          accelerator: 'CmdOrCtrl+=',
+          click: () => sendToRenderer('menu:split-down'),
+        },
+        {
+          label: 'Close Pane',
+          accelerator: 'CmdOrCtrl+Alt+W',
+          click: () => sendToRenderer('menu:close-pane'),
+        },
+        {
+          label: 'Next Pane',
+          accelerator: 'CmdOrCtrl+`',
+          click: () => sendToRenderer('menu:focus-pane-next'),
+        },
+        {
+          label: 'Previous Pane',
+          accelerator: 'CmdOrCtrl+Shift+`',
+          click: () => sendToRenderer('menu:focus-pane-prev'),
+        },
         {
           label: 'Process Viewer',
           accelerator: 'CmdOrCtrl+Y',
@@ -174,9 +219,11 @@ function buildMenu() {
         { role: 'reload' },
         { role: 'toggleDevTools' },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        { role: 'resetZoom', accelerator: 'CmdOrCtrl+0' },
+        // Move zoom-in off ⌘= so ⌘= can be Split Down. ⌘⇧= is the
+        // explicit "+" key, which is what macOS already labels for zoom-in.
+        { role: 'zoomIn', accelerator: 'CmdOrCtrl+Shift+=' },
+        { role: 'zoomOut', accelerator: 'CmdOrCtrl+-' },
         { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
@@ -425,6 +472,89 @@ ipcMain.handle('fs:reveal', async (_e, p: string) => {
 ipcMain.handle('fs:open-default', async (_e, p: string): Promise<{ ok: boolean; error?: string }> => {
   const err = await shell.openPath(p);
   return err ? { ok: false, error: err } : { ok: true };
+});
+
+// ---------- Terminal (PTY) ----------
+
+const ptys = new Map<string, IPty>();
+
+// node-pty's prebuilt spawn-helper sometimes loses its executable bit when
+// extracted by npm. Without +x, posix_spawnp fails. Self-heal at startup.
+async function ensurePtyHelperExecutable() {
+  if (process.platform === 'win32') return;
+  try {
+    const ptyPkgDir = path.dirname(require.resolve('node-pty/package.json'));
+    const candidates = [
+      path.join(ptyPkgDir, 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper'),
+      path.join(ptyPkgDir, 'build', 'Release', 'spawn-helper'),
+    ];
+    for (const c of candidates) {
+      try {
+        await fs.chmod(c, 0o755);
+      } catch {
+        // file may not exist for this arch — that's fine
+      }
+    }
+  } catch {
+    // node-pty not resolvable somehow — let pty:spawn surface the error
+  }
+}
+void ensurePtyHelperExecutable();
+
+ipcMain.handle('pty:spawn', (e, id: string, opts: { cwd?: string; cols?: number; rows?: number }): { ok: boolean; error?: string } => {
+  try {
+    if (ptys.has(id)) return { ok: true };
+    const shell = process.env.SHELL ?? '/bin/zsh';
+    const child = pty.spawn(shell, ['-l'], {
+      name: 'xterm-256color',
+      cols: opts.cols ?? 80,
+      rows: opts.rows ?? 24,
+      cwd: opts.cwd ?? os.homedir(),
+      env: { ...(process.env as Record<string, string>), TERM: 'xterm-256color', LANG: process.env.LANG ?? 'en_US.UTF-8' },
+    });
+    ptys.set(id, child);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    child.onData((data) => {
+      win?.webContents.send('pty:data', id, data);
+    });
+    child.onExit(({ exitCode }) => {
+      win?.webContents.send('pty:exit', id, exitCode);
+      ptys.delete(id);
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('pty:write', (_e, id: string, data: string): boolean => {
+  const p = ptys.get(id);
+  if (!p) return false;
+  p.write(data);
+  return true;
+});
+
+ipcMain.handle('pty:resize', (_e, id: string, cols: number, rows: number): boolean => {
+  const p = ptys.get(id);
+  if (!p) return false;
+  try {
+    p.resize(Math.max(1, Math.floor(cols)), Math.max(1, Math.floor(rows)));
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle('pty:kill', (_e, id: string): boolean => {
+  const p = ptys.get(id);
+  if (!p) return false;
+  try {
+    p.kill();
+  } catch {
+    // ignore
+  }
+  ptys.delete(id);
+  return true;
 });
 
 ipcMain.handle('fs:stat', async (_e, p: string): Promise<{ exists: boolean; isFile: boolean; isDirectory: boolean; error?: string }> => {

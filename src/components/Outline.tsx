@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { useWorkspace } from '../state/workspace';
+import { useWorkspace, findLeaf } from '../state/workspace';
+import { CodeMinimap } from './CodeMinimap';
+import { FolderPreview } from './FolderPreview';
 
 interface Heading {
   level: number;
@@ -27,8 +29,55 @@ function extractHeadings(markdown: string): Heading[] {
 }
 
 export function Outline() {
-  const activeTab = useWorkspace((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? null);
-  const headings = useMemo(() => (activeTab ? extractHeadings(activeTab.content) : []), [activeTab?.content]);
+  const activeTab = useWorkspace((s) => {
+    const focused = findLeaf(s.root, s.focusedLeafId);
+    if (!focused?.activeTabId) return null;
+    return s.tabs.find((t) => t.id === focused.activeTabId) ?? null;
+  });
+  const headings = useMemo(
+    () => (activeTab ? extractHeadings(activeTab.content) : []),
+    [activeTab?.content],
+  );
+
+  const jumpTo = (index: number) => {
+    if (!activeTab) return;
+    if (activeTab.kind === 'markdown') {
+      const focused = document.querySelector('.pane.pane--focused');
+      if (!focused) return;
+      const els = focused.querySelectorAll<HTMLElement>(
+        '.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4, .ProseMirror h5, .ProseMirror h6',
+      );
+      const target = els[index];
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Brief flash to anchor the eye.
+      target.classList.add('outline-flash');
+      setTimeout(() => target.classList.remove('outline-flash'), 800);
+    } else if (activeTab.kind === 'code') {
+      // For code editors, scroll the CodeMirror view to the heading's line.
+      const focused = document.querySelector('.pane.pane--focused');
+      const cm = focused?.querySelector<HTMLElement>('.cm-scroller');
+      const lines = focused?.querySelectorAll<HTMLElement>('.cm-line');
+      const heading = headings[index];
+      if (cm && lines && heading) {
+        const lineEl = lines[heading.line];
+        lineEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
+
+  if (activeTab?.kind === 'code') {
+    return (
+      <div className="outline-inner">
+        <div className="outline-header">Minimap</div>
+        <CodeMinimap content={activeTab.content} />
+      </div>
+    );
+  }
+
+  if (activeTab?.kind === 'folder') {
+    return <FolderPreviewSection tabId={activeTab.id} />;
+  }
 
   return (
     <div className="outline-inner">
@@ -38,12 +87,40 @@ export function Outline() {
           <div className="outline-empty">No headings.</div>
         ) : (
           headings.map((h, i) => (
-            <div key={i} className="outline-item" style={{ paddingLeft: 8 + (h.level - 1) * 12 }}>
+            <button
+              key={i}
+              className="outline-item"
+              style={{ paddingLeft: 8 + (h.level - 1) * 12 }}
+              onClick={() => jumpTo(i)}
+              title={h.text}
+            >
               {h.text}
-            </div>
+            </button>
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function FolderPreviewSection({ tabId }: { tabId: string }) {
+  const info = useWorkspace((s) => s.folderSelection);
+  const headerText =
+    info && info.tabId === tabId
+      ? info.selected.length === 0
+        ? 'Folder Info'
+        : info.selected.length === 1
+          ? 'Preview'
+          : 'Selection'
+      : 'Preview';
+  return (
+    <div className="outline-inner">
+      <div className="outline-header">{headerText}</div>
+      {info && info.tabId === tabId ? (
+        <FolderPreview info={info} />
+      ) : (
+        <div className="outline-empty">Loading…</div>
+      )}
     </div>
   );
 }

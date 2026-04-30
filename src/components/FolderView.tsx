@@ -14,6 +14,7 @@ import {
 
 interface Props {
   folderPath: string;
+  tabId: string;
 }
 
 interface History {
@@ -32,7 +33,7 @@ interface ItemProps {
 
 const PREVIEWABLE_IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']);
 
-export function FolderView({ folderPath: initialPath }: Props) {
+export function FolderView({ folderPath: initialPath, tabId }: Props) {
   const [history, setHistory] = useState<History>(() => ({ stack: [initialPath], cursor: 0 }));
   const currentPath = history.stack[history.cursor];
 
@@ -201,6 +202,30 @@ export function FolderView({ folderPath: initialPath }: Props) {
   }, [lastClicked]);
 
   const flatItems = useMemo(() => sections?.flatMap((s) => s.entries) ?? [], [sections]);
+
+  // Publish selection summary to workspace so the Outline (Preview) pane reflects it.
+  useEffect(() => {
+    const all = entries ?? [];
+    const folderCount = all.filter((e) => e.isDirectory).length;
+    const fileCount = all.length - folderCount;
+    const selectedEntries = all.filter((e) => selected.has(e.path));
+    workspace.setFolderSelection({
+      tabId,
+      currentPath,
+      selected: selectedEntries,
+      totalCount: all.length,
+      folderCount,
+      fileCount,
+    });
+  }, [entries, selected, currentPath, tabId]);
+
+  // Clear when this view unmounts (so Outline doesn't show stale data).
+  useEffect(() => {
+    return () => {
+      const cur = workspace.getState().folderSelection;
+      if (cur && cur.tabId === tabId) workspace.setFolderSelection(null);
+    };
+  }, [tabId]);
 
   const openItem = (entry: DirEntry) => {
     if (entry.isDirectory) navigate(entry.path);

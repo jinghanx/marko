@@ -73,6 +73,28 @@ const api = {
     ipcRenderer.on(channel, listener);
     return () => ipcRenderer.removeListener(channel, listener);
   },
+
+  // ---------- Terminal ----------
+  ptySpawn: (id: string, opts: { cwd?: string; cols?: number; rows?: number }) =>
+    ipcRenderer.invoke('pty:spawn', id, opts),
+  ptyWrite: (id: string, data: string) => ipcRenderer.invoke('pty:write', id, data),
+  ptyResize: (id: string, cols: number, rows: number) =>
+    ipcRenderer.invoke('pty:resize', id, cols, rows),
+  ptyKill: (id: string) => ipcRenderer.invoke('pty:kill', id),
+  onPtyData: (id: string, handler: (data: string) => void) => {
+    const listener = (_e: unknown, ptyId: string, data: string) => {
+      if (ptyId === id) handler(data);
+    };
+    ipcRenderer.on('pty:data', listener);
+    return () => ipcRenderer.removeListener('pty:data', listener);
+  },
+  onPtyExit: (id: string, handler: (exitCode: number) => void) => {
+    const listener = (_e: unknown, ptyId: string, exitCode: number) => {
+      if (ptyId === id) handler(exitCode);
+    };
+    ipcRenderer.on('pty:exit', listener);
+    return () => ipcRenderer.removeListener('pty:exit', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('marko', api);

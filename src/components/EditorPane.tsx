@@ -1,14 +1,26 @@
-import { useWorkspace } from '../state/workspace';
+import { useMemo } from 'react';
+import { useWorkspace, findLeaf, type Tab } from '../state/workspace';
 import { CrepeEditor } from './CrepeEditor';
 import { CodeEditor } from './CodeEditor';
 import { ImageViewer } from './ImageViewer';
 import { FolderView } from './FolderView';
 import { WebView } from './WebView';
+import { Terminal } from './Terminal';
 import { WelcomeScreen } from './WelcomeScreen';
 
-export function EditorPane() {
-  const tabs = useWorkspace((s) => s.tabs);
-  const activeTabId = useWorkspace((s) => s.activeTabId);
+interface EditorPaneProps {
+  paneId: string;
+}
+
+export function EditorPane({ paneId }: EditorPaneProps) {
+  const allTabs = useWorkspace((s) => s.tabs);
+  const leaf = useWorkspace((s) => findLeaf(s.root, paneId));
+  const tabs = useMemo(() => {
+    if (!leaf) return [];
+    const map = new Map(allTabs.map((t) => [t.id, t]));
+    return leaf.tabIds.map((id) => map.get(id)).filter((t): t is Tab => !!t);
+  }, [leaf, allTabs]);
+  const activeTabId = leaf?.activeTabId ?? null;
 
   if (tabs.length === 0) {
     return (
@@ -41,11 +53,12 @@ export function EditorPane() {
             <ImageViewer src={tab.savedContent} filePath={tab.filePath} title={tab.title} />
           )}
           {tab.kind === 'folder' && tab.filePath && (
-            <FolderView folderPath={tab.filePath} />
+            <FolderView folderPath={tab.filePath} tabId={tab.id} />
           )}
           {tab.kind === 'web' && tab.filePath && (
             <WebView tabId={tab.id} url={tab.filePath} />
           )}
+          {tab.kind === 'terminal' && <Terminal tabId={tab.id} />}
           {tab.kind === 'binary' && (
             <div className="binary-hint">
               <div className="binary-icon">⌬</div>

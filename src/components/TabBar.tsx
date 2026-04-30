@@ -1,9 +1,19 @@
-import { useEffect, useState } from 'react';
-import { useWorkspace, workspace, type Tab } from '../state/workspace';
+import { useEffect, useMemo, useState } from 'react';
+import { useWorkspace, workspace, findLeaf, type Tab } from '../state/workspace';
 
-export function TabBar() {
-  const tabs = useWorkspace((s) => s.tabs);
-  const activeTabId = useWorkspace((s) => s.activeTabId);
+interface TabBarProps {
+  paneId: string;
+}
+
+export function TabBar({ paneId }: TabBarProps) {
+  const allTabs = useWorkspace((s) => s.tabs);
+  const leaf = useWorkspace((s) => findLeaf(s.root, paneId));
+  const tabs = useMemo(() => {
+    if (!leaf) return [];
+    const map = new Map(allTabs.map((t) => [t.id, t]));
+    return leaf.tabIds.map((id) => map.get(id)).filter((t): t is Tab => !!t);
+  }, [leaf, allTabs]);
+  const activeTabId = leaf?.activeTabId ?? null;
   const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
 
   useEffect(() => {
@@ -33,7 +43,7 @@ export function TabBar() {
           : `${dirty.length} tabs have unsaved changes. Close anyway?`;
       if (!window.confirm(msg)) return;
     }
-    workspace.closeTabs(toClose.map((t) => t.id));
+    workspace.closeTabsInLeaf(paneId, toClose.map((t) => t.id));
   };
 
   return (
@@ -117,10 +127,21 @@ function KindIcon({ kind }: { kind: Tab['kind'] }) {
       return <ImageGlyph />;
     case 'binary':
       return <BinaryGlyph />;
+    case 'terminal':
+      return <TerminalGlyph />;
     case 'code':
     default:
       return <CodeGlyph />;
   }
+}
+
+function TerminalGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M4.5 6.5 L7 8 L4.5 9.5 M8.5 10 H11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function FolderGlyph() {

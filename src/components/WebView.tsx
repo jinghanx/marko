@@ -1,5 +1,5 @@
 import { createElement, useEffect, useRef, useState } from 'react';
-import { useWorkspace, workspace } from '../state/workspace';
+import { useWorkspace, workspace, findLeaf } from '../state/workspace';
 import { normalizeUrl } from '../lib/actions';
 import { uiBus } from '../lib/uiBus';
 
@@ -28,7 +28,10 @@ export function WebView({ tabId, url }: Props) {
   const [loading, setLoading] = useState(true);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const addressRef = useRef<HTMLInputElement | null>(null);
-  const isActive = useWorkspace((s) => s.activeTabId === tabId);
+  const isActive = useWorkspace((s) => {
+    const focused = findLeaf(s.root, s.focusedLeafId);
+    return focused?.activeTabId === tabId;
+  });
 
   // Cmd+L: only the active web tab responds.
   useEffect(() => {

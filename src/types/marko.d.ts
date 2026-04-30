@@ -55,6 +55,13 @@ export interface MarkoApi {
   killProcess(pid: number, signal?: string): Promise<{ ok: boolean; error?: string }>;
   systemStats(): Promise<SystemStats>;
   onMenu(channel: string, handler: () => void): () => void;
+
+  ptySpawn(id: string, opts: { cwd?: string; cols?: number; rows?: number }): Promise<{ ok: boolean; error?: string }>;
+  ptyWrite(id: string, data: string): Promise<boolean>;
+  ptyResize(id: string, cols: number, rows: number): Promise<boolean>;
+  ptyKill(id: string): Promise<boolean>;
+  onPtyData(id: string, handler: (data: string) => void): () => void;
+  onPtyExit(id: string, handler: (exitCode: number) => void): () => void;
 }
 
 declare global {

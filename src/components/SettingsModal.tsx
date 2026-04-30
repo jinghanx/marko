@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { settings, useSettings, type ThemeMode } from '../state/settings';
 import { EDITOR_THEMES, type EditorTheme } from '../lib/editorTheme';
+import { LIGHT_THEMES, DARK_THEMES } from '../lib/themes';
 
 interface Props {
   open: boolean;
@@ -58,6 +59,20 @@ export function SettingsModal({ open, onClose }: Props) {
           <Section label="Appearance">
             <Row label="Theme">
               <ThemeSelector value={s.theme} onChange={(theme) => settings.update({ theme })} />
+            </Row>
+            <Row label="Light scheme">
+              <ColorThemeSelect
+                themes={LIGHT_THEMES}
+                value={s.lightThemeId}
+                onChange={(id) => settings.update({ lightThemeId: id })}
+              />
+            </Row>
+            <Row label="Dark scheme">
+              <ColorThemeSelect
+                themes={DARK_THEMES}
+                value={s.darkThemeId}
+                onChange={(id) => settings.update({ darkThemeId: id })}
+              />
             </Row>
             <Row label="Editor theme">
               <EditorThemeSelector
@@ -183,6 +198,41 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     <div className="settings-row">
       <div className="settings-row-label">{label}</div>
       <div className="settings-row-control">{children}</div>
+    </div>
+  );
+}
+
+function ColorThemeSelect({
+  themes,
+  value,
+  onChange,
+}: {
+  themes: { id: string; name: string; bg: string; accent: string; text: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div className="theme-grid">
+      {themes.map((t) => (
+        <button
+          key={t.id}
+          className={`theme-swatch ${value === t.id ? 'theme-swatch--active' : ''}`}
+          onClick={() => onChange(t.id)}
+          title={t.name}
+        >
+          <span
+            className="theme-swatch-preview"
+            style={{
+              background: t.bg,
+              borderColor: value === t.id ? t.accent : 'var(--border)',
+            }}
+          >
+            <span className="theme-swatch-dot" style={{ background: t.accent }} />
+            <span className="theme-swatch-text" style={{ color: t.text }}>Aa</span>
+          </span>
+          <span className="theme-swatch-name">{t.name}</span>
+        </button>
+      ))}
     </div>
   );
 }

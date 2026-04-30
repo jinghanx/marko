@@ -4,11 +4,12 @@ import { EditorState, Compartment } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { vim } from '@replit/codemirror-vim';
-import { workspace, useWorkspace } from '../state/workspace';
+import { workspace, useWorkspace, findLeaf } from '../state/workspace';
 import { findLanguage } from '../lib/fileType';
 import { useSettings } from '../state/settings';
 import { installVimOverrides } from '../lib/vimSetup';
-import { LanguageDescription } from '@codemirror/language';
+import { LanguageDescription, syntaxHighlighting } from '@codemirror/language';
+import { classHighlighter } from '@lezer/highlight';
 import { languages } from '@codemirror/language-data';
 
 installVimOverrides();
@@ -41,6 +42,11 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
           // vim must come before basicSetup so its keymap takes precedence
           vimCompartment.of(vimMode ? vim() : []),
           basicSetup,
+          // Theme-driven syntax highlighting — emits `.tok-*` classes so our
+          // CSS variables (set per active color theme) drive the colors.
+          // Comes after basicSetup so it takes precedence over the default
+          // highlight style baked into basicSetup.
+          syntaxHighlighting(classHighlighter),
           keymap.of([indentWithTab]),
           EditorView.lineWrapping,
           langCompartment.of([]),
@@ -84,7 +90,10 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
   }, [vimMode]);
 
   const focusToken = useWorkspace((s) => s.focusToken);
-  const isActive = useWorkspace((s) => s.activeTabId === tabId);
+  const isActive = useWorkspace((s) => {
+    const focused = findLeaf(s.root, s.focusedLeafId);
+    return focused?.activeTabId === tabId;
+  });
   const seenToken = useRef(focusToken);
   useEffect(() => {
     if (focusToken === seenToken.current) return;

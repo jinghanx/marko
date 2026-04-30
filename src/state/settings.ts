@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { applyEditorTheme, watchSystemTheme, type EditorTheme } from '../lib/editorTheme';
+import { applyThemeToDom, getTheme, DEFAULT_LIGHT_ID, DEFAULT_DARK_ID } from '../lib/themes';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -20,6 +21,10 @@ export interface WorkspaceBookmark {
 export interface Settings {
   theme: ThemeMode;
   editorTheme: EditorTheme;
+  /** Color theme id used when the app is in light mode. */
+  lightThemeId: string;
+  /** Color theme id used when the app is in dark mode. */
+  darkThemeId: string;
   contentFont: string;
   uiFont: string;
   codeFont: string;
@@ -34,6 +39,8 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   editorTheme: 'frame',
+  lightThemeId: DEFAULT_LIGHT_ID,
+  darkThemeId: DEFAULT_DARK_ID,
   contentFont: `'New York', 'Iowan Old Style', 'PT Serif', Georgia, serif`,
   uiFont: `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif`,
   codeFont: `'SF Mono', Menlo, Monaco, Consolas, monospace`,
@@ -69,6 +76,18 @@ function persist(settings: Settings) {
 let state: Settings = load();
 const listeners = new Set<() => void>();
 
+function effectiveDark(theme: ThemeMode): boolean {
+  if (theme === 'dark') return true;
+  if (theme === 'light') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function activeTheme(s: Settings) {
+  const dark = effectiveDark(s.theme);
+  const id = dark ? s.darkThemeId : s.lightThemeId;
+  return getTheme(id) ?? getTheme(dark ? DEFAULT_DARK_ID : DEFAULT_LIGHT_ID)!;
+}
+
 function applyToDom(s: Settings) {
   const root = document.documentElement;
   if (s.theme === 'system') {
@@ -76,6 +95,8 @@ function applyToDom(s: Settings) {
   } else {
     root.setAttribute('data-theme', s.theme);
   }
+  // Apply the picked color theme — overrides default light/dark CSS vars.
+  applyThemeToDom(activeTheme(s));
   root.style.setProperty('--font-content', s.contentFont);
   root.style.setProperty('--font-ui', s.uiFont);
   root.style.setProperty('--font-mono', s.codeFont);
@@ -86,6 +107,11 @@ function applyToDom(s: Settings) {
 
 applyToDom(state);
 watchSystemTheme(() => ({ appTheme: state.theme, editorTheme: state.editorTheme }));
+
+// Re-apply when system color scheme flips (so the right light/dark theme kicks in).
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (state.theme === 'system') applyToDom(state);
+});
 
 export const settings = {
   get(): Settings {
@@ -120,4 +146,10 @@ export function useSettings(): Settings {
     () => state,
     () => state,
   );
+}
+
+/** Returns the currently-active theme (resolved against light/dark mode). */
+export function useActiveTheme() {
+  const s = useSettings();
+  return activeTheme(s);
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Crepe } from '@milkdown/crepe';
 import { editorViewCtx } from '@milkdown/kit/core';
-import { workspace, useWorkspace } from '../state/workspace';
+import { workspace, useWorkspace, findLeaf } from '../state/workspace';
 import { attachBlockDragPreview } from '../lib/blockDragPreview';
 
 import '@milkdown/crepe/theme/common/style.css';
@@ -62,7 +62,10 @@ export function CrepeEditor({ tabId, initialValue }: Props) {
   }, [tabId, initialValue]);
 
   const focusToken = useWorkspace((s) => s.focusToken);
-  const isActive = useWorkspace((s) => s.activeTabId === tabId);
+  const isActive = useWorkspace((s) => {
+    const focused = findLeaf(s.root, s.focusedLeafId);
+    return focused?.activeTabId === tabId;
+  });
   const seenToken = useRef(focusToken);
   useEffect(() => {
     // Only react to explicit focus requests, not to activation/mount.

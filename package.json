@@ -9,13 +9,18 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.node.json && vite build",
     "package:mac": "npm run build && electron-builder --mac --arm64 --x64",
+    "package:mac:arm": "npm run build && electron-builder --mac --arm64",
+    "package:mac:intel": "npm run build && electron-builder --mac --x64",
     "preview": "vite preview",
     "rename:dev-electron": "bash scripts/rename-dev-electron.sh"
   },
   "dependencies": {
     "@milkdown/crepe": "^7.20.0",
     "@replit/codemirror-vim": "^6.3.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "fzf": "^0.5.2",
+    "node-pty": "^1.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -35,17 +40,40 @@
     "appId": "com.marko.app",
     "productName": "Marko",
     "directories": {
-      "buildResources": "build"
+      "buildResources": "build",
+      "output": "release"
     },
     "files": [
-      "dist",
-      "dist-electron"
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asarUnpack": [
+      "**/node_modules/node-pty/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null,
       "target": [
-        "dmg"
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "extendInfo": {
+        "NSCameraUsageDescription": "Not used.",
+        "NSMicrophoneUsageDescription": "Not used."
+      }
+    },
+    "dmg": {
+      "title": "Marko ${version}",
+      "icon": "build/icon.png",
+      "iconSize": 96,
+      "window": { "width": 540, "height": 380 },
+      "contents": [
+        { "x": 140, "y": 180, "type": "file" },
+        { "x": 400, "y": 180, "type": "link", "path": "/Applications" }
       ]
     }
   }

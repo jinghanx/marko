@@ -28,6 +28,8 @@ const ROW_HEIGHT = 24;
 
 export function Sidebar() {
   const rootDir = useWorkspace((s) => s.rootDir);
+  const revealPath = useWorkspace((s) => s.revealPath);
+  const revealToken = useWorkspace((s) => s.revealToken);
   const showHidden = useSettings().showHiddenFiles;
 
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -110,14 +112,25 @@ export function Sidebar() {
     }
   }, [expanded, entriesMap, loadDir]);
 
-  // Scroll selected into view.
+  // Reveal scroll: center the row when revealToken bumps. Tracks pending so
+  // it survives lazy-load races (effect re-fires when visible grows).
+  const pendingRevealRef = useRef<{ token: number; path: string } | null>(null);
   useEffect(() => {
-    if (!selected) return;
-    const idx = visible.findIndex((v) => v.path === selected);
+    if (!revealPath || revealToken === 0) return;
+    pendingRevealRef.current = { token: revealToken, path: revealPath };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealToken]);
+
+  useEffect(() => {
+    const pending = pendingRevealRef.current;
+    if (!pending) return;
+    const idx = visible.findIndex((v) => v.path === pending.path);
     if (idx < 0) return;
     const row = treeRef.current?.querySelector<HTMLElement>(`[data-row-index="${idx}"]`);
-    row?.scrollIntoView({ block: 'nearest' });
-  }, [selected, visible]);
+    if (!row) return;
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    pendingRevealRef.current = null;
+  }, [visible, revealToken]);
 
   // Cancel edit on Escape, commit on Enter — handled in input.
 
@@ -136,6 +149,13 @@ export function Sidebar() {
     const node = visible[idx];
     if (!node) return;
     setSelected(node.path);
+    // Keep arrow-navigated row visible without racing the reveal-center scroll.
+    requestAnimationFrame(() => {
+      const row = treeRef.current?.querySelector<HTMLElement>(
+        `[data-row-index="${idx}"]`,
+      );
+      row?.scrollIntoView({ block: 'nearest' });
+    });
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -290,6 +310,33 @@ export function Sidebar() {
   }, [menu]);
 
   const toggleSidebar = useCallback(() => workspace.toggleSidebar(), []);
+
+  // Reveal a path: expand all ancestor directories under rootDir and select it.
+  // Lazy-loading still applies — the existing expanded-effect will fetch
+  // contents for newly-expanded dirs, and the visible list rebuilds when ready.
+  useEffect(() => {
+    if (!revealPath || !rootDir) return;
+    if (revealPath !== rootDir && !revealPath.startsWith(rootDir + '/')) return;
+    const ancestors = new Set<string>();
+    ancestors.add(rootDir);
+    if (revealPath !== rootDir) {
+      let p = revealPath;
+      while (p.length > rootDir.length) {
+        const slash = p.lastIndexOf('/');
+        if (slash <= 0) break;
+        p = p.slice(0, slash);
+        ancestors.add(p);
+        if (p === rootDir) break;
+      }
+    }
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      ancestors.forEach((a) => next.add(a));
+      return next;
+    });
+    setSelected(revealPath);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealToken]);
 
   return (
     <div className="sidebar-inner">

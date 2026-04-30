@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Marko — editor · finder · browser · terminal in one window</title>
+    <meta name="description" content="A macOS workspace that combines a markdown editor, a Finder-style folder browser, a code editor, an embedded browser, and a real terminal — all in one window with recursive split panes." />
+    <meta property="og:title" content="Marko — one window for everything" />
+    <meta property="og:description" content="Editor, finder, browser, and terminal in a single keyboard-driven macOS app." />
+    <meta property="og:image" content="/icon.png" />
+    <meta name="theme-color" content="#2d6cdf" />
+    <link rel="icon" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="/">
+          <img src="/icon.png" alt="" width="28" height="28" />
+          <span>Marko</span>
+        </a>
+        <div class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#shortcuts">Shortcuts</a>
+          <a href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">GitHub</a>
+          <a class="nav-cta" href="#download">Download</a>
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="hero-bg" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <img class="hero-icon" src="/icon.png" alt="Marko app icon" width="120" height="120" />
+        <h1>One window for everything.</h1>
+        <p class="tagline">
+          <span>editor</span>
+          <span class="dot">✦</span>
+          <span>finder</span>
+          <span class="dot">✦</span>
+          <span>browser</span>
+          <span class="dot">✦</span>
+          <span>terminal</span>
+        </p>
+        <p class="subhead">
+          Marko is a keyboard-driven macOS workspace. Markdown, code, folders, web pages, and a real
+          shell — all in one app, with recursive split panes and 15 hand-tuned color themes.
+        </p>
+        <div class="cta-row" id="download">
+          <a class="btn btn-primary" href="https://github.com/jinghanx/marko/releases/latest">
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 1v9m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Download for macOS
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.4 3.6 1 .1-.8.4-1.4.8-1.7-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11 11 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" fill="currentColor"/>
+            </svg>
+            View on GitHub
+          </a>
+        </div>
+        <p class="hero-meta">macOS 12+ · Apple Silicon &amp; Intel · Free &amp; open source</p>
+      </div>
+    </header>
+
+    <section class="window-demo">
+      <div class="window-frame">
+        <div class="window-chrome">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+        </div>
+        <div class="window-tabs">
+          <span class="window-tab window-tab--folder">
+            <span class="tab-glyph">📁</span>marko
+          </span>
+          <span class="window-tab window-tab--md window-tab--active">
+            <span class="tab-glyph">📝</span>README.md
+          </span>
+          <span class="window-tab window-tab--code">
+            <span class="tab-glyph">⟨⟩</span>App.tsx
+          </span>
+          <span class="window-tab window-tab--term">
+            <span class="tab-glyph">▍</span>zsh
+          </span>
+          <span class="window-tab window-tab--web">
+            <span class="tab-glyph">◯</span>news.ycombinator.com
+          </span>
+        </div>
+        <div class="window-body">
+          <aside class="demo-sidebar">
+            <div class="demo-side-h">marko</div>
+            <div class="demo-side-row demo-side-row--active">README.md</div>
+            <div class="demo-side-row">package.json</div>
+            <div class="demo-side-row">src/</div>
+            <div class="demo-side-row demo-indent">App.tsx</div>
+            <div class="demo-side-row demo-indent">main.tsx</div>
+            <div class="demo-side-row">build/</div>
+          </aside>
+          <main class="demo-main">
+            <h2 class="demo-h">Marko</h2>
+            <p class="demo-p"><em>One window for everything.</em></p>
+            <p class="demo-p">A keyboard-driven workspace.</p>
+            <ul class="demo-list">
+              <li>WYSIWYG markdown</li>
+              <li>Finder-style folder browser</li>
+              <li>Code editor with vim mode</li>
+              <li>Embedded browser &amp; terminal</li>
+            </ul>
+          </main>
+          <aside class="demo-outline">
+            <div class="demo-outline-h">Outline</div>
+            <div class="demo-outline-row">Marko</div>
+            <div class="demo-outline-row demo-outline-sub">Why</div>
+            <div class="demo-outline-row demo-outline-sub">Features</div>
+            <div class="demo-outline-row demo-outline-sub">Stack</div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="features" id="features">
+      <header class="section-head">
+        <h2>Built around how you actually work.</h2>
+        <p>Five distinct tools, one consistent surface. Move between them with muscle memory.</p>
+      </header>
+      <div class="feature-grid">
+        <div class="feature">
+          <div class="feature-icon">✎</div>
+          <h3>WYSIWYG markdown</h3>
+          <p>Live in-place rendering, slash commands, drag handles, code blocks, math, GFM tables. Saves real .md files.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📁</div>
+          <h3>Finder-style folders</h3>
+          <p>Drag to multi-select. Sort by date, kind, or size with section headers. Quick Look on Space. Cut, copy, paste.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⟨⟩</div>
+          <h3>Code editor</h3>
+          <p>CodeMirror 6 with auto-detected language for 30+ syntaxes. Optional vim mode. Theme-aware syntax colors.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">▍</div>
+          <h3>Real terminal</h3>
+          <p>xterm.js + node-pty running your real $SHELL. Themes match the app's color scheme. Multiple panes side by side.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">◯</div>
+          <h3>Embedded browser</h3>
+          <p>Type a URL in ⌘T → opens as a tab with back/forward, address bar, and a real Chromium webview.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">▰▰</div>
+          <h3>Recursive split panes</h3>
+          <p>Split any pane horizontally or vertically. Nest as deeply as you want. Each pane has its own tabs.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🎨</div>
+          <h3>15 color themes</h3>
+          <p>Tokyo Night, Catppuccin, Dracula, Gruvbox, One Dark, Nord, Solarized, Rosé Pine and more. Light + dark variants.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⌘</div>
+          <h3>Keyboard-first</h3>
+          <p>⌘P fuzzy file search, ⌘T autocompleting path or URL, ⌘\ split, ⌘Y htop-style process viewer, ⌘L address bar.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🗂</div>
+          <h3>Workspaces</h3>
+          <p>Bookmark folders you switch between. Auto-restore the last workspace on launch. Reveal active file in tree.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="shortcuts" id="shortcuts">
+      <header class="section-head">
+        <h2>One keystroke away.</h2>
+        <p>The full cheatsheet lives on the welcome screen. The greatest hits:</p>
+      </header>
+      <div class="shortcut-grid">
+        <div class="shortcut-col">
+          <div class="shortcut-h">Files</div>
+          <div class="shortcut"><kbd>⌘P</kbd><span>quick open</span></div>
+          <div class="shortcut"><kbd>⌘T</kbd><span>go to path / command</span></div>
+          <div class="shortcut"><kbd>⌘N</kbd><span>new file…</span></div>
+          <div class="shortcut"><kbd>⌘O</kbd><span>open file</span></div>
+          <div class="shortcut"><kbd>⌘⇧O</kbd><span>open folder</span></div>
+          <div class="shortcut"><kbd>⌘S</kbd><span>save</span></div>
+        </div>
+        <div class="shortcut-col">
+          <div class="shortcut-h">Tabs</div>
+          <div class="shortcut"><kbd>⌘W</kbd><span>close tab</span></div>
+          <div class="shortcut"><kbd>⌘⇧[</kbd><span>previous tab</span></div>
+          <div class="shortcut"><kbd>⌘⇧]</kbd><span>next tab</span></div>
+        </div>
+        <div class="shortcut-col">
+          <div class="shortcut-h">Panes</div>
+          <div class="shortcut"><kbd>⌘\</kbd><span>split right</span></div>
+          <div class="shortcut"><kbd>⌘=</kbd><span>split down</span></div>
+          <div class="shortcut"><kbd>⌘`</kbd><span>next pane</span></div>
+          <div class="shortcut"><kbd>⌘⌥W</kbd><span>close pane</span></div>
+        </div>
+        <div class="shortcut-col">
+          <div class="shortcut-h">View</div>
+          <div class="shortcut"><kbd>⌘E</kbd><span>toggle sidebar</span></div>
+          <div class="shortcut"><kbd>⌘⇧\</kbd><span>toggle outline</span></div>
+          <div class="shortcut"><kbd>⌘Y</kbd><span>process viewer</span></div>
+          <div class="shortcut"><kbd>⌘,</kbd><span>preferences</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-band">
+      <div class="cta-band-inner">
+        <h2>Stop alt-tabbing.</h2>
+        <p>Drop Marko into Applications and try it for an afternoon.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/jinghanx/marko/releases/latest">
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 1v9m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Download .dmg
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">View source</a>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <img src="/icon.png" alt="" width="20" height="20" />
+          <span>Marko</span>
+        </div>
+        <div class="footer-links">
+          <a href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/jinghanx/marko/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/jinghanx/marko/issues" target="_blank" rel="noopener">Issues</a>
+        </div>
+        <div class="footer-meta">MIT · Built with Electron + React</div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -187,7 +187,7 @@ export async function openFolderViaDialog() {
   const dir = await window.marko.openFolderDialog();
   if (!dir) return;
   workspace.setRootDir(dir);
-  workspace.setState({ sidebarVisible: true });
+  workspace.setSidebarVisible(true);
 }
 
 export async function openFileFromPath(filePath: string, opts: { focus?: boolean } = {}) {

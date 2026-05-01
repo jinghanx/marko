@@ -222,6 +222,7 @@ export interface MarkoApi {
     cancelLabel?: string;
     dangerous?: boolean;
   }): Promise<boolean>;
+  gitInit(repoDir: string): Promise<{ ok: boolean; error?: string }>;
   gitStatus(repoDir: string): Promise<GitStatusInfo>;
   gitDiff(repoDir: string, relPath: string, staged: boolean): Promise<{ ok: boolean; diff?: string; error?: string }>;
   gitStage(repoDir: string, paths: string[]): Promise<{ ok: boolean; error?: string }>;

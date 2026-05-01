@@ -467,6 +467,28 @@ export function GitView() {
       <div className="git-view git-view--empty">
         <div className="git-empty-title">Not a Git repository</div>
         <div className="git-empty-sub">{rootDir}</div>
+        <button
+          className="btn btn-primary"
+          disabled={busy}
+          onClick={async () => {
+            if (!rootDir) return;
+            setBusy(true);
+            setError(null);
+            try {
+              const r = await window.marko.gitInit(rootDir);
+              if (!r.ok) {
+                setError(r.error ?? 'Failed to initialize repository');
+                return;
+              }
+              await refresh();
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? 'Initializing…' : 'Initialize Git repository here'}
+        </button>
+        {error && <div className="git-empty-error">{error}</div>}
       </div>
     );
   }

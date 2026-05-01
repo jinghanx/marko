@@ -86,6 +86,7 @@ const api = {
   }): Promise<boolean> => ipcRenderer.invoke('app:confirm', opts),
 
   // ---------- Git ----------
+  gitInit: (repoDir: string) => ipcRenderer.invoke('git:init', repoDir),
   gitStatus: (repoDir: string) => ipcRenderer.invoke('git:status', repoDir),
   gitDiff: (repoDir: string, relPath: string, staged: boolean) =>
     ipcRenderer.invoke('git:diff', repoDir, relPath, staged),

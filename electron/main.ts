@@ -81,6 +81,29 @@ function createWindow() {
   });
 }
 
+/** Intercept popups opened from <webview> tags inside Marko (e.g., OAuth
+ *  sign-in flows for Google, Twitter, GitHub). The default behavior opens
+ *  them at full size without a sensible parent — we want a small floating
+ *  window above the main one, sharing the default session so cookies set
+ *  during the popup auth flow are visible to the originating webview. */
+app.on('web-contents-created', (_e, contents) => {
+  if (contents.getType() !== 'webview') return;
+  contents.setWindowOpenHandler(({ url }) => ({
+    action: 'allow',
+    overrideBrowserWindowOptions: {
+      width: 520,
+      height: 640,
+      parent: mainWindow ?? undefined,
+      modal: false,
+      autoHideMenuBar: true,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    },
+  }));
+});
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
 
@@ -607,6 +630,19 @@ async function isInsideRepo(repoDir: string): Promise<boolean> {
     return false;
   }
 }
+
+ipcMain.handle('git:init', async (_e, repoDir: string): Promise<{ ok: boolean; error?: string }> => {
+  if (!repoDir) return { ok: false, error: 'No directory selected' };
+  try {
+    if (await isInsideRepo(repoDir)) {
+      return { ok: false, error: 'Directory is already a Git repository' };
+    }
+    await git(repoDir).init();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+});
 
 ipcMain.handle('git:status', async (_e, repoDir: string): Promise<GitStatusInfo> => {
   if (!repoDir) return { isRepo: false, branch: null, tracking: null, ahead: 0, behind: 0, files: [] };

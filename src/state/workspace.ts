@@ -87,14 +87,17 @@ export interface Session {
   /** Per-session workspace root directory. Each session is an independent
    *  task context with its own sidebar / file palette / fuzzy search scope. */
   rootDir: string | null;
+  /** Per-session sidebar visibility — each workspace can decide whether
+   *  the file tree is showing. Defaults to true for new sessions. */
+  sidebarVisible: boolean;
+  /** Per-session outline visibility — same model as sidebarVisible. */
+  outlineVisible: boolean;
 }
 
 interface WorkspaceState {
   tabs: Tab[];
   sessions: Session[];
   activeSessionId: string;
-  sidebarVisible: boolean;
-  outlineVisible: boolean;
   focusToken: number;
   revealPath: string | null;
   revealToken: number;
@@ -128,6 +131,8 @@ function makeFreshSession(name = 'Workspace', rootDir: string | null = null): Se
     root: leaf,
     focusedLeafId: leaf.id,
     rootDir,
+    sidebarVisible: true,
+    outlineVisible: false,
   };
 }
 
@@ -137,8 +142,6 @@ let state: WorkspaceState = {
   tabs: [],
   sessions: [initialSession],
   activeSessionId: initialSession.id,
-  sidebarVisible: true,
-  outlineVisible: false,
   focusToken: 0,
   revealPath: null,
   revealToken: 0,
@@ -927,11 +930,27 @@ export const workspace = {
   },
 
   toggleSidebar() {
-    setState((prev) => ({ sidebarVisible: !prev.sidebarVisible }));
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      return {
+        sessions: patchActiveSession(prev, { sidebarVisible: !active.sidebarVisible }),
+      };
+    });
+  },
+
+  setSidebarVisible(visible: boolean) {
+    setState((prev) => ({
+      sessions: patchActiveSession(prev, { sidebarVisible: visible }),
+    }));
   },
 
   toggleOutline() {
-    setState((prev) => ({ outlineVisible: !prev.outlineVisible }));
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      return {
+        sessions: patchActiveSession(prev, { outlineVisible: !active.outlineVisible }),
+      };
+    });
   },
 
   requestEditorFocus() {
@@ -1053,8 +1072,11 @@ interface Snapshot {
   tabs: PersistedTab[];
   sessions: Session[];
   activeSessionId: string;
-  sidebarVisible: boolean;
-  outlineVisible: boolean;
+  /** Legacy global flags — retained for back-compat with snapshots written
+   *  before these became per-session. New code reads/writes
+   *  Session.sidebarVisible / Session.outlineVisible instead. */
+  sidebarVisible?: boolean;
+  outlineVisible?: boolean;
 }
 
 /** Build a JSON-safe snapshot of the current workspace. */
@@ -1114,8 +1136,6 @@ export function serializeWorkspace(): Snapshot {
     tabs: persistableTabs,
     sessions,
     activeSessionId: state.activeSessionId,
-    sidebarVisible: state.sidebarVisible,
-    outlineVisible: state.outlineVisible,
   };
 }
 
@@ -1177,13 +1197,28 @@ export async function hydrateFromSnapshot(snapshot: Snapshot): Promise<void> {
   );
   nextSessionId = Math.max(nextSessionId, maxIdSuffix('session', allSessionIds) + 1);
 
+  // Back-compat: older snapshots stored global `sidebarVisible` /
+  // `outlineVisible` flags. Migrate each onto sessions that don't already
+  // carry the field.
+  const legacySidebar = snapshot.sidebarVisible;
+  const legacyOutline = snapshot.outlineVisible;
+  const migratedSessions: Session[] = snapshot.sessions.map((sess) => ({
+    ...sess,
+    sidebarVisible:
+      typeof sess.sidebarVisible === 'boolean'
+        ? sess.sidebarVisible
+        : (legacySidebar ?? true),
+    outlineVisible:
+      typeof sess.outlineVisible === 'boolean'
+        ? sess.outlineVisible
+        : (legacyOutline ?? false),
+  }));
+
   // Apply the stub state synchronously so the window paints immediately.
   setState({
     tabs: stubTabs,
-    sessions: snapshot.sessions,
+    sessions: migratedSessions,
     activeSessionId: snapshot.activeSessionId,
-    sidebarVisible: snapshot.sidebarVisible,
-    outlineVisible: snapshot.outlineVisible,
     layoutCycle: null,
     folderSelection: null,
     revealPath: null,

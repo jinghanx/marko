@@ -115,7 +115,7 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
             title={tab.filePath ?? tab.title}
           >
             <span className={`tab-icon tab-icon--${tab.kind}`} aria-hidden>
-              <KindIcon kind={tab.kind} />
+              <KindIcon tab={tab} />
             </span>
             <span className="tab-title">{tab.title}</span>
             {tab.kind === 'markdown' && tab.viewMode === 'raw' && (
@@ -168,12 +168,12 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
   );
 }
 
-function KindIcon({ kind }: { kind: Tab['kind'] }) {
-  switch (kind) {
+function KindIcon({ tab }: { tab: Tab }) {
+  switch (tab.kind) {
     case 'folder':
       return <FolderGlyph />;
     case 'web':
-      return <GlobeGlyph />;
+      return <WebFavicon url={tab.filePath} />;
     case 'markdown':
       return <MarkdownGlyph />;
     case 'image':
@@ -214,6 +214,43 @@ function KindIcon({ kind }: { kind: Tab['kind'] }) {
     default:
       return <CodeGlyph />;
   }
+}
+
+/** Renders a site favicon for web tabs. Pulls `<host>/favicon.ico` directly
+ *  (no third-party lookup service — privacy-local). On any load failure
+ *  falls back to the globe glyph; same for non-http(s) URLs. */
+function WebFavicon({ url }: { url: string | null }) {
+  const [errored, setErrored] = useState(false);
+  let host: string | null = null;
+  let origin: string | null = null;
+  if (url) {
+    try {
+      const u = new URL(url);
+      if (u.protocol === 'http:' || u.protocol === 'https:') {
+        host = u.hostname;
+        origin = u.origin;
+      }
+    } catch {
+      // ignore — non-URL filePath, fall through to globe
+    }
+  }
+  // Reset the error state when the URL changes (different host = retry).
+  useEffect(() => {
+    setErrored(false);
+  }, [origin]);
+  if (!origin || !host || errored) return <GlobeGlyph />;
+  return (
+    <img
+      className="tab-favicon"
+      src={`${origin}/favicon.ico`}
+      alt=""
+      width={14}
+      height={14}
+      loading="lazy"
+      decoding="async"
+      onError={() => setErrored(true)}
+    />
+  );
 }
 
 function SqliteGlyph() {

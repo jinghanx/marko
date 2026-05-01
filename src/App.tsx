@@ -33,8 +33,8 @@ function gotoTabInFocused(idx: number) {
 }
 
 export function App() {
-  const sidebarVisible = useWorkspace((s) => s.sidebarVisible);
-  const outlineVisible = useWorkspace((s) => s.outlineVisible);
+  const sidebarVisible = useWorkspace((s) => getActiveSession(s).sidebarVisible);
+  const outlineVisible = useWorkspace((s) => getActiveSession(s).outlineVisible);
   const rootDir = useWorkspace((s) => getActiveSession(s).rootDir);
   const sessions = useWorkspace((s) => s.sessions);
   const activeSessionId = useWorkspace((s) => s.activeSessionId);
@@ -163,9 +163,9 @@ export function App() {
   return (
     <div className="app">
       <div className="titlebar">
+        <SessionStrip />
         <NowPlaying />
       </div>
-      <SessionStrip />
       <div className="app-body">
         <aside className={`sidebar ${sidebarVisible ? '' : 'sidebar--hidden'}`}>
           <Sidebar />

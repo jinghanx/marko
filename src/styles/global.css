@@ -18,8 +18,8 @@
   --tab-active-bg: var(--bg);
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 
-  --titlebar-h: 36px;
-  --tabbar-h: 32px;
+  --titlebar-h: 44px;
+  --tabbar-h: 44px;
   --sidebar-w: 240px;
   --outline-w: 220px;
 
@@ -196,14 +196,16 @@ button {
 .titlebar {
   height: var(--titlebar-h);
   flex: 0 0 auto;
-  background: var(--bg);
+  /* The titlebar is the session strip too: traffic lights on the left,
+   *  session bubbles in the middle, now-playing pill on the right. */
+  background: var(--tab-bg);
   -webkit-app-region: drag;
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  /* Leave space for the macOS traffic-light buttons on the left. */
-  padding: 0 12px 0 84px;
+  align-items: stretch;
+  /* Leave generous space for the macOS traffic-light buttons on the left
+   *  so they don't feel crammed against the first session bubble. */
+  padding: 0 12px 0 100px;
   gap: 8px;
 }
 
@@ -211,7 +213,9 @@ button {
  *  itself a drag region; we re-enable clicks for the pills. */
 .now-playing {
   display: flex;
+  align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
   -webkit-app-region: no-drag;
 }
 .now-playing-pill {
@@ -256,48 +260,56 @@ button {
   50% { transform: scaleY(1.05); }
 }
 
-/* Session strip — top-level tab bar for tmux-style sessions. */
+/* Session strip — top-level tab bar for tmux-style sessions. Lives inside
+ *  the titlebar (same row as traffic lights + now-playing pill). Styled
+ *  with the same bubble language as the file-tab bar. */
 .session-strip {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   display: flex;
   align-items: stretch;
-  background: var(--bg-muted);
-  border-bottom: 1px solid var(--border);
-  padding: 0 6px 0 0;
-  height: 30px;
+  gap: 5px;
+  padding: 9px 0 7px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
   -webkit-app-region: no-drag;
+  min-width: 0;
 }
 .session-strip::-webkit-scrollbar { display: none; }
 
 .session-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 0 10px 0 14px;
+  margin: 0;
+  border-radius: 10px;
   font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
-  border-right: 1px solid var(--border);
   min-width: 80px;
   max-width: 200px;
+  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, var(--tab-bg));
+  transition: background 80ms ease-out;
 }
-.session-tab:hover { color: var(--text); }
-.session-tab--active {
-  background: var(--bg);
+.session-tab:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 30%, var(--tab-bg));
+}
+.session-tab--active,
+.session-tab--active:hover {
+  background: linear-gradient(
+    to bottom,
+    var(--session-accent) 0,
+    var(--session-accent) 2px,
+    var(--tab-active-bg) 2px
+  );
   color: var(--text);
   font-weight: 600;
-  position: relative;
-}
-.session-tab--active::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: var(--session-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--session-accent) 40%, var(--border));
 }
 .session-tab-name {
   white-space: nowrap;
@@ -340,13 +352,23 @@ button {
   align-items: center;
   justify-content: center;
   width: 28px;
+  margin: 0;
+  border-radius: 10px;
   font-size: 14px;
+  line-height: 1;
   color: var(--text-muted);
   border: 0;
-  background: transparent;
   cursor: pointer;
+  -webkit-app-region: no-drag;
+  /* Match the bubble treatment of the surrounding session tabs. */
+  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, var(--tab-bg));
+  transition: background 80ms ease-out;
 }
-.session-tab-new:hover { color: var(--text); }
+.session-tab-new:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 30%, var(--tab-bg));
+}
 
 /* Drag-reorder feedback for session tabs. The dragged tab dims; the drop
  *  position is shown by an orange bar on the closest edge of the hover target. */
@@ -387,14 +409,16 @@ button {
 }
 
 .sidebar-header {
-  padding: 6px 8px 6px 12px;
+  padding: 0 8px 0 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
   border-bottom: 1px solid var(--border);
   font-size: 12px;
-  min-height: 32px;
+  /* Match the file-tab bar height so the two top rows line up. */
+  height: var(--tabbar-h);
+  flex: 0 0 auto;
 }
 
 .workspace-dd {
@@ -766,13 +790,15 @@ button {
   opacity: 0.92;
 }
 .pane:not(.pane--focused) .tab--active {
-  /* In an unfocused pane, the active-tab bar fades to a muted color
-     so the eye is drawn to the focused pane's active tab. */
+  /* Unfocused panes dim the active-tab accent stripe + fill so attention
+   *  stays on the focused pane's active tab. */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 50%, var(--text-muted)) 0,
+    color-mix(in srgb, var(--accent) 50%, var(--text-muted)) 2px,
+    color-mix(in srgb, var(--tab-active-bg) 85%, var(--text-muted)) 2px
+  );
   font-weight: 500;
-}
-.pane:not(.pane--focused) .tab--active::before {
-  background: var(--text-muted);
-  opacity: 0.5;
 }
 
 .splitter {
@@ -799,6 +825,10 @@ button {
   flex: 0 0 auto;
   display: flex;
   align-items: stretch;
+  gap: 5px;
+  padding: 9px 10px 7px;
+  /* Tabbar uses the muted bg shade so both inactive and active tab fills
+   *  stand out as distinct bubbles against it. */
   background: var(--tab-bg);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
@@ -813,15 +843,23 @@ button {
 .tab {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 12px;
-  border-right: 1px solid var(--border);
+  gap: 7px;
+  padding: 0 12px 0 14px;
+  margin: 0;
+  border-radius: 10px;
+  /* Inactive bubble fill + edge: shift the tabbar bg ~22% toward the
+   *  foreground color and ring with a hairline so each bubble has a
+   *  definitive silhouette against the tabbar regardless of theme. The
+   *  ring uses box-shadow (not border) so it doesn't change layout. */
+  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, var(--tab-bg));
   font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;
   min-width: 0;
   max-width: 220px;
   user-select: none;
+  transition: background 80ms ease-out;
 }
 .tab-icon {
   flex: 0 0 auto;
@@ -831,6 +869,13 @@ button {
   color: var(--text-muted);
 }
 .tab-icon:empty { display: none; }
+.tab-favicon {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  object-fit: contain;
+  display: block;
+}
 .tab-icon--folder { color: var(--accent); }
 .tab-icon--web { color: #2ea043; }
 .tab-icon--markdown { color: #d97757; }
@@ -855,26 +900,10 @@ button {
 .tab--drop-before { box-shadow: inset 2px 0 0 var(--accent); }
 .tab--drop-after { box-shadow: inset -2px 0 0 var(--accent); }
 
-.tab--terminal {
-  background: color-mix(in srgb, #4caf6d 8%, transparent);
-}
-.tab--terminal.tab--active {
-  background: color-mix(in srgb, #4caf6d 16%, var(--tab-active-bg));
-}
-.tab--folder {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  font-style: italic;
-}
-.tab--folder.tab--active {
-  background: color-mix(in srgb, var(--accent) 18%, var(--tab-active-bg));
-  font-style: italic;
-}
-.tab--web {
-  background: color-mix(in srgb, #2ecc71 10%, transparent);
-}
-.tab--web.tab--active {
-  background: color-mix(in srgb, #2ecc71 18%, var(--tab-active-bg));
-}
+/* Folder tabs keep an italic title as a subtle marker — color comes from
+ *  the shared inactive/active bubble fills rather than a per-kind tint. */
+.tab--folder { font-style: italic; }
+.tab--folder.tab--active { font-style: italic; }
 .tab--web .tab-icon { color: #2ea043; }
 
 /* Terminal host */
@@ -1070,35 +1099,26 @@ button {
 
 .tab:hover {
   color: var(--text);
+  /* Slightly tint the bubble fill on hover so the tab visibly responds
+   *  before clicking. */
+  background: color-mix(in srgb, var(--text) 8%, var(--tab-bg));
 }
 
-.tab--active {
-  background: var(--tab-active-bg);
+.tab--active,
+.tab--active:hover {
+  /* Active tab is also a bubble (same shape as inactive ones), but with a
+   *  distinct fill (matches the editor) and a small accent stripe at the
+   *  top. The top stripe is drawn as a gradient so it follows the rounded
+   *  corners cleanly. */
+  background: linear-gradient(
+    to bottom,
+    var(--accent) 0,
+    var(--accent) 2px,
+    var(--tab-active-bg) 2px
+  );
   color: var(--text);
   font-weight: 600;
   position: relative;
-}
-.tab--active::before {
-  /* Bright accent bar at the top of the active tab. */
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 2px;
-  background: var(--accent);
-  pointer-events: none;
-}
-.tab--active::after {
-  /* Hide the focused-pane bar behind the active tab — the tab's own bar
-     replaces it for a cleaner look. */
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 1px;
-  background: var(--tab-active-bg);
 }
 
 .tab-title {
@@ -1144,39 +1164,60 @@ button {
   color: var(--text);
 }
 
-/* Pinned tabs (Chrome-style) — narrower, hide the title, accent border on
- *  the left, and only show the close button on hover. The pin lives in
- *  every leaf the tab is a member of, so each one renders compactly. */
+/* Pinned tabs — Chrome-style "narrow tab", same height + corner radius as
+ *  unpinned ones. Just a tighter footprint, favicon-only, no separate
+ *  background tint at rest (the tab's own active/hover fills carry over).
+ *  Web tabs with real favicons become the most distinct; for non-web tabs
+ *  the row-level `title` tooltip still surfaces the full name. */
 .tab--pinned {
-  max-width: 44px;
-  padding: 0 8px;
-  border-left: 2px solid var(--accent);
+  position: relative;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  padding: 0;
+  justify-content: center;
 }
-.tab--pinned .tab-title {
-  display: none;
+.tab--pinned .tab-icon {
+  transform: scale(1.18);
 }
-.tab--pinned .tab-close {
-  width: 14px;
-  height: 14px;
-  font-size: 11px;
-  opacity: 0;
-  transition: opacity 80ms ease-in;
+.tab--pinned .tab-favicon {
+  width: 16px;
+  height: 16px;
 }
-.tab--pinned:hover .tab-close,
-.tab--pinned.tab--active .tab-close {
-  opacity: 1;
-}
+.tab--pinned .tab-title,
 .tab--pinned .tab-mode-badge {
   display: none;
 }
+/* Pinned tabs hide the close button entirely — to close, the user
+ *  unpins via the right-click menu first (Chrome convention). */
+.tab--pinned .tab-close {
+  display: none;
+}
+.tab--pinned .tab-dirty {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
 
 .tab-new {
-  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  margin: 0;
+  border-radius: 10px;
+  font-size: 16px;
+  line-height: 1;
   color: var(--text-muted);
+  /* Match the bubble treatment of the surrounding file tabs. */
+  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, var(--tab-bg));
+  transition: background 80ms ease-out;
 }
 
 .tab-new:hover {
   color: var(--text);
+  background: color-mix(in srgb, var(--text) 30%, var(--tab-bg));
 }
 
 .editor-pane {
@@ -2893,14 +2934,18 @@ button {
   font-size: 12.5px;
 }
 .git-view--empty {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+  gap: 10px;
   padding: 40px;
   color: var(--text-muted);
 }
-.git-empty-title { font-size: 14px; color: var(--text); margin-bottom: 6px; }
+.git-empty-title { font-size: 14px; color: var(--text); }
 .git-empty-sub { font-family: var(--font-mono); font-size: 11.5px; }
+.git-empty-error { font-size: 12px; color: #d1383b; }
 .git-toolbar {
   flex: 0 0 auto;
   display: flex;
@@ -5374,7 +5419,12 @@ button {
 }
 
 .outline-header {
-  padding: 8px 12px;
+  /* Matches the file-tab bar height so the top edges line up across panes. */
+  height: var(--tabbar-h);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;

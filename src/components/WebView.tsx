@@ -145,11 +145,14 @@ export function WebView({ tabId, url }: Props) {
         />
       </div>
       {/* `webview` is an Electron-specific element; React's typings don't
-          model its DOM attributes, so we cast props through React.createElement. */}
+          model its DOM attributes, so we cast props through React.createElement.
+          `allowpopups` is required for OAuth flows that open a sign-in popup
+          (Google, Twitter, GitHub, etc.). */}
       {createElement('webview', {
         ref: wvRef,
         src: url,
         className: 'webview-frame',
+        allowpopups: 'true',
         webpreferences: 'contextIsolation=yes',
       })}
       <div className="webview-status">{currentUrl}</div>

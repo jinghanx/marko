@@ -15,7 +15,7 @@ A separate static landing page lives in `landing/` (plain HTML/CSS, deployed to 
 | `npm run dev` | Vite + Electron with HMR. Renderer hot-reloads instantly. Main-process and preload changes rebuild but do **not** auto-restart Electron — `⌘Q` and rerun `npm run dev` to pick up `electron/main.ts` or `electron/preload.ts` changes. |
 | `npm run rename:dev-electron` | One-time patch of `node_modules/electron/dist/Electron.app/Contents/Info.plist` so the dev menu bar reads "Marko" instead of "Electron". Re-run after any `npm install` that reinstalls Electron. |
 | `npm run build` | `tsc -p tsconfig.node.json` then `vite build`. Outputs to `dist/` (renderer) and `dist-electron/` (main + preload). |
-| `npm run package:mac` | Build + `electron-builder --mac --arm64 --x64`. Outputs `release/Marko-X.Y.Z-arm64.dmg` and `release/Marko-X.Y.Z.dmg`. |
+| `npm run package:mac` | Build + `electron-builder --mac --arm64 --x64`. Outputs `release/Marko-arm64.dmg` and `release/Marko-x64.dmg`. The version-less filenames are produced by the `mac.artifactName` template in `package.json` so the landing page can hardcode stable download URLs. |
 | `npm run package:mac:arm` / `:intel` | Single-arch builds (faster). |
 | `npx tsc --noEmit -p tsconfig.json` | Typecheck the renderer. No test framework is configured. |
 | `npx tsc --noEmit -p tsconfig.node.json` | Typecheck `electron/` + `vite.config.ts`. |
@@ -78,4 +78,4 @@ CodeMirror's `defaultHighlightStyle` is bypassed by adding `syntaxHighlighting(c
 ## Things to know about the conversation context
 
 - Code-signing for the .dmg is **disabled** (`mac.identity: null` in `package.json`'s `build` block). Users hit a Gatekeeper warning on first launch. Don't enable signing without an Apple Developer cert in env.
-- The GitHub repo is `jinghanx/marko` (public). Releases pattern: `gh release create vX.Y.Z release/*.dmg`. The landing page links to `releases/latest/download/Marko-X.Y.Z-{arm64,}.dmg` — keep DMG asset filenames consistent across releases or update the landing page.
+- The GitHub repo is `jinghanx/marko` (public). Releases pattern: `gh release create vX.Y.Z release/Marko-arm64.dmg release/Marko-x64.dmg`. The landing page links to `releases/latest/download/Marko-{arm64,x64}.dmg` — version-less by design (see `mac.artifactName` in package.json), so the landing page never needs to be edited at release time.

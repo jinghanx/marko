@@ -18,6 +18,39 @@ export interface WorkspaceBookmark {
   path: string;
 }
 
+export type SearchEngineId = 'google' | 'duckduckgo' | 'kagi' | 'bing' | 'brave' | 'custom';
+
+/** Built-in search engines. The `template` uses `{q}` as the (already
+ *  url-encoded) query placeholder. `custom` is a user-defined template that
+ *  lives separately in `customSearchUrl`. */
+export const SEARCH_ENGINES: {
+  id: Exclude<SearchEngineId, 'custom'>;
+  name: string;
+  template: string;
+  host: string;
+}[] = [
+  { id: 'google', name: 'Google', template: 'https://www.google.com/search?q={q}', host: 'google.com' },
+  { id: 'duckduckgo', name: 'DuckDuckGo', template: 'https://duckduckgo.com/?q={q}', host: 'duckduckgo.com' },
+  { id: 'kagi', name: 'Kagi', template: 'https://kagi.com/search?q={q}', host: 'kagi.com' },
+  { id: 'bing', name: 'Bing', template: 'https://www.bing.com/search?q={q}', host: 'bing.com' },
+  { id: 'brave', name: 'Brave Search', template: 'https://search.brave.com/search?q={q}', host: 'search.brave.com' },
+];
+
+/** Build the search URL for `query` using current settings. Falls back to
+ *  Google if the user picked custom but didn't supply a template. */
+export function buildSearchUrl(s: Settings, query: string): { url: string; host: string } {
+  const encoded = encodeURIComponent(query);
+  if (s.searchEngine === 'custom' && s.customSearchUrl.includes('{q}')) {
+    const url = s.customSearchUrl.replace(/\{q\}/g, encoded);
+    let host = 'custom';
+    try { host = new URL(url).hostname; } catch { /* ignore */ }
+    return { url, host };
+  }
+  const id = s.searchEngine === 'custom' ? 'google' : s.searchEngine;
+  const engine = SEARCH_ENGINES.find((e) => e.id === id) ?? SEARCH_ENGINES[0];
+  return { url: engine.template.replace('{q}', encoded), host: engine.host };
+}
+
 export interface Settings {
   theme: ThemeMode;
   editorTheme: EditorTheme;
@@ -38,6 +71,12 @@ export interface Settings {
   workspaceBookmarks: WorkspaceBookmark[];
   /** Most-recently-opened file paths, newest first. Capped at MAX_RECENT_FILES. */
   recentFiles: string[];
+  /** Most-recently-opened URLs (web tabs), newest first. Same cap. */
+  recentUrls: string[];
+  /** Search engine used by ⌘T's web-search fallback. */
+  searchEngine: SearchEngineId;
+  /** When `searchEngine === 'custom'`, the URL template (must contain `{q}`). */
+  customSearchUrl: string;
 }
 
 export const MAX_RECENT_FILES = 30;
@@ -58,6 +97,9 @@ export const DEFAULT_SETTINGS: Settings = {
   showHiddenFiles: false,
   workspaceBookmarks: [],
   recentFiles: [],
+  recentUrls: [],
+  searchEngine: 'google',
+  customSearchUrl: 'https://example.com/?q={q}',
 };
 
 const STORAGE_KEY = 'marko:settings';
@@ -149,6 +191,18 @@ export const settings = {
       MAX_RECENT_FILES,
     );
     state = { ...state, recentFiles: next };
+    persist(state);
+    listeners.forEach((fn) => fn());
+  },
+
+  /** Move `url` to the front of recentUrls (deduped, capped). */
+  pushRecentUrl(url: string) {
+    if (!url) return;
+    const next = [url, ...state.recentUrls.filter((u) => u !== url)].slice(
+      0,
+      MAX_RECENT_FILES,
+    );
+    state = { ...state, recentUrls: next };
     persist(state);
     listeners.forEach((fn) => fn());
   },

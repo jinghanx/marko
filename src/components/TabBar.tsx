@@ -198,10 +198,50 @@ function KindIcon({ kind }: { kind: Tab['kind'] }) {
       return <SearchGlyph />;
     case 'http':
       return <HttpGlyph />;
+    case 'clipboard':
+      return <ClipboardGlyph />;
+    case 'settings':
+      return <SettingsGlyph />;
+    case 'sqlite':
+      return <SqliteGlyph />;
     case 'code':
     default:
       return <CodeGlyph />;
   }
+}
+
+function SqliteGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <ellipse cx="8" cy="3.6" rx="5" ry="1.6" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3 3.6 V8 a5 1.6 0 0 0 10 0 V3.6" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3 8 V12.4 a5 1.6 0 0 0 10 0 V8" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+function SettingsGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        d="M8 1.6 L8 3.4 M8 12.6 L8 14.4 M14.4 8 L12.6 8 M3.4 8 L1.6 8 M12.5 3.5 L11.2 4.8 M4.8 11.2 L3.5 12.5 M12.5 12.5 L11.2 11.2 M4.8 4.8 L3.5 3.5"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ClipboardGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <rect x="3.5" y="3" width="9" height="11" rx="1.4" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="6" y="1.6" width="4" height="2.6" rx="0.6" stroke="currentColor" strokeWidth="1.2" fill="currentColor" fillOpacity="0.15" />
+      <path d="M5.5 8 H10.5 M5.5 10.5 H9" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function TerminalGlyph() {

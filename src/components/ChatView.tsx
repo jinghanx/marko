@@ -91,7 +91,7 @@ export function ChatView({ tabId, initialValue }: Props) {
   /** Picker shown when the user has multiple open file tabs. */
   const [openTabPicker, setOpenTabPicker] = useState<Array<{ id: string; label: string; path: string }> | null>(null);
   // History sidebar — list of archived chats from ~/.marko/chats/.
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
   const [history, setHistory] = useState<ChatHistoryEntry[]>([]);
   const [historyFilter, setHistoryFilter] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -621,7 +621,7 @@ export function ChatView({ tabId, initialValue }: Props) {
 
       {keyMissing && (
         <div className="chat-banner">
-          No API key set for this provider. Add one in Preferences → AI.
+          No API key set for this provider. Add one in Settings → AI.
         </div>
       )}
 
@@ -687,7 +687,7 @@ export function ChatView({ tabId, initialValue }: Props) {
             <div className="chat-empty-title">Start a conversation</div>
             <div className="chat-empty-sub">
               {providers.length === 0
-                ? 'Add a provider in Preferences → AI.'
+                ? 'Add a provider in Settings → AI.'
                 : 'Type below and press Enter.'}
             </div>
           </div>

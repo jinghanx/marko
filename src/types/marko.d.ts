@@ -141,6 +141,51 @@ export interface ChatHistoryEntry {
   preview: string;
 }
 
+export interface ClipboardEntry {
+  id: string;
+  ts: number;
+  kind: 'text' | 'image';
+  preview: string;
+  text?: string;
+  imagePath?: string;
+  width?: number;
+  height?: number;
+  pinned?: boolean;
+  byteSize?: number;
+}
+
+export interface SqliteColumn {
+  name: string;
+  type: string;
+  notNull: boolean;
+  pk: number;
+  defaultValue: string | null;
+}
+
+export interface SqliteSchemaTable {
+  name: string;
+  type: 'table' | 'view';
+  rowCount: number | null;
+  columns: SqliteColumn[];
+}
+
+export interface SqliteSchema {
+  tables: SqliteSchemaTable[];
+  pragma: { foreignKeys: boolean; journalMode: string };
+}
+
+export interface SqliteQueryResult {
+  ok: boolean;
+  columns?: string[];
+  rows?: unknown[][];
+  rowCount?: number;
+  changes?: number;
+  isReadOnly?: boolean;
+  truncated?: boolean;
+  timeMs?: number;
+  error?: string;
+}
+
 export interface MarkoApi {
   readFile(filePath: string): Promise<string>;
   writeFile(filePath: string, content: string): Promise<boolean>;
@@ -219,6 +264,18 @@ export interface MarkoApi {
   chatHistorySave(id: string, data: unknown): Promise<{ ok: boolean }>;
   chatHistoryLoad(id: string): Promise<string | null>;
   chatHistoryDelete(id: string): Promise<{ ok: boolean }>;
+  sqliteOpen(filePath: string): Promise<{ ok: boolean; error?: string }>;
+  sqliteClose(filePath: string): Promise<{ ok: boolean }>;
+  sqliteSchema(filePath: string): Promise<{ ok: boolean; data?: SqliteSchema; error?: string }>;
+  sqliteQuery(filePath: string, sql: string): Promise<SqliteQueryResult>;
+  clipboardList(): Promise<ClipboardEntry[]>;
+  clipboardWrite(id: string): Promise<{ ok: boolean }>;
+  clipboardDelete(id: string): Promise<{ ok: boolean }>;
+  clipboardClear(): Promise<{ ok: boolean }>;
+  clipboardPin(id: string, pinned: boolean): Promise<{ ok: boolean }>;
+  clipboardSetPaused(paused: boolean): Promise<{ ok: boolean }>;
+  clipboardGetPaused(): Promise<boolean>;
+  onClipboardChanged(handler: () => void): () => void;
   gitApplyPatch(repoDir: string, patch: string, opts: { cached?: boolean; reverse?: boolean }): Promise<{ ok: boolean; error?: string }>;
   gitLog(repoDir: string, opts?: { limit?: number; ref?: string }): Promise<{ ok: boolean; commits?: GitLogEntry[]; error?: string }>;
   gitShow(repoDir: string, hash: string): Promise<{ ok: boolean; diff?: string; error?: string }>;

@@ -116,20 +116,6 @@ export function openChatTab(opts: { focus?: boolean } = {}) {
   return tab;
 }
 
-/** Reveal an existing chat tab, or open a fresh one. The chat tab itself
- *  has a sidebar (toggled with the "History" button) for browsing past
- *  conversations — there is no separate history tab. */
-export function openChatHistoryTab(opts: { focus?: boolean } = {}) {
-  const focus = opts.focus ?? true;
-  const existing = workspace.getState().tabs.find((t) => t.kind === 'chat');
-  if (existing) {
-    workspace.revealTab(existing.id);
-    if (focus) workspace.requestEditorFocus();
-    return existing;
-  }
-  return openChatTab(opts);
-}
-
 export function openSearchTab(opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? true;
   const tab = workspace.openNewTab({ kind: 'search', title: 'Search' });
@@ -144,6 +130,37 @@ export function openHttpTab(opts: { focus?: boolean } = {}) {
   return tab;
 }
 
+/** Reveal the existing clipboard-history tab if one is open in the active
+ *  session, otherwise open a fresh one. The clipboard log is global, so
+ *  multiple tabs would just show the same thing. */
+export function openClipboardTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const existing = workspace.getState().tabs.find((t) => t.kind === 'clipboard');
+  if (existing) {
+    workspace.revealTab(existing.id);
+    if (focus) workspace.requestEditorFocus();
+    return existing;
+  }
+  const tab = workspace.openNewTab({ kind: 'clipboard', title: 'Clipboard' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
+/** Reveal the existing settings tab if one is open, otherwise open a fresh
+ *  one. Settings are global, so a single instance is the right model. */
+export function openSettingsTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const existing = workspace.getState().tabs.find((t) => t.kind === 'settings');
+  if (existing) {
+    workspace.revealTab(existing.id);
+    if (focus) workspace.requestEditorFocus();
+    return existing;
+  }
+  const tab = workspace.openNewTab({ kind: 'settings', title: 'Settings' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
 export function openUrlInTab(rawUrl: string, opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? true;
   const url = normalizeUrl(rawUrl);
@@ -154,6 +171,7 @@ export function openUrlInTab(rawUrl: string, opts: { focus?: boolean } = {}) {
     // ignore
   }
   workspace.openFileTab(url, url, title, 'web');
+  settings.pushRecentUrl(url);
   if (focus) workspace.requestEditorFocus();
 }
 
@@ -201,6 +219,15 @@ export async function openFileFromPath(filePath: string, opts: { focus?: boolean
   if (kindByExt === 'pdf') {
     // Same story for PDFs — PdfViewer streams via marko-file://.
     workspace.openFileTab(filePath, '', title, 'pdf');
+    settings.pushRecentFile(filePath);
+    maybeRevealInTree(filePath);
+    if (focus) workspace.requestEditorFocus();
+    return;
+  }
+  if (kindByExt === 'sqlite') {
+    // SQLite databases never load content into the renderer; the SqliteView
+    // component opens a connection through main and queries on demand.
+    workspace.openFileTab(filePath, '', title, 'sqlite');
     settings.pushRecentFile(filePath);
     maybeRevealInTree(filePath);
     if (focus) workspace.requestEditorFocus();

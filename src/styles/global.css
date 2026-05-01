@@ -1702,6 +1702,56 @@ button {
   font-family: var(--font-mono);
   font-size: 13px;
 }
+.pathinput-suggestion {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+}
+.pathinput-suggestion-glyph {
+  flex: 0 0 18px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.pathinput-suggestion-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pathinput-suggestion-title {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pathinput-suggestion-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pathinput-suggestion-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.palette-row--active .pathinput-suggestion-tag {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
 .pathinput-hint code {
   background: var(--bg-muted);
   padding: 1px 5px;
@@ -4525,6 +4575,592 @@ button {
   margin-top: 4px;
 }
 
+/* Clipboard history tab — split list/detail view, fed by a global watcher
+ *  in the main process. */
+.clipboard-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  outline: none;
+}
+.clipboard-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.clipboard-search {
+  flex: 1 1 220px;
+  min-width: 140px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-family: var(--font-ui);
+  outline: none;
+}
+.clipboard-search:focus {
+  border-color: var(--accent);
+}
+.clipboard-filter {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.clipboard-chip {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-transform: capitalize;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.clipboard-chip:hover {
+  color: var(--text);
+}
+.clipboard-chip--active {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.clipboard-toolbar-spacer {
+  flex: 1 1 auto;
+}
+.clipboard-toolbar-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.clipboard-toolbar-btn:hover {
+  background: var(--bg-muted);
+}
+.clipboard-toolbar-btn--paused {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.clipboard-body {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  min-height: 0;
+}
+.clipboard-list {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 4px 0 12px;
+}
+.clipboard-section {
+  padding: 4px 0;
+}
+.clipboard-section-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 8px 14px 4px;
+}
+.clipboard-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.clipboard-row:hover {
+  background: var(--bg-muted);
+}
+.clipboard-row--active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-left-color: var(--accent);
+}
+.clipboard-row-glyph {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.clipboard-row-main {
+  min-width: 0;
+}
+.clipboard-row-preview {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+.clipboard-row-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.clipboard-row-dot {
+  opacity: 0.6;
+}
+.clipboard-row-pin {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.clipboard-row-pin:hover {
+  color: var(--text);
+}
+.clipboard-row-pin--on {
+  color: var(--accent);
+}
+.clipboard-empty {
+  padding: 36px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.clipboard-empty-icon {
+  font-size: 32px;
+  opacity: 0.45;
+  margin-bottom: 10px;
+}
+.clipboard-empty-title {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.clipboard-empty-sub {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.clipboard-empty-sub code {
+  background: var(--bg-muted);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+.clipboard-detail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.clipboard-detail--empty {
+  align-items: center;
+  justify-content: center;
+}
+.clipboard-detail-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.clipboard-detail-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.clipboard-detail-btn:hover {
+  background: var(--bg-muted);
+}
+.clipboard-detail-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+.clipboard-detail-btn--primary:hover {
+  filter: brightness(1.05);
+  background: var(--accent);
+}
+.clipboard-detail-meta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.clipboard-flavor-tag {
+  font-family: var(--font-mono);
+  background: var(--bg-muted);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.clipboard-detail-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 16px 18px;
+}
+.clipboard-detail-text {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+}
+.clipboard-detail-text--json {
+  /* JSON gets a subtle monospaced block — syntax-highlighted variant could
+   *  be added later by routing through CodeMirror. */
+  background: var(--bg-muted);
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+.clipboard-detail-image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100% - 8px);
+  margin: 0 auto;
+  border-radius: 6px;
+  background: repeating-conic-gradient(
+    color-mix(in srgb, var(--text) 6%, transparent) 0% 25%,
+    transparent 0% 50%
+  );
+  background-size: 16px 16px;
+}
+
+/* SQLite tab — schema sidebar on the left, query editor + result grid on
+ *  the right. Connection lifecycle and queries run in the main process. */
+.sqlite-view {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  background: var(--bg);
+  min-height: 0;
+}
+.sqlite-sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg-elev);
+  min-height: 0;
+}
+.sqlite-sidebar-header {
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.sqlite-sidebar-title {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sqlite-sidebar-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.sqlite-pill {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.sqlite-pill--ok {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.sqlite-sidebar-filter {
+  margin: 8px 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  outline: none;
+}
+.sqlite-sidebar-filter:focus { border-color: var(--accent); }
+.sqlite-table-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px 0 12px;
+}
+.sqlite-empty {
+  padding: 16px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sqlite-table-row {
+  font-size: 12.5px;
+  border-left: 2px solid transparent;
+}
+.sqlite-table-row--active {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-left-color: var(--accent);
+}
+.sqlite-table-row-main {
+  display: flex;
+  align-items: center;
+}
+.sqlite-table-row-disclose {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 22px;
+  font-size: 10px;
+  text-align: center;
+  flex: 0 0 auto;
+  padding: 6px 0;
+}
+.sqlite-table-row-disclose:hover { color: var(--text); }
+.sqlite-table-row-name {
+  background: transparent;
+  border: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px 6px 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: var(--font-ui);
+  min-width: 0;
+}
+.sqlite-table-row-name:hover { background: var(--bg-muted); }
+.sqlite-table-row-icon {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+.sqlite-table-row-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+}
+.sqlite-table-row-count {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.sqlite-column-list {
+  padding: 2px 0 6px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sqlite-column-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 1px 14px 1px 4px;
+}
+.sqlite-column-name {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.sqlite-column-name--pk {
+  font-weight: 600;
+}
+.sqlite-column-type {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.sqlite-column-flag {
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  color: color-mix(in srgb, var(--accent) 80%, var(--text-muted));
+  margin-left: auto;
+}
+.sqlite-main {
+  display: grid;
+  grid-template-rows: minmax(120px, 40%) 1fr;
+  min-height: 0;
+}
+.sqlite-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  min-height: 0;
+}
+.sqlite-sql-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.sqlite-sql-editor .cm-editor {
+  height: 100%;
+}
+.sqlite-editor-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.sqlite-editor-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sqlite-result {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
+.sqlite-result--empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.sqlite-result--ok {
+  padding: 14px 18px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.sqlite-result--error {
+  padding: 14px 18px;
+}
+.sqlite-result-error-title {
+  color: #d1383b;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.sqlite-result-error-body {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-muted);
+  padding: 10px 12px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  margin: 0;
+}
+.sqlite-result-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 14px 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.sqlite-result-spacer { flex: 1 1 auto; }
+.sqlite-result-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.sqlite-grid-scroll {
+  flex: 1 1 auto;
+  overflow: auto;
+  min-height: 0;
+}
+.sqlite-grid {
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  width: max-content;
+  min-width: 100%;
+}
+.sqlite-grid th,
+.sqlite-grid td {
+  padding: 4px 10px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  text-align: left;
+  vertical-align: top;
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sqlite-grid th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-weight: 600;
+  text-transform: none;
+}
+.sqlite-grid tbody tr:hover {
+  background: var(--bg-muted);
+}
+.sqlite-grid-rownum {
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  background: var(--bg-elev);
+  position: sticky;
+  left: 0;
+}
+.sqlite-grid thead .sqlite-grid-rownum {
+  z-index: 2;
+}
+.sql-cell-null {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.sql-cell-num {
+  color: color-mix(in srgb, var(--accent) 80%, var(--text));
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sql-cell-blob {
+  color: var(--text-muted);
+}
+
 /* Excalidraw whiteboard tab — the library renders its own toolbar/canvas;
  *  we just give it a flex container that fills the pane. */
 .excalidraw-pane {
@@ -4950,6 +5586,39 @@ button {
 .settings-modal {
   width: 560px;
   max-width: 100%;
+}
+
+/* Settings as a tab — natural document flow inside the editor-host (which
+ *  is the actual scroll container; setting overflow here would create a
+ *  duplicate scrollbar). The header is sticky so it stays visible while
+ *  scrolling deep into the form. */
+.settings-view {
+  background: var(--bg);
+  min-height: 100%;
+}
+.settings-view-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.settings-view-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+.settings-view-body {
+  padding: 16px 24px 32px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .shortcuts-modal {

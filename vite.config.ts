@@ -24,6 +24,7 @@ export default defineConfig({
                 'node-pty',
                 'electron',
                 'simple-git',
+                'better-sqlite3',
                 ...builtinModules,
                 ...builtinModules.map((m) => `node:${m}`),
               ],

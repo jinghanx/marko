@@ -18,7 +18,10 @@ export type TabKind =
   | 'excalidraw'
   | 'chat'
   | 'search'
-  | 'http';
+  | 'http'
+  | 'clipboard'
+  | 'settings'
+  | 'sqlite';
 
 export interface Tab {
   id: string;

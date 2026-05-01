@@ -302,7 +302,7 @@ export function Terminal({ tabId }: Props) {
 
     const provider = await pickAiProvider();
     if (!provider) {
-      setAiError('No AI provider configured. Add one in Preferences → AI.');
+      setAiError('No AI provider configured. Add one in Settings → AI.');
       setAiBusy(false);
       return;
     }

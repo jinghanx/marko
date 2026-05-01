@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react';
-import { settings, useSettings, type ThemeMode } from '../state/settings';
+import { settings, useSettings, type ThemeMode, SEARCH_ENGINES, type SearchEngineId } from '../state/settings';
 import { EDITOR_THEMES, type EditorTheme } from '../lib/editorTheme';
 import { LIGHT_THEMES, DARK_THEMES } from '../lib/themes';
-
-interface Props {
-  open: boolean;
-  onClose: () => void;
-}
 
 const FONT_PRESETS = {
   content: [
@@ -31,31 +26,24 @@ const FONT_PRESETS = {
   ],
 };
 
-export function SettingsModal({ open, onClose }: Props) {
+export function SettingsView() {
   const s = useSettings();
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Preferences</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
+    <div className="settings-view">
+      <div className="settings-view-header">
+        <h2>Settings</h2>
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            if (window.confirm('Reset all preferences to defaults?')) settings.reset();
+          }}
+        >
+          Reset to defaults
+        </button>
+      </div>
 
-        <div className="modal-body">
+      <div className="settings-view-body">
           <Section label="Appearance">
             <Row label="Theme">
               <ThemeSelector value={s.theme} onChange={(theme) => settings.update({ theme })} />
@@ -165,22 +153,42 @@ export function SettingsModal({ open, onClose }: Props) {
             </Row>
           </Section>
 
-          <AiProvidersSection />
-        </div>
+          <Section label="Search">
+            <Row label="Web search engine">
+              <div className="font-select">
+                <select
+                  value={s.searchEngine}
+                  onChange={(e) => settings.update({ searchEngine: e.target.value as SearchEngineId })}
+                >
+                  {SEARCH_ENGINES.map((eng) => (
+                    <option key={eng.id} value={eng.id}>
+                      {eng.name}
+                    </option>
+                  ))}
+                  <option value="custom">Custom…</option>
+                </select>
+              </div>
+            </Row>
+            {s.searchEngine === 'custom' && (
+              <Row label="Custom URL">
+                <div className="font-select">
+                  <input
+                    type="text"
+                    className="font-custom"
+                    value={s.customSearchUrl}
+                    spellCheck={false}
+                    placeholder="https://example.com/search?q={q}"
+                    onChange={(e) => settings.update({ customSearchUrl: e.target.value })}
+                  />
+                  <span className="settings-hint">
+                    Use <code>{'{q}'}</code> where the query goes; the value is URL-encoded.
+                  </span>
+                </div>
+              </Row>
+            )}
+          </Section>
 
-        <div className="modal-footer">
-          <button
-            className="btn btn-ghost"
-            onClick={() => {
-              if (window.confirm('Reset all preferences to defaults?')) settings.reset();
-            }}
-          >
-            Reset to defaults
-          </button>
-          <button className="btn btn-primary" onClick={onClose}>
-            Done
-          </button>
-        </div>
+          <AiProvidersSection />
       </div>
     </div>
   );

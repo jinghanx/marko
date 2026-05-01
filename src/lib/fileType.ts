@@ -1,7 +1,7 @@
 import { LanguageDescription } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 
-export type FileKind = 'markdown' | 'code' | 'image' | 'media' | 'pdf' | 'csv' | 'json' | 'excalidraw' | 'binary';
+export type FileKind = 'markdown' | 'code' | 'image' | 'media' | 'pdf' | 'csv' | 'json' | 'excalidraw' | 'sqlite' | 'binary';
 
 const MARKDOWN_EXT = new Set(['md', 'markdown', 'mdown', 'mkd', 'mdx']);
 
@@ -16,8 +16,9 @@ const BINARY_EXT = new Set([
   'zip', 'tar', 'gz', 'tgz', 'rar', '7z',
   'exe', 'dll', 'so', 'dylib', 'bin', 'class', 'jar', 'wasm',
   'woff', 'woff2', 'ttf', 'otf', 'eot',
-  'sqlite', 'db',
 ]);
+
+const SQLITE_EXT = new Set(['sqlite', 'sqlite3', 'db', 'db3']);
 
 function getExt(path: string): string {
   const name = path.split('/').pop() ?? path;
@@ -35,6 +36,7 @@ export function detectKind(path: string): FileKind {
   if (ext === 'csv' || ext === 'tsv') return 'csv';
   if (ext === 'excalidraw') return 'excalidraw';
   if (ext === 'json') return 'json';
+  if (SQLITE_EXT.has(ext)) return 'sqlite';
   if (BINARY_EXT.has(ext)) return 'binary';
   return 'code';
 }

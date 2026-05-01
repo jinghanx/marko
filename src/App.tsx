@@ -3,14 +3,13 @@ import { useWorkspace, workspace, getActiveSession, getAllLeaves } from './state
 import { Sidebar } from './components/Sidebar';
 import { PaneNode } from './components/PaneNode';
 import { Outline } from './components/Outline';
-import { SettingsModal } from './components/SettingsModal';
 import { FilePalette } from './components/FilePalette';
 import { NewFilePicker } from './components/NewFilePicker';
 import { PathInput } from './components/PathInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { SessionStrip } from './components/SessionStrip';
 import { NowPlaying } from './components/NowPlaying';
-import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab } from './lib/actions';
+import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab, openClipboardTab, openSettingsTab } from './lib/actions';
 import { uiBus } from './lib/uiBus';
 import { resetWorkspaceAndReload } from './lib/persistence';
 
@@ -19,7 +18,6 @@ type Modal =
   | null
   | { kind: 'palette'; replace: boolean }
   | { kind: 'path'; replace: boolean }
-  | { kind: 'settings' }
   | { kind: 'newFile' }
   | { kind: 'shortcuts' };
 
@@ -61,7 +59,7 @@ export function App() {
   useEffect(() => {
     const offs = [
       uiBus.on('open-palette', () => setModal({ kind: 'palette', replace: false })),
-      uiBus.on('open-settings', () => setModal({ kind: 'settings' })),
+      uiBus.on('open-settings', () => openSettingsTab()),
       uiBus.on('open-process-viewer', () => openProcessTab()),
       uiBus.on('open-new-file', () => setModal({ kind: 'newFile' })),
       uiBus.on('open-path', () => setModal({ kind: 'path', replace: false })),
@@ -77,7 +75,7 @@ export function App() {
       window.marko.onMenu('menu:toggle-sidebar', () => workspace.toggleSidebar()),
       window.marko.onMenu('menu:toggle-outline', () => workspace.toggleOutline()),
       window.marko.onMenu('menu:toggle-markdown-mode', () => workspace.toggleMarkdownViewMode()),
-      window.marko.onMenu('menu:preferences', () => setModal({ kind: 'settings' })),
+      window.marko.onMenu('menu:preferences', () => openSettingsTab()),
       window.marko.onMenu('menu:find-in-files', () => {
         // Reuse an existing Search tab in the active session if one exists,
         // otherwise open a new one.
@@ -102,6 +100,7 @@ export function App() {
       window.marko.onMenu('menu:new-terminal', () => openTerminalTab()),
       window.marko.onMenu('menu:focus-address', () => uiBus.emit('focus-address')),
       window.marko.onMenu('menu:process-viewer', () => openProcessTab()),
+      window.marko.onMenu('menu:open-clipboard', () => openClipboardTab()),
       window.marko.onMenu('menu:show-shortcuts', () => setModal({ kind: 'shortcuts' })),
       window.marko.onMenu('menu:split-right', () => workspace.splitFocused('horizontal')),
       window.marko.onMenu('menu:split-down', () => workspace.splitFocused('vertical')),
@@ -173,7 +172,6 @@ export function App() {
           </aside>
         )}
       </div>
-      <SettingsModal open={modal?.kind === 'settings'} onClose={close} />
       <FilePalette
         open={modal?.kind === 'palette'}
         replace={modal?.kind === 'palette' ? modal.replace : false}

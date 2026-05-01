@@ -10,6 +10,9 @@ import { JsonViewer } from './JsonViewer';
 import { DiffViewer } from './DiffViewer';
 import { ExcalidrawViewer } from './ExcalidrawViewer';
 import { ChatView } from './ChatView';
+import { ClipboardView } from './ClipboardView';
+import { SettingsView } from './SettingsView';
+import { SqliteView } from './SqliteView';
 import { SearchView } from './SearchView';
 import { HttpClient } from './HttpClient';
 import { FolderView } from './FolderView';
@@ -127,6 +130,11 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
             <ChatView tabId={tab.id} initialValue={tab.content} />
           )}
           {tab.kind === 'search' && <SearchView />}
+          {tab.kind === 'clipboard' && <ClipboardView />}
+          {tab.kind === 'settings' && <SettingsView />}
+          {tab.kind === 'sqlite' && tab.filePath && (
+            <SqliteView tabId={tab.id} filePath={tab.filePath} />
+          )}
           {tab.kind === 'http' && (
             <HttpClient tabId={tab.id} initialValue={tab.content} />
           )}

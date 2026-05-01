@@ -183,6 +183,29 @@ const api = {
     ipcRenderer.invoke('chat-history:save', id, data),
   chatHistoryLoad: (id: string) => ipcRenderer.invoke('chat-history:load', id),
   chatHistoryDelete: (id: string) => ipcRenderer.invoke('chat-history:delete', id),
+
+  // ---------- SQLite ----------
+  sqliteOpen: (filePath: string) => ipcRenderer.invoke('sqlite:open', filePath),
+  sqliteClose: (filePath: string) => ipcRenderer.invoke('sqlite:close', filePath),
+  sqliteSchema: (filePath: string) => ipcRenderer.invoke('sqlite:schema', filePath),
+  sqliteQuery: (filePath: string, sql: string) =>
+    ipcRenderer.invoke('sqlite:query', filePath, sql),
+
+  // ---------- Clipboard history ----------
+  clipboardList: () => ipcRenderer.invoke('clipboard:list'),
+  clipboardWrite: (id: string) => ipcRenderer.invoke('clipboard:write', id),
+  clipboardDelete: (id: string) => ipcRenderer.invoke('clipboard:delete', id),
+  clipboardClear: () => ipcRenderer.invoke('clipboard:clear'),
+  clipboardPin: (id: string, pinned: boolean) =>
+    ipcRenderer.invoke('clipboard:pin', id, pinned),
+  clipboardSetPaused: (paused: boolean) =>
+    ipcRenderer.invoke('clipboard:set-paused', paused),
+  clipboardGetPaused: (): Promise<boolean> => ipcRenderer.invoke('clipboard:get-paused'),
+  onClipboardChanged: (handler: () => void) => {
+    const listener = () => handler();
+    ipcRenderer.on('clipboard:changed', listener);
+    return () => ipcRenderer.removeListener('clipboard:changed', listener);
+  },
   gitApplyPatch: (
     repoDir: string,
     patch: string,

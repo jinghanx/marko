@@ -673,7 +673,7 @@ export const workspace = {
       // user can change it via the workspace dropdown.
       const rootDir = opts.rootDir !== undefined ? opts.rootDir : current.rootDir;
       const session = makeFreshSession(
-        opts.name ?? `Session ${prev.sessions.length + 1}`,
+        opts.name ?? `Workspace ${prev.sessions.length + 1}`,
         rootDir,
       );
       return {

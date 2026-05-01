@@ -12,8 +12,10 @@
    *  per-pane file tab accent (which uses --accent). Not theme-overridden —
    *  this orange reads cleanly in both light and dark modes. */
   --session-accent: #d97757;
-  --tab-bg: #f3f3f1;
-  --tab-active-bg: #ffffff;
+  /* Derived from theme so the tab strip stays in the same color family as
+   *  the rest of the app on every color theme (cream / dark / warm / etc). */
+  --tab-bg: var(--bg-muted);
+  --tab-active-bg: var(--bg);
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 
   --titlebar-h: 36px;
@@ -43,8 +45,6 @@
    These selectors only carry the smaller derived bits. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --tab-bg: var(--bg-muted);
-    --tab-active-bg: var(--bg);
     --shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
     --selection-bg: color-mix(in srgb, var(--accent) 38%, transparent);
     --scroll-thumb: rgba(255, 255, 255, 0.16);
@@ -53,8 +53,6 @@
 }
 
 :root[data-theme='dark'] {
-  --tab-bg: var(--bg-muted);
-  --tab-active-bg: var(--bg);
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
   --selection-bg: color-mix(in srgb, var(--accent) 38%, transparent);
   --scroll-thumb: rgba(255, 255, 255, 0.16);
@@ -151,7 +149,7 @@ button {
   overflow: auto;
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 24px;
   font-family: var(--font-ui);
   color: var(--text);
@@ -170,7 +168,7 @@ button {
 .errorboundary-stack {
   background: var(--bg-muted);
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 9px;
   font-size: 11px;
   overflow: auto;
   max-height: 320px;
@@ -185,7 +183,7 @@ button {
   font-family: var(--font-ui);
   font-size: 12px;
   padding: 6px 14px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -311,7 +309,7 @@ button {
 .session-tab-close {
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
   line-height: 1;
   color: var(--text-muted);
@@ -332,7 +330,7 @@ button {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: 5px;
   padding: 1px 6px;
   outline: none;
   min-width: 0;
@@ -416,7 +414,7 @@ button {
   background: transparent;
   border: 0;
   padding: 2px 6px;
-  border-radius: 5px;
+  border-radius: 7px;
   cursor: pointer;
   text-align: left;
   min-width: 0;
@@ -446,7 +444,7 @@ button {
   max-width: min(420px, calc(100vw - 24px));
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 11px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
   padding: 4px;
   z-index: 80;
@@ -464,7 +462,7 @@ button {
 .workspace-dd-item {
   display: flex;
   align-items: stretch;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 .workspace-dd-item:hover {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
@@ -512,7 +510,7 @@ button {
   color: var(--text-muted);
   background: transparent;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.1s;
@@ -535,7 +533,7 @@ button {
   font-size: 13px;
   padding: 6px 10px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -563,7 +561,7 @@ button {
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   padding: 0;
 }
@@ -652,7 +650,7 @@ button {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: 5px;
   padding: 1px 6px;
   outline: none;
 }
@@ -664,7 +662,7 @@ button {
   color: var(--text);
   background: color-mix(in srgb, #d1383b 18%, var(--bg-muted));
   border: 1px solid color-mix(in srgb, #d1383b 40%, transparent);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* Context menu */
@@ -673,8 +671,8 @@ button {
   min-width: 180px;
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.26);
   padding: 4px;
   z-index: 200;
   font-size: 13px;
@@ -688,7 +686,7 @@ button {
   justify-content: space-between;
   gap: 12px;
   padding: 5px 10px;
-  border-radius: 4px;
+  border-radius: 6px;
   text-align: left;
   background: transparent;
   cursor: pointer;
@@ -880,13 +878,118 @@ button {
 .tab--web .tab-icon { color: #2ea043; }
 
 /* Terminal host */
-.terminal-host {
+.terminal-wrap {
   height: 100%;
+  width: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.terminal-host {
+  flex: 1;
   width: 100%;
   background: var(--bg);
   padding: 8px 4px 8px 8px;
   box-sizing: border-box;
   overflow: hidden;
+  outline: none;
+}
+.terminal-host .xterm-link-layer .xterm-link {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Search overlay — Cmd+F. Sits in the top-right corner. */
+.terminal-search {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  z-index: 10;
+}
+.terminal-search-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 10px;
+  width: 220px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.terminal-search-btn {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.terminal-search-btn:hover {
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+  color: var(--text);
+}
+.terminal-search-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* AI command-generation bar — Cmd+I. Sits at the bottom of the terminal so
+ *  it's out of the way of the prompt line. */
+.terminal-ai {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 10px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-elev));
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--border-strong));
+  border-radius: 9px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  z-index: 10;
+}
+.terminal-ai-icon {
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+.terminal-ai-input {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.terminal-ai-input:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+.terminal-ai-input::placeholder { color: var(--text-muted); }
+.terminal-ai-error {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #d1383b;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .terminal-host .xterm {
   height: 100%;
@@ -921,7 +1024,7 @@ button {
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
-  border-radius: 6px;
+  border-radius: 9px;
   cursor: pointer;
   font-size: 14px;
   padding: 0;
@@ -1017,7 +1120,7 @@ button {
   font-weight: 700;
   letter-spacing: 0.06em;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 5px;
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
@@ -1027,7 +1130,7 @@ button {
 .tab-close {
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
   line-height: 1;
   color: var(--text-muted);
@@ -1112,7 +1215,7 @@ button {
   gap: 10px;
   align-items: baseline;
   padding: 3px 6px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text);
@@ -1135,7 +1238,7 @@ button {
   font-weight: 700;
   background: var(--bg-muted);
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text);
   text-align: center;
   white-space: nowrap;
@@ -1203,7 +1306,7 @@ button {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-strong);
-  border-radius: 7px;
+  border-radius: 9px;
   padding: 2px;
   gap: 1px;
   box-shadow: var(--shadow);
@@ -1215,7 +1318,7 @@ button {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -1302,7 +1405,7 @@ button {
 .md-preview-inner pre {
   background: var(--bg-muted);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 9px;
   padding: 12px 14px;
   overflow-x: auto;
   font-family: var(--font-mono);
@@ -1313,7 +1416,7 @@ button {
   background: var(--code-bg);
   color: var(--code-fg);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid var(--code-border);
   font-family: var(--font-mono);
   font-size: 0.88em;
@@ -1483,8 +1586,8 @@ button {
   width: min(640px, calc(100% - 48px));
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.32);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1602,7 +1705,7 @@ button {
 .pathinput-hint code {
   background: var(--bg-muted);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 5px;
   font-family: var(--font-mono);
   font-size: 11px;
   margin: 0 2px;
@@ -1657,7 +1760,7 @@ button {
   margin: 0 2px;
   background: var(--bg);
   border: 1px solid var(--border-strong);
-  border-radius: 3px;
+  border-radius: 5px;
   color: var(--text-muted);
 }
 
@@ -1950,7 +2053,7 @@ button {
   display: inline-flex;
   align-items: center;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 .proc-fkey kbd {
   display: inline-block;
@@ -2142,7 +2245,7 @@ button {
   font-family: inherit;
   font-size: 12px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -2185,7 +2288,7 @@ button {
   font-family: var(--font-ui);
   font-size: 12px;
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -2202,7 +2305,7 @@ button {
   min-width: 200px;
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 11px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
   padding: 6px 4px;
   z-index: 50;
@@ -2223,7 +2326,7 @@ button {
   font-size: 13px;
   padding: 5px 12px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -2301,7 +2404,7 @@ button {
   padding: 8px 4px;
   border: 0;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 11px;
   cursor: pointer;
   text-align: center;
   font-family: inherit;
@@ -2358,7 +2461,7 @@ button {
 .folder-item-thumb {
   width: var(--folder-icon-size, 72px);
   height: var(--folder-icon-size, 72px);
-  border-radius: 6px;
+  border-radius: 9px;
   overflow: hidden;
   background: var(--bg-muted);
   border: 1px solid var(--border);
@@ -2426,7 +2529,7 @@ button {
   display: inline-flex;
   background: var(--bg);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: 9px;
   padding: 2px;
   gap: 2px;
   flex: 0 0 auto;
@@ -2779,7 +2882,7 @@ button {
 .git-btn {
   height: 24px;
   padding: 0 10px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -2944,7 +3047,7 @@ button {
 .git-file-btn {
   width: 20px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -2967,7 +3070,7 @@ button {
   justify-content: center;
   font-size: 9.5px;
   font-weight: 700;
-  border-radius: 3px;
+  border-radius: 5px;
   font-family: var(--font-mono);
 }
 .git-badge--modified { background: color-mix(in srgb, #d4a300 30%, transparent); color: #b88200; }
@@ -3084,7 +3187,7 @@ button {
   font-family: var(--font-ui);
   font-size: 10.5px;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3148,7 +3251,7 @@ button {
   flex-direction: column;
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: 9px;
   padding: 4px 0;
   min-width: 180px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
@@ -3233,7 +3336,7 @@ button {
   color: var(--text-muted);
   background: var(--bg-muted);
   padding: 0 4px;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 .git-commit-subject {
   flex: 1;
@@ -3284,7 +3387,7 @@ button {
   font-size: 12px;
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--bg);
   color: var(--text);
   outline: none;
@@ -3298,7 +3401,7 @@ button {
   font-weight: 600;
   padding: 0 16px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--accent);
   color: white;
   cursor: pointer;
@@ -3332,7 +3435,7 @@ button {
   font-size: 12px;
   font-weight: 600;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3350,7 +3453,7 @@ button {
   font-family: var(--font-mono);
   font-size: 12.5px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3363,7 +3466,7 @@ button {
   font-weight: 600;
   padding: 0 18px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--accent);
   color: white;
   cursor: pointer;
@@ -3433,7 +3536,7 @@ button {
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 4px 8px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3445,7 +3548,7 @@ button {
 .http-header-remove {
   width: 22px;
   height: 22px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-muted);
@@ -3461,7 +3564,7 @@ button {
   font-family: var(--font-ui);
   font-size: 11.5px;
   padding: 4px 10px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px dashed var(--border-strong);
   background: transparent;
   color: var(--text-muted);
@@ -3513,7 +3616,7 @@ button {
 .http-status {
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 11px;
 }
 .http-status--2xx { background: color-mix(in srgb, #2ea043 24%, transparent); color: #2ea043; }
@@ -3578,7 +3681,7 @@ button {
   font-size: 12px;
   font-weight: 500;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px dashed var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3593,7 +3696,7 @@ button {
   font-family: var(--font-ui);
   font-size: 12px;
   padding: 5px 8px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3615,7 +3718,7 @@ button {
 .chat-history-side-row {
   position: relative;
   padding: 8px 26px 8px 10px;
-  border-radius: 5px;
+  border-radius: 7px;
   cursor: pointer;
   margin: 1px 4px;
 }
@@ -3651,7 +3754,7 @@ button {
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 13px;
   line-height: 1;
   cursor: pointer;
@@ -3701,7 +3804,7 @@ button {
   font-family: var(--font-mono);
   font-size: 13px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3713,7 +3816,7 @@ button {
   font-family: var(--font-mono);
   font-size: 11.5px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text-muted);
@@ -3723,7 +3826,7 @@ button {
 .search-flags {
   display: inline-flex;
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: 9px;
   overflow: hidden;
 }
 .search-flag {
@@ -3749,7 +3852,7 @@ button {
   font-family: var(--font-ui);
   font-size: 11.5px;
   padding: 6px 12px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid color-mix(in srgb, #d1383b 50%, var(--border-strong));
   background: color-mix(in srgb, #d1383b 12%, var(--bg));
   color: #d1383b;
@@ -3767,7 +3870,7 @@ button {
   font-size: 11px;
   background: var(--bg-muted);
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 .search-error {
   color: #d1383b;
@@ -3870,7 +3973,7 @@ button {
   font-family: var(--font-ui);
   font-size: 12px;
   padding: 4px 8px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3881,7 +3984,7 @@ button {
   font-family: var(--font-ui);
   font-size: 11.5px;
   padding: 4px 10px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -3913,7 +4016,7 @@ button {
   font-family: var(--font-content);
   font-size: 12.5px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -4046,7 +4149,7 @@ button {
   font-size: 0.9em;
   background: var(--bg-muted);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 .chat-msg-body--md hr {
   border: 0;
@@ -4073,7 +4176,7 @@ button {
 .chat-code-block {
   position: relative;
   margin: 10px 0;
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--bg-muted);
   border: 1px solid var(--border);
   overflow: hidden;
@@ -4115,7 +4218,7 @@ button {
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text-muted);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.1s;
@@ -4227,7 +4330,7 @@ button {
   gap: 2px;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 7px;
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
@@ -4268,7 +4371,7 @@ button {
   font-family: var(--font-ui);
   font-size: 13px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -4284,7 +4387,7 @@ button {
   font-weight: 600;
   padding: 0 18px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--accent);
   color: white;
   cursor: pointer;
@@ -4304,7 +4407,7 @@ button {
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--bg);
 }
 .ai-provider-row--editing {
@@ -4330,7 +4433,7 @@ button {
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: 5px;
   background: var(--bg-muted);
   color: var(--text-muted);
   text-transform: uppercase;
@@ -4367,7 +4470,7 @@ button {
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 5px 10px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -4404,7 +4507,7 @@ button {
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 5px 8px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -4582,7 +4685,7 @@ button {
   margin-top: 8px;
   padding: 4px 8px;
   background: var(--bg-muted);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .outline {
@@ -4678,7 +4781,7 @@ button {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 9px;
   background:
     linear-gradient(45deg, var(--bg-muted) 25%, transparent 25%),
     linear-gradient(-45deg, var(--bg-muted) 25%, transparent 25%),
@@ -4758,7 +4861,7 @@ button {
   padding: 8px;
   background: var(--bg-muted);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 10.5px;
   line-height: 1.4;
@@ -4836,8 +4939,8 @@ button {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 48px);
@@ -4866,7 +4969,7 @@ button {
   font-size: 13px;
   padding: 6px 10px;
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--bg);
   color: var(--text);
   outline: none;
@@ -4915,7 +5018,7 @@ button {
   font-weight: 700;
   background: var(--bg-muted);
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: 6px;
   text-align: center;
   white-space: nowrap;
 }
@@ -4947,7 +5050,7 @@ button {
 .modal-close {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: 9px;
   font-size: 18px;
   line-height: 1;
   color: var(--text-muted);
@@ -4975,7 +5078,7 @@ button {
   font-family: var(--font-ui);
   font-size: 13px;
   padding: 6px 14px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid transparent;
   cursor: pointer;
   background: transparent;
@@ -5004,7 +5107,7 @@ button {
 
 .settings-section-rows {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--bg-muted);
   overflow: hidden;
 }
@@ -5037,14 +5140,14 @@ button {
   display: inline-flex;
   background: var(--bg);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: 9px;
   padding: 2px;
   gap: 2px;
 }
 .seg-control-item {
   font-size: 12px;
   padding: 4px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-muted);
 }
 .seg-control-item--active {
@@ -5067,7 +5170,7 @@ button {
   font-family: var(--font-ui);
   font-size: 13px;
   padding: 5px 8px;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--text);
@@ -5107,7 +5210,7 @@ button {
   justify-content: space-between;
   padding: 8px 10px;
   height: 38px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--border);
   transition: border-color 0.1s, transform 0.08s;
 }

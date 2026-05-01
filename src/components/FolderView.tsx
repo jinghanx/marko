@@ -569,6 +569,27 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [canBack, canForward, currentPath]);
 
+  // Mouse X1/X2 (back/forward — common on MX-style mice). Scope to clicks
+  // inside this folder view so multiple folder tabs don't all navigate at
+  // once. mousedown + preventDefault to also suppress Chromium's default
+  // history navigation that would otherwise fire from the same event.
+  useEffect(() => {
+    const onMouse = (e: MouseEvent) => {
+      if (e.button !== 3 && e.button !== 4) return;
+      const grid = gridRef.current;
+      if (!grid) return;
+      const root = grid.closest('.folder-view') as HTMLElement | null;
+      if (!root) return;
+      const target = e.target as Node;
+      if (!root.contains(target)) return;
+      e.preventDefault();
+      if (e.button === 3 && canBack) goBack();
+      else if (e.button === 4 && canForward) goForward();
+    };
+    window.addEventListener('mousedown', onMouse);
+    return () => window.removeEventListener('mousedown', onMouse);
+  }, [canBack, canForward, currentPath]);
+
   return (
     <div className="folder-view">
       <div className="folder-toolbar">

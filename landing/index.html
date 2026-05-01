@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Marko — editor · finder · browser · terminal in one window</title>
-    <meta name="description" content="A macOS workspace that combines a markdown editor, a Finder-style folder browser, a code editor, an embedded browser, and a real terminal — all in one window with recursive split panes." />
+    <title>Marko — editor · finder · browser · terminal · git · AI · whiteboard</title>
+    <meta name="description" content="A keyboard-driven macOS workspace: markdown, code, Finder-style folders, embedded browser, terminal, full Git client, streaming AI chat, find-in-files, HTTP client, whiteboard, PDF, CSV, JSON, diff — 18 tab kinds, recursive split panes, tmux-style sessions, all in one window." />
     <meta property="og:title" content="Marko — one window for everything" />
-    <meta property="og:description" content="Editor, finder, browser, and terminal in a single keyboard-driven macOS app." />
+    <meta property="og:description" content="Editor, finder, browser, terminal, Git, AI chat, whiteboard, and a long tail of dev tabs in a single keyboard-driven macOS app." />
     <meta property="og:image" content="/icon.png" />
     <meta name="theme-color" content="#2d6cdf" />
     <link rel="icon" href="/icon.png" />
@@ -45,13 +45,16 @@
           <span class="dot">✦</span>
           <span>finder</span>
           <span class="dot">✦</span>
-          <span>browser</span>
-          <span class="dot">✦</span>
           <span>terminal</span>
+          <span class="dot">✦</span>
+          <span>git</span>
+          <span class="dot">✦</span>
+          <span>AI</span>
         </p>
         <p class="subhead">
-          Marko is a keyboard-driven macOS workspace. Markdown, code, folders, web pages, and a real
-          shell — all in one app, with recursive split panes and 15 hand-tuned color themes.
+          A keyboard-driven macOS workspace. 18 tab kinds — markdown, code, folder, browser,
+          terminal, full Git client, streaming AI chat, find-in-files, HTTP client, whiteboard,
+          PDF, CSV, JSON, diff, and more — under recursive split panes and tmux-style sessions.
         </p>
         <div class="cta-row" id="download">
           <a
@@ -123,8 +126,11 @@
           <span class="window-tab window-tab--term">
             <span class="tab-glyph">▍</span>zsh
           </span>
-          <span class="window-tab window-tab--web">
-            <span class="tab-glyph">◯</span>news.ycombinator.com
+          <span class="window-tab window-tab--code">
+            <span class="tab-glyph">⎇</span>git
+          </span>
+          <span class="window-tab window-tab--md">
+            <span class="tab-glyph">✨</span>chat
           </span>
         </div>
         <div class="window-body">
@@ -161,54 +167,84 @@
 
     <section class="features" id="features">
       <header class="section-head">
-        <h2>Built around how you actually work.</h2>
-        <p>Five distinct tools, one consistent surface. Move between them with muscle memory.</p>
+        <h2>Eighteen tab kinds. One window.</h2>
+        <p>Every dev surface that usually lives in its own app, addressable by a single keystroke.</p>
       </header>
       <div class="feature-grid">
         <div class="feature">
           <div class="feature-icon">✎</div>
           <h3>WYSIWYG markdown</h3>
-          <p>Live in-place rendering, slash commands, drag handles, code blocks, math, GFM tables. Saves real .md files.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">📁</div>
-          <h3>Finder-style folders</h3>
-          <p>Drag to multi-select. Sort by date, kind, or size with section headers. Quick Look on Space. Cut, copy, paste.</p>
+          <p>Milkdown Crepe — slash commands, drag handles, GFM tables, math, code blocks. Toggle rendered / raw / split.</p>
         </div>
         <div class="feature">
           <div class="feature-icon">⟨⟩</div>
           <h3>Code editor</h3>
-          <p>CodeMirror 6 with auto-detected language for 30+ syntaxes. Optional vim mode. Theme-aware syntax colors.</p>
+          <p>CodeMirror 6 with 30+ language packs, vim mode, theme-aware syntax colours, and live cross-pane edit sync.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📁</div>
+          <h3>Finder-style folders</h3>
+          <p>Drag-select, sort by date / kind / size, section headers, cut / copy / paste, drag-to-move, Quick Look, MX-mouse back/forward.</p>
         </div>
         <div class="feature">
           <div class="feature-icon">▍</div>
-          <h3>Real terminal</h3>
-          <p>xterm.js + node-pty running your real $SHELL. Themes match the app's color scheme. Multiple panes side by side.</p>
+          <h3>Real terminal — with AI</h3>
+          <p>xterm.js + node-pty + your $SHELL. <strong>⌘I</strong> describes a command in English; the AI types it into your prompt for review. Click any path in output → opens in the editor.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⎇</div>
+          <h3>Full Git client</h3>
+          <p>Status with hunk- and line-level stage / unstage / discard. Branches, stashes, tags, commit history with cherry-pick, fetch / pull / push. Source-tree-equivalent without leaving the window.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✨</div>
+          <h3>Streaming AI chat</h3>
+          <p>OpenAI / OpenRouter / Anthropic / Ollama / LM Studio — any OpenAI-compatible endpoint. Attach files for context (drag, dialog, or open-tab picker). Markdown rendering with copy-code buttons. History sidebar. Keys encrypted via Keychain.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔎</div>
+          <h3>Find-in-files</h3>
+          <p>Ripgrep streaming. Case / whole-word / regex toggles. Glob filter. Click any match to jump to that line in the editor.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">→</div>
+          <h3>HTTP client</h3>
+          <p>Postman-lite request builder. Method, URL, headers, body. Response with status pill, time, size, JSON pretty-print, headers viewer.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✏︎</div>
+          <h3>Whiteboard</h3>
+          <p>Embedded Excalidraw. Canvas matches your active theme. <code>.excalidraw</code> files round-trip. Cross-pane sync.</p>
         </div>
         <div class="feature">
           <div class="feature-icon">◯</div>
           <h3>Embedded browser</h3>
-          <p>Type a URL in ⌘T → opens as a tab with back/forward, address bar, and a real Chromium webview.</p>
+          <p>Real Chromium webview with back / forward / reload / address bar. The Now-Playing pill in the titlebar lights up when YouTube or Spotify plays.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">▤</div>
+          <h3>Format viewers</h3>
+          <p>PDF (Chromium native). CSV / TSV with sortable tables. JSON tree inspector. Side-by-side file diff. Image fit / 100 %. mp3/mp4 streaming with seek.</p>
         </div>
         <div class="feature">
           <div class="feature-icon">▰▰</div>
-          <h3>Recursive split panes</h3>
-          <p>Split any pane horizontally or vertically. Nest as deeply as you want. Each pane has its own tabs.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🎨</div>
-          <h3>15 color themes</h3>
-          <p>Tokyo Night, Catppuccin, Dracula, Gruvbox, One Dark, Nord, Solarized, Rosé Pine and more. Light + dark variants.</p>
+          <h3>Splits + sessions</h3>
+          <p>Recursive split panes (⌘\ / ⌘=, nest as deep as you want). Tmux-style sessions, each with its own pane tree and workspace root. Drag tabs to reorder.</p>
         </div>
         <div class="feature">
           <div class="feature-icon">⌘</div>
           <h3>Keyboard-first</h3>
-          <p>⌘P fuzzy file search, ⌘T autocompleting path or URL, ⌘\ split, ⌘Y htop-style process viewer, ⌘L address bar.</p>
+          <p>⌘P fuzzy file search with Recents. ⌘T multi-suggestion path / URL / command palette. ⌘⇧F find-in-files. ⌘⇧/ for the full cheatsheet.</p>
         </div>
         <div class="feature">
-          <div class="feature-icon">🗂</div>
-          <h3>Workspaces</h3>
-          <p>Bookmark folders you switch between. Auto-restore the last workspace on launch. Reveal active file in tree.</p>
+          <div class="feature-icon">💾</div>
+          <h3>Stays where you left it</h3>
+          <p>Sessions, panes, open tabs, scratch buffers, AI chats, Git/HTTP requests — all survive restart. Now-Playing pill keeps audio alive when you switch sessions.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🎨</div>
+          <h3>15 color themes</h3>
+          <p>Tokyo Night, Catppuccin, Dracula, Gruvbox, One Dark, Nord, Solarized, Rosé Pine, and more. Token colours and the terminal palette derive from each theme's ANSI palette so everything stays coherent.</p>
         </div>
       </div>
     </section>
@@ -223,37 +259,52 @@
           <div class="shortcut-h">Files</div>
           <div class="shortcut"><kbd>⌘P</kbd><span>quick open</span></div>
           <div class="shortcut"><kbd>⌘T</kbd><span>go to path / command</span></div>
+          <div class="shortcut"><kbd>⌘⇧F</kbd><span>find in files</span></div>
           <div class="shortcut"><kbd>⌘N</kbd><span>new file…</span></div>
           <div class="shortcut"><kbd>⌘O</kbd><span>open file</span></div>
           <div class="shortcut"><kbd>⌘⇧O</kbd><span>open folder</span></div>
           <div class="shortcut"><kbd>⌘S</kbd><span>save</span></div>
         </div>
         <div class="shortcut-col">
-          <div class="shortcut-h">Tabs</div>
+          <div class="shortcut-h">Tabs &amp; sessions</div>
           <div class="shortcut"><kbd>⌘W</kbd><span>close tab</span></div>
           <div class="shortcut"><kbd>⌘⇧[</kbd><span>previous tab</span></div>
           <div class="shortcut"><kbd>⌘⇧]</kbd><span>next tab</span></div>
+          <div class="shortcut"><kbd>⌘⌥N</kbd><span>new session</span></div>
+          <div class="shortcut"><kbd>⌘⇧9</kbd><span>previous session</span></div>
+          <div class="shortcut"><kbd>⌘⇧0</kbd><span>next session</span></div>
         </div>
         <div class="shortcut-col">
           <div class="shortcut-h">Panes</div>
           <div class="shortcut"><kbd>⌘\</kbd><span>split right</span></div>
           <div class="shortcut"><kbd>⌘=</kbd><span>split down</span></div>
           <div class="shortcut"><kbd>⌘`</kbd><span>next pane</span></div>
+          <div class="shortcut"><kbd>⌘⇧Space</kbd><span>cycle layout</span></div>
           <div class="shortcut"><kbd>⌘⌥W</kbd><span>close pane</span></div>
         </div>
         <div class="shortcut-col">
-          <div class="shortcut-h">View</div>
+          <div class="shortcut-h">Tools</div>
           <div class="shortcut"><kbd>⌘E</kbd><span>toggle sidebar</span></div>
           <div class="shortcut"><kbd>⌘⇧\</kbd><span>toggle outline</span></div>
+          <div class="shortcut"><kbd>⌘⇧M</kbd><span>cycle markdown view</span></div>
           <div class="shortcut"><kbd>⌘Y</kbd><span>process viewer</span></div>
+          <div class="shortcut"><kbd>⌘⇧/</kbd><span>all shortcuts</span></div>
           <div class="shortcut"><kbd>⌘,</kbd><span>preferences</span></div>
+        </div>
+        <div class="shortcut-col">
+          <div class="shortcut-h">Terminal</div>
+          <div class="shortcut"><kbd>⌘F</kbd><span>find in scrollback</span></div>
+          <div class="shortcut"><kbd>⌘K</kbd><span>clear</span></div>
+          <div class="shortcut"><kbd>⌘I</kbd><span>ask AI for a command</span></div>
+          <div class="shortcut"><kbd>⌘-click</kbd><span>open URL</span></div>
+          <div class="shortcut"><kbd>click</kbd><span>open file path</span></div>
         </div>
       </div>
     </section>
 
     <section class="cta-band">
       <div class="cta-band-inner">
-        <h2>Stop alt-tabbing.</h2>
+        <h2>Stop alt-tabbing between fifteen apps.</h2>
         <p>Drop Marko into Applications and try it for an afternoon.</p>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-0.1.0-arm64.dmg">

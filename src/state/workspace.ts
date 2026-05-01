@@ -41,6 +41,9 @@ export interface Tab {
   content: string;
   savedContent: string;
   dirty: boolean;
+  /** Pinned tabs sort to the front of every leaf they're in (Chrome-style)
+   *  and survive "Close Other Tabs" / "Close Tabs to the Right". */
+  pinned?: boolean;
 }
 
 // ---------- Pane tree ----------
@@ -484,6 +487,33 @@ export const workspace = {
       };
     });
     revealActiveTabInTree();
+  },
+
+  /** Toggle pin on a tab. Pinned tabs sort to the front of every leaf they
+   *  appear in (Chrome-style); the pin state is per-tab, not per-leaf. */
+  togglePinTab(id: string) {
+    setState((prev) => {
+      const target = prev.tabs.find((t) => t.id === id);
+      if (!target) return prev;
+      const nextPinned = !target.pinned;
+      const tabs = prev.tabs.map((t) => (t.id === id ? { ...t, pinned: nextPinned } : t));
+      // Re-sort tabIds in every leaf that contains this tab so pinned tabs
+      // come first (preserving relative order within each group).
+      const pinnedById = new Map<string, boolean>();
+      for (const t of tabs) pinnedById.set(t.id, !!t.pinned);
+      const sortLeafTabs = (l: LeafNode): LeafNode => {
+        if (!l.tabIds.includes(id)) return l;
+        const pinned = l.tabIds.filter((tid) => pinnedById.get(tid));
+        const rest = l.tabIds.filter((tid) => !pinnedById.get(tid));
+        return { ...l, tabIds: [...pinned, ...rest] };
+      };
+      const visit = (n: PaneTree): PaneTree => {
+        if (n.kind === 'leaf') return sortLeafTabs(n);
+        return { ...n, children: [visit(n.children[0]), visit(n.children[1])] };
+      };
+      const sessions = prev.sessions.map((s) => ({ ...s, root: visit(s.root) }));
+      return { tabs, sessions };
+    });
   },
 
   setFocusedPane(leafId: string) {
@@ -1012,6 +1042,7 @@ interface PersistedTab {
   viewMode?: 'rendered' | 'raw' | 'split' | 'tree';
   diffLeft?: string;
   diffRight?: string;
+  pinned?: boolean;
   /** Only persisted for unsaved scratch tabs (no filePath). For tabs with a
    *  filePath we re-read from disk on hydrate. */
   scratchContent?: string;
@@ -1046,6 +1077,7 @@ export function serializeWorkspace(): Snapshot {
       viewMode: tab.viewMode,
       diffLeft: tab.diffLeft,
       diffRight: tab.diffRight,
+      pinned: tab.pinned,
     };
     // Untitled scratch buffers: persist content directly so the user doesn't
     // lose work. File-backed tabs re-read from disk on hydrate.
@@ -1117,6 +1149,7 @@ export async function hydrateFromSnapshot(snapshot: Snapshot): Promise<void> {
     viewMode: p.viewMode,
     diffLeft: p.diffLeft,
     diffRight: p.diffRight,
+    pinned: p.pinned,
     content: p.scratchContent ?? '',
     savedContent: p.scratchContent ?? '',
     dirty: false,

@@ -1144,6 +1144,32 @@ button {
   color: var(--text);
 }
 
+/* Pinned tabs (Chrome-style) — narrower, hide the title, accent border on
+ *  the left, and only show the close button on hover. The pin lives in
+ *  every leaf the tab is a member of, so each one renders compactly. */
+.tab--pinned {
+  max-width: 44px;
+  padding: 0 8px;
+  border-left: 2px solid var(--accent);
+}
+.tab--pinned .tab-title {
+  display: none;
+}
+.tab--pinned .tab-close {
+  width: 14px;
+  height: 14px;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 80ms ease-in;
+}
+.tab--pinned:hover .tab-close,
+.tab--pinned.tab--active .tab-close {
+  opacity: 1;
+}
+.tab--pinned .tab-mode-badge {
+  display: none;
+}
+
 .tab-new {
   padding: 0 12px;
   color: var(--text-muted);

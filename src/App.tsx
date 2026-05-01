@@ -21,6 +21,17 @@ type Modal =
   | { kind: 'newFile' }
   | { kind: 'shortcuts' };
 
+/** Activate the Nth tab in the currently-focused leaf. `idx === -1` means
+ *  the last tab. Out-of-range indexes silently no-op (Chrome behavior). */
+function gotoTabInFocused(idx: number) {
+  const leaf = workspace.getFocusedLeaf();
+  if (!leaf || leaf.tabIds.length === 0) return;
+  const target = idx < 0 ? leaf.tabIds[leaf.tabIds.length - 1] : leaf.tabIds[idx];
+  if (!target) return;
+  workspace.setActiveTab(target);
+  workspace.requestEditorFocus();
+}
+
 export function App() {
   const sidebarVisible = useWorkspace((s) => s.sidebarVisible);
   const outlineVisible = useWorkspace((s) => s.outlineVisible);
@@ -72,6 +83,11 @@ export function App() {
       window.marko.onMenu('menu:close-tab', () => closeActiveTab()),
       window.marko.onMenu('menu:prev-tab', () => workspace.cycleTab(-1)),
       window.marko.onMenu('menu:next-tab', () => workspace.cycleTab(1)),
+      // ⌘1-8 = activate Nth tab in focused leaf; ⌘9 = activate last tab.
+      ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
+        window.marko.onMenu(`menu:goto-tab-${n}`, () => gotoTabInFocused(n - 1)),
+      ),
+      window.marko.onMenu('menu:goto-tab-last', () => gotoTabInFocused(-1)),
       window.marko.onMenu('menu:toggle-sidebar', () => workspace.toggleSidebar()),
       window.marko.onMenu('menu:toggle-outline', () => workspace.toggleOutline()),
       window.marko.onMenu('menu:toggle-markdown-mode', () => workspace.toggleMarkdownViewMode()),

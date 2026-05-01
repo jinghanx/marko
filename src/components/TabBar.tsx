@@ -85,6 +85,7 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
             key={tab.id}
             className={
               `tab tab--${tab.kind} ${active ? 'tab--active' : ''}` +
+              (tab.pinned ? ' tab--pinned' : '') +
               (isDragging ? ' tab--dragging' : '') +
               (insertSide === 'before' ? ' tab--drop-before' : '') +
               (insertSide === 'after' ? ' tab--drop-after' : '')
@@ -150,12 +151,17 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
           allTabs={tabs}
           onClose={() => setMenu(null)}
           onCloseTab={(t) => closeWithDirtyCheck([t])}
-          onCloseOthers={(t) => closeWithDirtyCheck(tabs.filter((x) => x.id !== t.id))}
+          // "Close Other" and "Close to Right" never close pinned tabs —
+          // matches Chrome's pinned-tab behavior.
+          onCloseOthers={(t) =>
+            closeWithDirtyCheck(tabs.filter((x) => x.id !== t.id && !x.pinned))
+          }
           onCloseToRight={(t) => {
             const idx = tabs.findIndex((x) => x.id === t.id);
-            closeWithDirtyCheck(tabs.slice(idx + 1));
+            closeWithDirtyCheck(tabs.slice(idx + 1).filter((x) => !x.pinned));
           }}
-          onCloseAll={() => closeWithDirtyCheck(tabs)}
+          onCloseAll={() => closeWithDirtyCheck(tabs.filter((x) => !x.pinned))}
+          onTogglePin={(t) => workspace.togglePinTab(t.id)}
         />
       )}
     </div>
@@ -494,6 +500,7 @@ function TabContextMenu({
   onCloseOthers,
   onCloseToRight,
   onCloseAll,
+  onTogglePin,
 }: {
   x: number;
   y: number;
@@ -504,6 +511,7 @@ function TabContextMenu({
   onCloseOthers: (t: Tab) => void;
   onCloseToRight: (t: Tab) => void;
   onCloseAll: () => void;
+  onTogglePin: (t: Tab) => void;
 }) {
   const wrap = (fn: () => void) => () => {
     onClose();
@@ -520,6 +528,10 @@ function TabContextMenu({
       style={{ left: x, top: y }}
       onMouseDown={(e) => e.stopPropagation()}
     >
+      <button className="ctx-menu-item" onClick={wrap(() => onTogglePin(tab))}>
+        {tab.pinned ? 'Unpin Tab' : 'Pin Tab'}
+      </button>
+      <div className="ctx-menu-sep" />
       <button className="ctx-menu-item" onClick={wrap(() => onCloseTab(tab))}>
         Close <span className="ctx-menu-kbd">⌘W</span>
       </button>

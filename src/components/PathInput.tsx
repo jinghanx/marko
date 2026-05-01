@@ -92,7 +92,45 @@ const COMMANDS: Command[] = [
       await openFileFromPath(file, { focus: true });
     },
   },
+  // Standard macOS folders. Resolved against the home dir at run time so
+  // they keep working regardless of which user is running the app.
+  {
+    keywords: ['downloads', 'dl'],
+    label: 'Open ~/Downloads',
+    category: 'Folder',
+    run: () => openHomeFolder('Downloads'),
+  },
+  {
+    keywords: ['documents', 'docs'],
+    label: 'Open ~/Documents',
+    category: 'Folder',
+    run: () => openHomeFolder('Documents'),
+  },
+  {
+    keywords: ['desktop'],
+    label: 'Open ~/Desktop',
+    category: 'Folder',
+    run: () => openHomeFolder('Desktop'),
+  },
+  {
+    keywords: ['home', '~'],
+    label: 'Open ~ (home)',
+    category: 'Folder',
+    run: () => openHomeFolder(''),
+  },
+  {
+    keywords: ['applications', 'apps'],
+    label: 'Open /Applications',
+    category: 'Folder',
+    run: () => openFolderInEditor('/Applications', { focus: true }),
+  },
 ];
+
+async function openHomeFolder(sub: string): Promise<void> {
+  const home = await window.marko.homeDir();
+  const full = sub ? `${home}/${sub}` : home;
+  await openFolderInEditor(full, { focus: true });
+}
 
 /** Discriminated union — every suggestion row is one of these. Note that
  *  workspace file matches are intentionally NOT here: ⌘P (Quick Open) owns

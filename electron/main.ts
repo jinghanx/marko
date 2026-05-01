@@ -314,6 +314,18 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+Shift+]',
           click: () => sendToRenderer('menu:next-tab'),
         },
+        // Chrome-style numeric tab jumps. ⌘1–8 selects the Nth tab in the
+        // focused leaf; ⌘9 jumps to the last tab regardless of count.
+        ...([1, 2, 3, 4, 5, 6, 7, 8] as const).map((n) => ({
+          label: `Go to Tab ${n}`,
+          accelerator: `CmdOrCtrl+${n}`,
+          click: () => sendToRenderer(`menu:goto-tab-${n}`),
+        } satisfies Electron.MenuItemConstructorOptions)),
+        {
+          label: 'Go to Last Tab',
+          accelerator: 'CmdOrCtrl+9',
+          click: () => sendToRenderer('menu:goto-tab-last'),
+        },
         { type: 'separator' },
         { role: 'minimize' },
         { label: 'Close Window', role: 'close' },

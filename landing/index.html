@@ -28,7 +28,6 @@
         </a>
         <div class="nav-links">
           <a href="#features">Features</a>
-          <a href="#shortcuts">Shortcuts</a>
           <a href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">GitHub</a>
           <a class="nav-cta" href="#download">Download</a>
         </div>
@@ -54,7 +53,7 @@
         <p class="subhead">
           A keyboard-driven macOS workspace. 18 tab kinds — markdown, code, folder, browser,
           terminal, full Git client, streaming AI chat, find-in-files, HTTP client, whiteboard,
-          PDF, CSV, JSON, diff, and more — under recursive split panes and tmux-style sessions.
+          PDF, CSV, JSON, diff — under recursive split panes and tmux-style sessions.
         </p>
         <div class="cta-row" id="download">
           <a
@@ -80,8 +79,6 @@
           macOS 12+ · <a id="alt-arch-link" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-0.1.0.dmg">Intel build</a> · Free &amp; open source
         </p>
         <script>
-          // Best-effort arch detection. UA Client Hints work on Chrome/Edge;
-          // Safari falls back to "Apple Silicon" since most modern Macs are arm64.
           (async function () {
             const btn = document.getElementById('primary-download');
             const label = document.getElementById('primary-download-label');
@@ -106,6 +103,7 @@
       </div>
     </header>
 
+    <!-- Hero window: markdown editor -->
     <section class="window-demo">
       <div class="window-frame">
         <div class="window-chrome">
@@ -114,24 +112,12 @@
           <span class="dot dot-green"></span>
         </div>
         <div class="window-tabs">
-          <span class="window-tab window-tab--folder">
-            <span class="tab-glyph">📁</span>marko
-          </span>
-          <span class="window-tab window-tab--md window-tab--active">
-            <span class="tab-glyph">📝</span>README.md
-          </span>
-          <span class="window-tab window-tab--code">
-            <span class="tab-glyph">⟨⟩</span>App.tsx
-          </span>
-          <span class="window-tab window-tab--term">
-            <span class="tab-glyph">▍</span>zsh
-          </span>
-          <span class="window-tab window-tab--code">
-            <span class="tab-glyph">⎇</span>git
-          </span>
-          <span class="window-tab window-tab--md">
-            <span class="tab-glyph">✨</span>chat
-          </span>
+          <span class="window-tab window-tab--folder"><span class="tab-glyph">📁</span>marko</span>
+          <span class="window-tab window-tab--md window-tab--active"><span class="tab-glyph">📝</span>README.md</span>
+          <span class="window-tab window-tab--code"><span class="tab-glyph">⟨⟩</span>App.tsx</span>
+          <span class="window-tab window-tab--term"><span class="tab-glyph">▍</span>zsh</span>
+          <span class="window-tab"><span class="tab-glyph">⎇</span>git</span>
+          <span class="window-tab"><span class="tab-glyph">✨</span>chat</span>
         </div>
         <div class="window-body">
           <aside class="demo-sidebar">
@@ -165,140 +151,338 @@
       </div>
     </section>
 
-    <section class="features" id="features">
-      <header class="section-head">
-        <h2>Eighteen tab kinds. One window.</h2>
-        <p>Every dev surface that usually lives in its own app, addressable by a single keystroke.</p>
-      </header>
-      <div class="feature-grid">
-        <div class="feature">
-          <div class="feature-icon">✎</div>
-          <h3>WYSIWYG markdown</h3>
-          <p>Milkdown Crepe — slash commands, drag handles, GFM tables, math, code blocks. Toggle rendered / raw / split.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">⟨⟩</div>
-          <h3>Code editor</h3>
-          <p>CodeMirror 6 with 30+ language packs, vim mode, theme-aware syntax colours, and live cross-pane edit sync.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">📁</div>
-          <h3>Finder-style folders</h3>
-          <p>Drag-select, sort by date / kind / size, section headers, cut / copy / paste, drag-to-move, Quick Look, MX-mouse back/forward.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">▍</div>
-          <h3>Real terminal — with AI</h3>
-          <p>xterm.js + node-pty + your $SHELL. <strong>⌘I</strong> describes a command in English; the AI types it into your prompt for review. Click any path in output → opens in the editor.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">⎇</div>
-          <h3>Full Git client</h3>
-          <p>Status with hunk- and line-level stage / unstage / discard. Branches, stashes, tags, commit history with cherry-pick, fetch / pull / push. Source-tree-equivalent without leaving the window.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">✨</div>
-          <h3>Streaming AI chat</h3>
-          <p>OpenAI / OpenRouter / Anthropic / Ollama / LM Studio — any OpenAI-compatible endpoint. Attach files for context (drag, dialog, or open-tab picker). Markdown rendering with copy-code buttons. History sidebar. Keys encrypted via Keychain.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔎</div>
-          <h3>Find-in-files</h3>
-          <p>Ripgrep streaming. Case / whole-word / regex toggles. Glob filter. Click any match to jump to that line in the editor.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">→</div>
-          <h3>HTTP client</h3>
-          <p>Postman-lite request builder. Method, URL, headers, body. Response with status pill, time, size, JSON pretty-print, headers viewer.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">✏︎</div>
-          <h3>Whiteboard</h3>
-          <p>Embedded Excalidraw. Canvas matches your active theme. <code>.excalidraw</code> files round-trip. Cross-pane sync.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">◯</div>
-          <h3>Embedded browser</h3>
-          <p>Real Chromium webview with back / forward / reload / address bar. The Now-Playing pill in the titlebar lights up when YouTube or Spotify plays.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">▤</div>
-          <h3>Format viewers</h3>
-          <p>PDF (Chromium native). CSV / TSV with sortable tables. JSON tree inspector. Side-by-side file diff. Image fit / 100 %. mp3/mp4 streaming with seek.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">▰▰</div>
-          <h3>Splits + sessions</h3>
-          <p>Recursive split panes (⌘\ / ⌘=, nest as deep as you want). Tmux-style sessions, each with its own pane tree and workspace root. Drag tabs to reorder.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">⌘</div>
-          <h3>Keyboard-first</h3>
-          <p>⌘P fuzzy file search with Recents. ⌘T multi-suggestion path / URL / command palette. ⌘⇧F find-in-files. ⌘⇧/ for the full cheatsheet.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">💾</div>
-          <h3>Stays where you left it</h3>
-          <p>Sessions, panes, open tabs, scratch buffers, AI chats, Git/HTTP requests — all survive restart. Now-Playing pill keeps audio alive when you switch sessions.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🎨</div>
-          <h3>15 color themes</h3>
-          <p>Tokyo Night, Catppuccin, Dracula, Gruvbox, One Dark, Nord, Solarized, Rosé Pine, and more. Token colours and the terminal palette derive from each theme's ANSI palette so everything stays coherent.</p>
+    <!-- Showcase: Git client -->
+    <section class="showcase showcase--reverse" id="features">
+      <div class="showcase-text">
+        <span class="showcase-tag">Git</span>
+        <h2>A full Git client without leaving the window.</h2>
+        <p>
+          Status with <strong>hunk-level</strong> and <strong>line-level</strong> stage / unstage / discard.
+          Branches, stashes, tags. Commit history with cherry-pick. Fetch, pull, push.
+          Source-tree-equivalent — no separate app, no terminal incantations.
+        </p>
+        <ul class="showcase-list">
+          <li>Click any line in a hunk to stage just that line</li>
+          <li>Drop other branches in one click; current + main/master/develop are kept</li>
+          <li>History view with cherry-pick · branches with merge / rebase</li>
+        </ul>
+      </div>
+      <div class="showcase-mock">
+        <div class="mock mock--git">
+          <div class="mock-chrome">
+            <span class="md-dot md-dot-red"></span>
+            <span class="md-dot md-dot-yellow"></span>
+            <span class="md-dot md-dot-green"></span>
+            <span class="mock-toolbar">
+              <span class="mock-pill mock-pill--accent">⎇ feature/git-rebase</span>
+              <span class="mock-pill mock-pill--ghost">Fetch</span>
+              <span class="mock-pill mock-pill--ghost">Pull</span>
+              <span class="mock-pill mock-pill--ghost">Push</span>
+            </span>
+          </div>
+          <div class="mock-git-body">
+            <aside class="mock-git-files">
+              <div class="mock-git-section">Staged · 2</div>
+              <div class="mock-git-row mock-git-row--staged">
+                <span class="mock-badge mock-badge--add">A</span>
+                <span class="mock-git-path">README.md</span>
+              </div>
+              <div class="mock-git-row mock-git-row--staged">
+                <span class="mock-badge mock-badge--mod">M</span>
+                <span class="mock-git-path">src/state/workspace.ts</span>
+              </div>
+              <div class="mock-git-section">Changes · 3</div>
+              <div class="mock-git-row mock-git-row--active">
+                <span class="mock-badge mock-badge--mod">M</span>
+                <span class="mock-git-path">src/components/GitView.tsx</span>
+              </div>
+              <div class="mock-git-row">
+                <span class="mock-badge mock-badge--mod">M</span>
+                <span class="mock-git-path">src/styles/global.css</span>
+              </div>
+              <div class="mock-git-row">
+                <span class="mock-badge mock-badge--del">D</span>
+                <span class="mock-git-path">old-helper.ts</span>
+              </div>
+            </aside>
+            <div class="mock-git-diff">
+              <div class="mock-git-hunk-head">@@ -42,6 +42,12 @@ export function GitView()</div>
+              <div class="mock-diff-line"> &nbsp; const refresh = useCallback(async () =&gt; {</div>
+              <div class="mock-diff-line"> &nbsp; &nbsp; if (!rootDir) return;</div>
+              <div class="mock-diff-line mock-diff-line--add">+ &nbsp;const [s, b] = await Promise.all([</div>
+              <div class="mock-diff-line mock-diff-line--add">+ &nbsp; &nbsp;window.marko.gitStatus(rootDir),</div>
+              <div class="mock-diff-line mock-diff-line--add mock-diff-line--selected">+ &nbsp; &nbsp;window.marko.gitBranches(rootDir),</div>
+              <div class="mock-diff-line mock-diff-line--add">+ &nbsp;]);</div>
+              <div class="mock-diff-line mock-diff-line--rem">- &nbsp;const s = await window.marko.gitStatus(rootDir);</div>
+              <div class="mock-diff-line"> &nbsp; setStatus(s);</div>
+              <div class="mock-git-hunk-actions">
+                <span class="mock-pill mock-pill--accent">Stage 1 line</span>
+                <span class="mock-pill mock-pill--danger">Discard</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="shortcuts" id="shortcuts">
+    <!-- Showcase: AI chat -->
+    <section class="showcase">
+      <div class="showcase-text">
+        <span class="showcase-tag">AI Chat</span>
+        <h2>Streaming chat that knows your code.</h2>
+        <p>
+          OpenAI, OpenRouter, Anthropic, Ollama, LM Studio — anything OpenAI-compatible. API keys
+          encrypted via macOS Keychain.
+          Attach files for context (drag-drop, dialog, or open-tab picker), so the model sees your actual code.
+        </p>
+        <ul class="showcase-list">
+          <li>Markdown-rendered replies with copy-buttons on every code block</li>
+          <li>History sidebar — past chats persist and reopen instantly</li>
+          <li>Per-chat system prompt · live token estimate · export to markdown</li>
+        </ul>
+      </div>
+      <div class="showcase-mock">
+        <div class="mock mock--chat">
+          <div class="mock-chrome">
+            <span class="md-dot md-dot-red"></span>
+            <span class="md-dot md-dot-yellow"></span>
+            <span class="md-dot md-dot-green"></span>
+            <span class="mock-toolbar">
+              <span class="mock-pill mock-pill--ghost">OpenRouter</span>
+              <span class="mock-pill mock-pill--ghost mock-pill--mono">claude-3.5-sonnet</span>
+              <span class="mock-toolbar-spacer"></span>
+              <span class="mock-pill mock-pill--mono">~1.2kt</span>
+              <span class="mock-pill mock-pill--accent">History</span>
+            </span>
+          </div>
+          <div class="mock-chat-body">
+            <aside class="mock-chat-side">
+              <div class="mock-chat-side-new">+ New chat</div>
+              <div class="mock-chat-side-row mock-chat-side-row--active">
+                <div class="mock-chat-side-title">Refactor GitView's refresh hook</div>
+                <div class="mock-chat-side-meta">2m · 8 msgs</div>
+              </div>
+              <div class="mock-chat-side-row">
+                <div class="mock-chat-side-title">CodeMirror cross-pane sync</div>
+                <div class="mock-chat-side-meta">1h · 12 msgs</div>
+              </div>
+              <div class="mock-chat-side-row">
+                <div class="mock-chat-side-title">Excalidraw bg color follows theme</div>
+                <div class="mock-chat-side-meta">3h · 4 msgs</div>
+              </div>
+              <div class="mock-chat-side-row">
+                <div class="mock-chat-side-title">Why does my useEffect loop?</div>
+                <div class="mock-chat-side-meta">1d · 6 msgs</div>
+              </div>
+            </aside>
+            <div class="mock-chat-main">
+              <div class="mock-chat-msg mock-chat-msg--user">
+                <div class="mock-chat-role">YOU</div>
+                <div class="mock-chat-body-text">Refactor this hook so the two requests run in parallel.</div>
+              </div>
+              <div class="mock-chat-msg mock-chat-msg--assistant">
+                <div class="mock-chat-role">ASSISTANT</div>
+                <div class="mock-chat-body-text">Use <code>Promise.all</code>:</div>
+                <div class="mock-chat-code">
+                  <span class="mock-chat-code-lang">ts</span>
+                  <span class="mock-chat-code-copy">Copy</span>
+                  <pre>const [s, b] = await Promise.all([
+  window.marko.gitStatus(rootDir),
+  window.marko.gitBranches(rootDir),
+]);</pre>
+                </div>
+                <div class="mock-chat-body-text">Both calls fire at once instead of sequentially.</div>
+              </div>
+              <div class="mock-chat-attach">
+                <span class="mock-chip">📎 GitView.tsx</span>
+                <span class="mock-chip">📎 workspace.ts</span>
+                <span class="mock-chip-add">+ File…</span>
+              </div>
+              <div class="mock-chat-input">
+                <span class="mock-chat-input-text">Now memoize the result so re-renders don't refetch…</span>
+                <span class="mock-chat-send">Send</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Showcase: Terminal with AI -->
+    <section class="showcase showcase--reverse">
+      <div class="showcase-text">
+        <span class="showcase-tag">Terminal</span>
+        <h2>A terminal that types commands for you.</h2>
+        <p>
+          xterm.js + node-pty + your real <code>$SHELL</code>. Press <kbd class="inline-kbd">⌘I</kbd>
+          and describe what you want — the AI types the command into your prompt for review.
+          Hit Enter to run. No surprise execution.
+        </p>
+        <ul class="showcase-list">
+          <li>Click any file path in output to open it in the editor (with line jump)</li>
+          <li>⌘F search scrollback · ⌘K clear · ⌘-click URLs</li>
+          <li>Themes match the app's color scheme — ANSI palette derived from each theme</li>
+        </ul>
+      </div>
+      <div class="showcase-mock">
+        <div class="mock mock--term">
+          <div class="mock-chrome">
+            <span class="md-dot md-dot-red"></span>
+            <span class="md-dot md-dot-yellow"></span>
+            <span class="md-dot md-dot-green"></span>
+            <span class="mock-toolbar">
+              <span class="mock-pill mock-pill--mono mock-pill--ghost">~/projects/marko · zsh</span>
+            </span>
+          </div>
+          <div class="mock-term">
+            <div class="mock-term-line"><span class="mock-term-prompt">~/projects/marko</span> $ npm run dev</div>
+            <div class="mock-term-line mock-term-dim">  vite v8.0.5 dev server running at:</div>
+            <div class="mock-term-line mock-term-dim">  &gt; Local: <span class="mock-term-link">http://localhost:5173</span></div>
+            <div class="mock-term-line mock-term-dim">  &gt; ready in 612 ms</div>
+            <div class="mock-term-line"><span class="mock-term-prompt">~/projects/marko</span> $ <span class="mock-term-link mock-term-link--path">src/components/GitView.tsx:42</span></div>
+            <div class="mock-term-line"><span class="mock-term-prompt">~/projects/marko</span> $ <span class="mock-term-cursor">▍</span></div>
+            <div class="mock-term-ai">
+              <span class="mock-term-ai-icon">✨</span>
+              <span class="mock-term-ai-input">find all .ts files modified in the last week</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Showcase: Find in files -->
+    <section class="showcase">
+      <div class="showcase-text">
+        <span class="showcase-tag">Find in files</span>
+        <h2>Ripgrep, grouped, jumpable.</h2>
+        <p>
+          <kbd class="inline-kbd">⌘⇧F</kbd> → query, glob, regex/word/case toggles.
+          Results stream in grouped by file. Click any match to open the file at that line.
+        </p>
+      </div>
+      <div class="showcase-mock">
+        <div class="mock mock--find">
+          <div class="mock-chrome">
+            <span class="md-dot md-dot-red"></span>
+            <span class="md-dot md-dot-yellow"></span>
+            <span class="md-dot md-dot-green"></span>
+          </div>
+          <div class="mock-find-toolbar">
+            <span class="mock-find-input">workspace.openFileTab</span>
+            <span class="mock-find-glob">*.{ts,tsx}</span>
+            <span class="mock-find-flags">
+              <span class="mock-find-flag">Aa</span>
+              <span class="mock-find-flag">\b</span>
+              <span class="mock-find-flag mock-find-flag--on">.*</span>
+            </span>
+          </div>
+          <div class="mock-find-summary">7 matches in 4 files</div>
+          <div class="mock-find-list">
+            <div class="mock-find-file">▼ src/lib/actions.ts <span class="mock-find-count">3</span></div>
+            <div class="mock-find-match"><span class="mock-find-line">119</span><span class="mock-find-text">    <em>workspace.openFileTab</em>(filePath, dataUrl, title, 'image');</span></div>
+            <div class="mock-find-match"><span class="mock-find-line">128</span><span class="mock-find-text">    <em>workspace.openFileTab</em>(filePath, '', title, 'media');</span></div>
+            <div class="mock-find-match"><span class="mock-find-line">137</span><span class="mock-find-text">    <em>workspace.openFileTab</em>(filePath, c, title, kind);</span></div>
+            <div class="mock-find-file">▼ src/components/PathInput.tsx <span class="mock-find-count">2</span></div>
+            <div class="mock-find-match"><span class="mock-find-line">186</span><span class="mock-find-text">      const open = stat.isDirectory ? () =&gt; <em>workspace.openFileTab</em></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Showcase: splits + sessions -->
+    <section class="showcase showcase--reverse">
+      <div class="showcase-text">
+        <span class="showcase-tag">Layout</span>
+        <h2>Splits to the depth you want. Sessions for parallel projects.</h2>
+        <p>
+          Split horizontally (<kbd class="inline-kbd">⌘\</kbd>) or vertically (<kbd class="inline-kbd">⌘=</kbd>),
+          nest as deep as you want. Tmux-style sessions give each project its own pane tree and workspace root.
+          Everything — sessions, panes, open tabs, scratch buffers — survives restart.
+        </p>
+        <ul class="showcase-list">
+          <li>Drag tabs to reorder, drag-drop into the chat as context</li>
+          <li>"Now Playing" pill in the titlebar surfaces audio/video from any tab in any session</li>
+          <li>Cross-pane edit sync: same file open twice, edits appear live in both</li>
+        </ul>
+      </div>
+      <div class="showcase-mock">
+        <div class="mock mock--layout">
+          <div class="mock-chrome">
+            <span class="md-dot md-dot-red"></span>
+            <span class="md-dot md-dot-yellow"></span>
+            <span class="md-dot md-dot-green"></span>
+            <span class="mock-toolbar">
+              <span class="mock-now-playing">▮▮▮ chill-beats.mp3</span>
+            </span>
+          </div>
+          <div class="mock-session-strip">
+            <span class="mock-session mock-session--active">Workspace 1</span>
+            <span class="mock-session">Workspace 2</span>
+            <span class="mock-session">Notes</span>
+          </div>
+          <div class="mock-layout">
+            <div class="mock-layout-pane">
+              <div class="mock-pane-tab">📁 src/components</div>
+              <div class="mock-pane-content mock-pane-content--folder">
+                <div class="mock-folder-grid">
+                  <div class="mock-folder-item">📄<br/>App.tsx</div>
+                  <div class="mock-folder-item">📄<br/>ChatView</div>
+                  <div class="mock-folder-item">📄<br/>GitView</div>
+                  <div class="mock-folder-item">📄<br/>Terminal</div>
+                </div>
+              </div>
+            </div>
+            <div class="mock-layout-split"></div>
+            <div class="mock-layout-pane">
+              <div class="mock-layout-pane-row">
+                <div class="mock-pane-tab">⟨⟩ ChatView.tsx</div>
+                <div class="mock-pane-content mock-pane-content--code">
+                  <div class="mock-code-line"><span class="mock-code-kw">export</span> <span class="mock-code-kw">function</span> <span class="mock-code-fn">ChatView</span>() {</div>
+                  <div class="mock-code-line">  <span class="mock-code-kw">const</span> [messages, setMessages] = <span class="mock-code-fn">useState</span>([]);</div>
+                  <div class="mock-code-line">  <span class="mock-code-kw">return</span> (</div>
+                  <div class="mock-code-line">    <span class="mock-code-tag">&lt;div</span> <span class="mock-code-attr">className</span>=<span class="mock-code-str">"chat-view"</span><span class="mock-code-tag">&gt;</span></div>
+                </div>
+              </div>
+              <div class="mock-layout-split mock-layout-split--horizontal"></div>
+              <div class="mock-layout-pane-row">
+                <div class="mock-pane-tab">▍ zsh</div>
+                <div class="mock-pane-content mock-pane-content--term">
+                  <div class="mock-term-line">$ npm run typecheck</div>
+                  <div class="mock-term-line mock-term-dim">  no errors found</div>
+                  <div class="mock-term-line">$ <span class="mock-term-cursor">▍</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab kinds cloud -->
+    <section class="kinds-cloud">
       <header class="section-head">
-        <h2>One keystroke away.</h2>
-        <p>The full cheatsheet lives on the welcome screen. The greatest hits:</p>
+        <h2>Eighteen tab kinds, addressable by one keystroke.</h2>
+        <p>Type <kbd class="inline-kbd">⌘T</kbd>, then a hint. The whole app opens to the right tool.</p>
       </header>
-      <div class="shortcut-grid">
-        <div class="shortcut-col">
-          <div class="shortcut-h">Files</div>
-          <div class="shortcut"><kbd>⌘P</kbd><span>quick open</span></div>
-          <div class="shortcut"><kbd>⌘T</kbd><span>go to path / command</span></div>
-          <div class="shortcut"><kbd>⌘⇧F</kbd><span>find in files</span></div>
-          <div class="shortcut"><kbd>⌘N</kbd><span>new file…</span></div>
-          <div class="shortcut"><kbd>⌘O</kbd><span>open file</span></div>
-          <div class="shortcut"><kbd>⌘⇧O</kbd><span>open folder</span></div>
-          <div class="shortcut"><kbd>⌘S</kbd><span>save</span></div>
-        </div>
-        <div class="shortcut-col">
-          <div class="shortcut-h">Tabs &amp; sessions</div>
-          <div class="shortcut"><kbd>⌘W</kbd><span>close tab</span></div>
-          <div class="shortcut"><kbd>⌘⇧[</kbd><span>previous tab</span></div>
-          <div class="shortcut"><kbd>⌘⇧]</kbd><span>next tab</span></div>
-          <div class="shortcut"><kbd>⌘⌥N</kbd><span>new session</span></div>
-          <div class="shortcut"><kbd>⌘⇧9</kbd><span>previous session</span></div>
-          <div class="shortcut"><kbd>⌘⇧0</kbd><span>next session</span></div>
-        </div>
-        <div class="shortcut-col">
-          <div class="shortcut-h">Panes</div>
-          <div class="shortcut"><kbd>⌘\</kbd><span>split right</span></div>
-          <div class="shortcut"><kbd>⌘=</kbd><span>split down</span></div>
-          <div class="shortcut"><kbd>⌘`</kbd><span>next pane</span></div>
-          <div class="shortcut"><kbd>⌘⇧Space</kbd><span>cycle layout</span></div>
-          <div class="shortcut"><kbd>⌘⌥W</kbd><span>close pane</span></div>
-        </div>
-        <div class="shortcut-col">
-          <div class="shortcut-h">Tools</div>
-          <div class="shortcut"><kbd>⌘E</kbd><span>toggle sidebar</span></div>
-          <div class="shortcut"><kbd>⌘⇧\</kbd><span>toggle outline</span></div>
-          <div class="shortcut"><kbd>⌘⇧M</kbd><span>cycle markdown view</span></div>
-          <div class="shortcut"><kbd>⌘Y</kbd><span>process viewer</span></div>
-          <div class="shortcut"><kbd>⌘⇧/</kbd><span>all shortcuts</span></div>
-          <div class="shortcut"><kbd>⌘,</kbd><span>preferences</span></div>
-        </div>
-        <div class="shortcut-col">
-          <div class="shortcut-h">Terminal</div>
-          <div class="shortcut"><kbd>⌘F</kbd><span>find in scrollback</span></div>
-          <div class="shortcut"><kbd>⌘K</kbd><span>clear</span></div>
-          <div class="shortcut"><kbd>⌘I</kbd><span>ask AI for a command</span></div>
-          <div class="shortcut"><kbd>⌘-click</kbd><span>open URL</span></div>
-          <div class="shortcut"><kbd>click</kbd><span>open file path</span></div>
-        </div>
+      <div class="kinds-grid">
+        <div class="kind-card"><span class="kind-icon">📝</span><span class="kind-name">Markdown</span></div>
+        <div class="kind-card"><span class="kind-icon">⟨⟩</span><span class="kind-name">Code</span></div>
+        <div class="kind-card"><span class="kind-icon">🖼</span><span class="kind-name">Image</span></div>
+        <div class="kind-card"><span class="kind-icon">▶</span><span class="kind-name">Media</span></div>
+        <div class="kind-card"><span class="kind-icon">PDF</span><span class="kind-name">PDF</span></div>
+        <div class="kind-card"><span class="kind-icon">▤</span><span class="kind-name">CSV / TSV</span></div>
+        <div class="kind-card"><span class="kind-icon">{ }</span><span class="kind-name">JSON</span></div>
+        <div class="kind-card"><span class="kind-icon">±</span><span class="kind-name">Diff</span></div>
+        <div class="kind-card"><span class="kind-icon">📁</span><span class="kind-name">Folder</span></div>
+        <div class="kind-card"><span class="kind-icon">◯</span><span class="kind-name">Web</span></div>
+        <div class="kind-card"><span class="kind-icon">▍</span><span class="kind-name">Terminal</span></div>
+        <div class="kind-card"><span class="kind-icon">📊</span><span class="kind-name">Activity</span></div>
+        <div class="kind-card"><span class="kind-icon">⎇</span><span class="kind-name">Git</span></div>
+        <div class="kind-card"><span class="kind-icon">🔎</span><span class="kind-name">Find</span></div>
+        <div class="kind-card"><span class="kind-icon">→</span><span class="kind-name">HTTP</span></div>
+        <div class="kind-card"><span class="kind-icon">✏︎</span><span class="kind-name">Whiteboard</span></div>
+        <div class="kind-card"><span class="kind-icon">✨</span><span class="kind-name">AI Chat</span></div>
+        <div class="kind-card"><span class="kind-icon">⌂</span><span class="kind-name">Welcome</span></div>
       </div>
     </section>
 

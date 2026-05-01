@@ -2145,7 +2145,7 @@ button {
   flex: 1;
   height: 100%;
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: var(--editor-font-size);
   background: var(--bg);
   color: var(--text);
 }
@@ -2153,7 +2153,7 @@ button {
 .codemirror-host .cm-content,
 .codemirror-host .cm-line {
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: var(--editor-font-size);
   line-height: 1.55;
 }
 .codemirror-host .cm-scroller {
@@ -2166,7 +2166,7 @@ button {
 /* Match the vim block cursor's overlaid character to the surrounding text. */
 .codemirror-host .cm-fat-cursor {
   font-family: var(--font-mono) !important;
-  font-size: 13.5px !important;
+  font-size: var(--editor-font-size) !important;
   font-weight: inherit !important;
 }
 .codemirror-host .cm-gutters {
@@ -5035,6 +5035,15 @@ button {
 }
 .sqlite-sql-editor .cm-editor {
   height: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--editor-font-size);
+}
+.sqlite-sql-editor .cm-scroller,
+.sqlite-sql-editor .cm-content,
+.sqlite-sql-editor .cm-line {
+  font-family: var(--font-mono);
+  font-size: var(--editor-font-size);
+  line-height: 1.55;
 }
 .sqlite-editor-toolbar {
   flex: 0 0 auto;

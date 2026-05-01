@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
-import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useWorkspace, workspace, getActiveSession } from '../state/workspace';
 import { useActiveTheme, useSettings } from '../state/settings';
 import { xtermThemeFor } from '../lib/themes';
-import { openFileFromPath } from '../lib/actions';
+import { openFileFromPath, openFolderInEditor, openUrlInTab } from '../lib/actions';
 import '@xterm/xterm/css/xterm.css';
 
 const AI_SYSTEM_PROMPT = [
@@ -41,6 +40,30 @@ interface Props {
  *  trailing optional `:lineNo` lets us deep-link to a specific line. */
 const FILE_PATH_RE =
   /(?<![:/\w@])(\.{0,2}\/[\w./@\-+]+|\/[\w./@\-+]+|[\w./\-+]+\.[\w-]+)(?::(\d+))?(?::(\d+))?/g;
+
+/** URL detector for terminal links. Three flavors are recognized:
+ *    1. Explicit-scheme:        https://… / http://… / file://…
+ *    2. www-prefixed bare hosts: www.example.com[/path]
+ *    3. Bare multi-segment hosts ending in a known TLD, with optional path:
+ *       app.pacifica.fi[/dashboard]
+ *  The TLD list keeps us from misfiring on things like `app.tsx` (`.tsx`
+ *  isn't in the list). Trailing punctuation is stripped in the activate
+ *  handler so a URL at the end of a sentence doesn't grab the period. */
+const URL_TLDS =
+  'com|org|net|io|dev|app|co|me|ai|gg|xyz|tv|ly|fm|sh|so|info|biz|edu|gov|' +
+  'us|uk|ca|de|fr|jp|cn|in|br|ru|au|nz|fi|dk|pl|no|se|nl|es|it|kr|sg|hk|tw|' +
+  'mx|to|tt|gl|ch|at|be|ie|cz|gr|hu|pt|ro|ua|tr|il|ar|cl|za|sa|ae|id|my|th|vn';
+const URL_LINK_RE = new RegExp(
+  '(?:' +
+    '(?:https?|file)://[^\\s<>"\']+' +
+    '|' +
+    'www\\.[^\\s<>"\']+' +
+    '|' +
+    '(?<![\\w./])(?:[\\w-]+\\.)+(?:' + URL_TLDS + ')' +
+    '(?:[/?#][^\\s<>"\']*)?(?=\\s|$|[)\\].,;:!?"\'])' +
+  ')',
+  'g',
+);
 
 export function Terminal({ tabId }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -83,18 +106,52 @@ export function Terminal({ tabId }: Props) {
     });
     const fit = new FitAddon();
     const search = new SearchAddon();
-    const webLinks = new WebLinksAddon((event, uri) => {
-      // Cmd-click (or shift-click) only — single click should not steal focus
-      // from someone selecting text. xterm passes the original mouse event.
-      if (event && (event.metaKey || event.ctrlKey)) {
-        void window.marko.openDefault(uri).catch(() => {
-          // Fall through to default browser open via shell.
-        });
-      }
-    });
     term.loadAddon(fit);
     term.loadAddon(search);
-    term.loadAddon(webLinks);
+
+    // URL link provider. The bundled WebLinksAddon's activation gating is
+    // unreliable across versions (and was eating clicks here), so we own
+    // the regex + activate path directly.
+    const urlLinkDispose = term.registerLinkProvider({
+      provideLinks(_lineNum, callback) {
+        const buffer = term.buffer.active;
+        const line = buffer.getLine(_lineNum - 1);
+        if (!line) {
+          callback(undefined);
+          return;
+        }
+        const text = line.translateToString(true);
+        const out: Array<{
+          range: { start: { x: number; y: number }; end: { x: number; y: number } };
+          text: string;
+          activate: (event: MouseEvent) => void;
+        }> = [];
+        URL_LINK_RE.lastIndex = 0;
+        let urlMatch: RegExpExecArray | null;
+        while ((urlMatch = URL_LINK_RE.exec(text)) !== null) {
+          // Strip common trailing punctuation that's almost always not part
+          // of the URL (e.g., `see https://example.com.`).
+          let raw = urlMatch[0];
+          const trail = raw.match(/[)\].,;:!?'"]+$/);
+          if (trail) raw = raw.slice(0, raw.length - trail[0].length);
+          if (raw.length < 8) continue;
+          const start = urlMatch.index;
+          const end = start + raw.length;
+          const uri = raw;
+          out.push({
+            range: {
+              start: { x: start + 1, y: _lineNum },
+              end: { x: end, y: _lineNum },
+            },
+            text: raw,
+            activate: () => {
+              workspace.openInSide(() => openUrlInTab(uri), tabId);
+            },
+          });
+        }
+        callback(out.length > 0 ? out : undefined);
+      },
+    });
 
     // Click-to-open file paths. Each matching link gets registered; when
     // clicked we resolve relative paths against the workspace rootDir and
@@ -113,16 +170,26 @@ export function Terminal({ tabId }: Props) {
           text: string;
           activate: (event: MouseEvent) => void;
         }> = [];
-        let match: RegExpExecArray | null;
         FILE_PATH_RE.lastIndex = 0;
-        while ((match = FILE_PATH_RE.exec(text)) !== null) {
-          const matchedText = match[0];
+        let m: RegExpExecArray | null;
+        while ((m = FILE_PATH_RE.exec(text)) !== null) {
+          const matchedText = m[0];
           // Drop trivial/false-positive matches: bare extension-only,
           // protocol-prefixed, or anything obviously not a real file.
           if (matchedText.startsWith('http')) continue;
           if (matchedText.length < 3) continue;
-          const linePart = match[2] ? parseInt(match[2], 10) : undefined;
-          const start = match.index;
+          // If this region looks more like a URL (www.foo.com, github.io,
+          // etc.), let the URL provider handle it instead of statting and
+          // failing.
+          URL_LINK_RE.lastIndex = 0;
+          if (URL_LINK_RE.test(matchedText)) continue;
+          // Snapshot the match data — every activate handler that the loop
+          // pushes shares the *same* `m` reference, so the value of `m[1]`
+          // by the time the user clicks would be `null` (loop exit). Pin
+          // the path + line number now.
+          const pathOnly = m[1];
+          const linePart = m[2] ? parseInt(m[2], 10) : undefined;
+          const start = m.index;
           const end = start + matchedText.length;
           links.push({
             range: {
@@ -131,29 +198,31 @@ export function Terminal({ tabId }: Props) {
             },
             text: matchedText,
             activate: () => {
-              const pathOnly = match![1];
               const abs = pathOnly.startsWith('/')
                 ? pathOnly
                 : `${rootDir ?? ''}/${pathOnly}`;
               void window.marko.stat(abs).then((stat) => {
                 if (!stat.exists) return;
-                if (stat.isDirectory) {
-                  // Folder paths could open in folder view — but for
-                  // simplicity, just reveal in the tree.
-                  workspace.revealInTree(abs);
-                  return;
-                }
-                void openFileFromPath(abs, { focus: true });
-                if (linePart) {
-                  // Defer slightly so the editor has time to mount.
-                  setTimeout(() => {
-                    window.dispatchEvent(
-                      new CustomEvent('marko:goto-line', {
-                        detail: { path: abs, line: linePart },
-                      }),
-                    );
-                  }, 80);
-                }
+                // Files and folders both open as tabs in the side pane so
+                // the terminal stays put. Folder gets a folder-view tab,
+                // file gets routed by `openFileFromPath` to the right kind.
+                workspace.openInSide(async () => {
+                  if (stat.isDirectory) {
+                    await openFolderInEditor(abs, { focus: true });
+                  } else {
+                    await openFileFromPath(abs, { focus: true });
+                    if (linePart) {
+                      // Defer slightly so the editor has time to mount.
+                      setTimeout(() => {
+                        window.dispatchEvent(
+                          new CustomEvent('marko:goto-line', {
+                            detail: { path: abs, line: linePart },
+                          }),
+                        );
+                      }, 80);
+                    }
+                  }
+                }, tabId);
               });
             },
           });
@@ -228,6 +297,7 @@ export function Terminal({ tabId }: Props) {
       ro.disconnect();
       onUserInput.dispose();
       linkDispose.dispose();
+      urlLinkDispose.dispose();
       dispose?.();
       disposeExit?.();
       void window.marko.ptyKill(ptyId);

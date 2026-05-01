@@ -586,6 +586,71 @@ export const workspace = {
 
   // ---------- Splitting ----------
 
+  /** Run `opener` in a "side pane" — an existing sibling leaf if the origin
+   *  pane is already in a split, otherwise a freshly-created empty pane to
+   *  the right. `originTabId` pins the origin to the leaf containing that
+   *  tab (used by terminal link clicks so focus race conditions don't
+   *  redirect the open into the wrong leaf). Falls back to the focused
+   *  leaf when no origin is given. */
+  openInSide(opener: () => void | Promise<void>, originTabId?: string) {
+    const active = getActiveSession(state);
+    const originLeaf = originTabId
+      ? findLeafByTabId(active.root, originTabId)
+      : findLeaf(active.root, active.focusedLeafId);
+    if (!originLeaf) {
+      void opener();
+      return;
+    }
+    const parentInfo = findParent(active.root, originLeaf.id);
+    if (parentInfo) {
+      // Reuse the sibling subtree — pick its first leaf so repeated clicks
+      // recycle the existing side pane instead of stacking splits.
+      const siblingTree = parentInfo.parent.children[parentInfo.index === 0 ? 1 : 0];
+      const siblingLeaf =
+        siblingTree.kind === 'leaf' ? siblingTree : getAllLeaves(siblingTree)[0];
+      setState((prev) => ({
+        sessions: patchActiveSession(prev, { focusedLeafId: siblingLeaf.id }),
+      }));
+      void opener();
+      return;
+    }
+    // No sibling — split horizontally with an empty new leaf and focus it.
+    let newLeafId: string | null = null;
+    setState((prev) => {
+      const a = getActiveSession(prev);
+      const l = findLeaf(a.root, originLeaf.id);
+      if (!l) return prev;
+      const newLeaf: LeafNode = {
+        kind: 'leaf',
+        id: newNodeId('leaf'),
+        tabIds: [],
+        activeTabId: null,
+      };
+      newLeafId = newLeaf.id;
+      const split: SplitNode = {
+        kind: 'split',
+        id: newNodeId('split'),
+        direction: 'horizontal',
+        ratio: 0.5,
+        children: [l, newLeaf],
+      };
+      return {
+        sessions: patchActiveSession(prev, {
+          root: replaceNode(a.root, l, split),
+          focusedLeafId: newLeaf.id,
+        }),
+      };
+    });
+    // Belt-and-suspenders: ensure the new leaf is focused even if a later
+    // synchronous setState ran in between (e.g., a stray pane mousedown).
+    if (newLeafId) {
+      setState((prev) => ({
+        sessions: patchActiveSession(prev, { focusedLeafId: newLeafId! }),
+      }));
+    }
+    void opener();
+  },
+
   splitFocused(direction: 'horizontal' | 'vertical') {
     setState((prev) => {
       const active = getActiveSession(prev);

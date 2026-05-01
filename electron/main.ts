@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, protocol, net } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, protocol, net, safeStorage } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -140,6 +140,11 @@ function buildMenu() {
           label: 'Quick Open (Replace)…',
           accelerator: 'CmdOrCtrl+Shift+P',
           click: () => sendToRenderer('menu:quick-open-replace'),
+        },
+        {
+          label: 'Find in Files…',
+          accelerator: 'CmdOrCtrl+Shift+F',
+          click: () => sendToRenderer('menu:find-in-files'),
         },
         {
           label: 'Go to Path…',
@@ -1412,3 +1417,585 @@ ipcMain.handle('image:load', async (_e, filePath: string) => {
   const buf = await fs.readFile(filePath);
   return `data:${mime};base64,${buf.toString('base64')}`;
 });
+
+
+// =====================================================================
+// AI chat: provider config, encrypted API keys, streaming completions.
+// Streaming happens here in main so (a) API keys never reach the renderer,
+// (b) CORS can't bite us, (c) we can abort cleanly via AbortController.
+// =====================================================================
+
+interface AiProvider {
+  id: string;
+  name: string;
+  baseURL: string;
+  defaultModel: string;
+  needsKey: boolean;
+  isLocal: boolean;
+  /** Provider-specific extra headers (e.g. OpenRouter recommends
+   *  HTTP-Referer + X-Title for routing/leaderboards). */
+  extraHeaders?: Record<string, string>;
+}
+
+const DEFAULT_PROVIDERS: AiProvider[] = [
+  {
+    id: 'lmstudio',
+    name: 'LM Studio (local)',
+    baseURL: 'http://localhost:1234/v1',
+    defaultModel: 'local-model',
+    needsKey: false,
+    isLocal: true,
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama (local)',
+    baseURL: 'http://localhost:11434/v1',
+    defaultModel: 'llama3.2',
+    needsKey: false,
+    isLocal: true,
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    baseURL: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o-mini',
+    needsKey: true,
+    isLocal: false,
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    baseURL: 'https://openrouter.ai/api/v1',
+    defaultModel: 'openai/gpt-4o-mini',
+    needsKey: true,
+    isLocal: false,
+    extraHeaders: {
+      'HTTP-Referer': 'https://github.com/jinghanx/marko',
+      'X-Title': 'Marko',
+    },
+  },
+];
+
+async function aiProvidersPath(): Promise<string> {
+  const dir = await ensureMarkoDir();
+  return path.join(dir, 'ai-providers.json');
+}
+async function aiKeysPath(): Promise<string> {
+  const dir = await ensureMarkoDir();
+  return path.join(dir, 'ai-keys.json');
+}
+
+async function readProviders(): Promise<AiProvider[]> {
+  try {
+    const raw = await fs.readFile(await aiProvidersPath(), 'utf8');
+    const parsed = JSON.parse(raw) as AiProvider[];
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      // Backfill any default providers that aren't yet in the user's list
+      // (so newly-shipped defaults like OpenRouter show up automatically).
+      const known = new Set(parsed.map((p) => p.id));
+      const merged = [...parsed];
+      let added = false;
+      for (const def of DEFAULT_PROVIDERS) {
+        if (!known.has(def.id)) {
+          merged.push(def);
+          added = true;
+        }
+      }
+      if (added) {
+        // Persist so we don't have to merge on every read.
+        await writeProviders(merged).catch(() => {});
+      }
+      return merged;
+    }
+  } catch {
+    // file missing or corrupt — fall through to defaults
+  }
+  return DEFAULT_PROVIDERS;
+}
+
+async function writeProviders(list: AiProvider[]): Promise<void> {
+  const file = await aiProvidersPath();
+  await fs.writeFile(file, JSON.stringify(list, null, 2), 'utf8');
+}
+
+async function readKeys(): Promise<Record<string, string>> {
+  try {
+    const raw = await fs.readFile(await aiKeysPath(), 'utf8');
+    return JSON.parse(raw) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+async function writeKeys(map: Record<string, string>): Promise<void> {
+  const file = await aiKeysPath();
+  await fs.writeFile(file, JSON.stringify(map), 'utf8');
+}
+
+async function readDecryptedKey(providerId: string): Promise<string | null> {
+  const map = await readKeys();
+  const enc = map[providerId];
+  if (!enc) return null;
+  if (!safeStorage.isEncryptionAvailable()) return null;
+  try {
+    return safeStorage.decryptString(Buffer.from(enc, 'base64'));
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.handle('ai:providers', readProviders);
+
+ipcMain.handle(
+  'ai:provider-save',
+  async (_e, p: AiProvider): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const list = await readProviders();
+      const idx = list.findIndex((x) => x.id === p.id);
+      if (idx >= 0) list[idx] = p;
+      else list.push(p);
+      await writeProviders(list);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'ai:provider-delete',
+  async (_e, id: string): Promise<{ ok: boolean }> => {
+    try {
+      const list = await readProviders();
+      await writeProviders(list.filter((p) => p.id !== id));
+      const map = await readKeys();
+      delete map[id];
+      await writeKeys(map);
+    } catch {
+      // ignore
+    }
+    return { ok: true };
+  },
+);
+
+ipcMain.handle(
+  'ai:set-key',
+  async (_e, id: string, key: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { ok: false, error: 'OS keychain not available' };
+    }
+    try {
+      const map = await readKeys();
+      map[id] = safeStorage.encryptString(key).toString('base64');
+      await writeKeys(map);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'ai:has-key',
+  async (_e, id: string): Promise<boolean> => {
+    const map = await readKeys();
+    return !!map[id];
+  },
+);
+
+ipcMain.handle(
+  'ai:delete-key',
+  async (_e, id: string): Promise<{ ok: boolean }> => {
+    const map = await readKeys();
+    delete map[id];
+    await writeKeys(map);
+    return { ok: true };
+  },
+);
+
+// In-flight chat requests, keyed by reqId so the renderer can cancel.
+const inflightChats = new Map<string, AbortController>();
+
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface ChatStartArgs {
+  providerId: string;
+  model: string;
+  messages: ChatMessage[];
+  systemPrompt?: string;
+}
+
+ipcMain.handle(
+  'ai:chat-start',
+  async (
+    e,
+    reqId: string,
+    args: ChatStartArgs,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const list = await readProviders();
+    const provider = list.find((p) => p.id === args.providerId);
+    if (!provider) return { ok: false, error: `Unknown provider: ${args.providerId}` };
+
+    const apiKey = provider.needsKey ? await readDecryptedKey(provider.id) : null;
+    if (provider.needsKey && !apiKey) {
+      return { ok: false, error: `No API key set for ${provider.name}` };
+    }
+
+    const controller = new AbortController();
+    inflightChats.set(reqId, controller);
+
+    const messages: ChatMessage[] = args.systemPrompt
+      ? [{ role: 'system', content: args.systemPrompt }, ...args.messages]
+      : args.messages;
+
+    const url = `${provider.baseURL.replace(/\/$/, '')}/chat/completions`;
+    const sender = e.sender;
+
+    // Run in background so we can return immediately to the renderer.
+    void (async () => {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+            ...(provider.extraHeaders ?? {}),
+          },
+          body: JSON.stringify({
+            model: args.model || provider.defaultModel,
+            messages,
+            stream: true,
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          sender.send(`ai:chat:done:${reqId}`, {
+            ok: false,
+            error: `HTTP ${res.status}: ${body.slice(0, 500)}`,
+          });
+          return;
+        }
+        if (!res.body) {
+          sender.send(`ai:chat:done:${reqId}`, { ok: false, error: 'Empty body' });
+          return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() ?? '';
+          for (const ev of events) {
+            const trimmed = ev.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const data = trimmed.slice(5).trim();
+            if (!data || data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data) as {
+                choices?: Array<{ delta?: { content?: string } }>;
+              };
+              const delta = parsed.choices?.[0]?.delta?.content;
+              if (delta) sender.send(`ai:chat:chunk:${reqId}`, delta);
+            } catch {
+              // skip malformed events
+            }
+          }
+        }
+        sender.send(`ai:chat:done:${reqId}`, { ok: true });
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          sender.send(`ai:chat:done:${reqId}`, { ok: false, error: 'Cancelled' });
+        } else {
+          sender.send(`ai:chat:done:${reqId}`, {
+            ok: false,
+            error: (err as Error).message,
+          });
+        }
+      } finally {
+        inflightChats.delete(reqId);
+      }
+    })();
+
+    return { ok: true };
+  },
+);
+
+ipcMain.handle('ai:chat-cancel', (_e, reqId: string) => {
+  inflightChats.get(reqId)?.abort();
+  inflightChats.delete(reqId);
+  return { ok: true };
+});
+
+// =====================================================================
+// Find-in-files (ripgrep). We stream rg's --json output; the renderer
+// parses match events and renders grouped results.
+// =====================================================================
+
+const inflightSearches = new Map<string, ReturnType<typeof spawn>>();
+
+interface SearchArgs {
+  rootDir: string;
+  query: string;
+  caseSensitive?: boolean;
+  regex?: boolean;
+  wholeWord?: boolean;
+  /** rg-style glob filter, e.g. "*.{ts,tsx}". */
+  glob?: string;
+}
+
+ipcMain.handle(
+  'search:start',
+  async (e, reqId: string, args: SearchArgs): Promise<{ ok: boolean; error?: string }> => {
+    if (!args.rootDir || !args.query) {
+      return { ok: false, error: 'Missing rootDir or query' };
+    }
+    const rgArgs: string[] = ['--json'];
+    if (!args.caseSensitive) rgArgs.push('-i');
+    if (args.wholeWord) rgArgs.push('-w');
+    if (!args.regex) rgArgs.push('-F');
+    if (args.glob && args.glob.trim()) {
+      rgArgs.push('-g', args.glob.trim());
+    }
+    // Cap matches so a very common query doesn't tail forever.
+    rgArgs.push('-M', '500'); // truncate long lines
+    rgArgs.push('--', args.query, args.rootDir);
+
+    let proc;
+    try {
+      proc = spawn('rg', rgArgs);
+    } catch (err) {
+      return { ok: false, error: `Failed to spawn rg: ${(err as Error).message}` };
+    }
+    inflightSearches.set(reqId, proc);
+
+    let buffer = '';
+    let stderr = '';
+    proc.stdout?.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.type === 'match') {
+            const m = msg.data;
+            const path = m.path?.text ?? '';
+            const lineNumber = m.line_number ?? 0;
+            const text = m.lines?.text ?? '';
+            const submatches: Array<{ start: number; end: number }> = (m.submatches ?? []).map(
+              (s: { start: number; end: number }) => ({ start: s.start, end: s.end }),
+            );
+            e.sender.send(`search:match:${reqId}`, { path, lineNumber, text, submatches });
+          }
+        } catch {
+          // skip malformed line
+        }
+      }
+    });
+    proc.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    proc.on('error', (err) => {
+      const msg = err.message.includes('ENOENT')
+        ? 'ripgrep (rg) not found. Install with `brew install ripgrep`.'
+        : err.message;
+      e.sender.send(`search:done:${reqId}`, { ok: false, error: msg });
+      inflightSearches.delete(reqId);
+    });
+    proc.on('close', (code) => {
+      // rg exits 1 when there are no matches — that's not an error.
+      const ok = code === 0 || code === 1;
+      e.sender.send(`search:done:${reqId}`, {
+        ok,
+        error: ok ? undefined : stderr.trim() || `rg exit ${code}`,
+        exitCode: code,
+      });
+      inflightSearches.delete(reqId);
+    });
+
+    return { ok: true };
+  },
+);
+
+ipcMain.handle('search:cancel', (_e, reqId: string) => {
+  const proc = inflightSearches.get(reqId);
+  if (proc) {
+    try {
+      proc.kill();
+    } catch {
+      // already exited
+    }
+    inflightSearches.delete(reqId);
+  }
+  return { ok: true };
+});
+
+// =====================================================================
+// HTTP client tab — main proxies the request so we bypass CORS, support
+// any host, and keep response body parsing in Node.
+// =====================================================================
+
+interface HttpHeader {
+  key: string;
+  value: string;
+  enabled: boolean;
+}
+
+interface HttpRequestArgs {
+  method: string;
+  url: string;
+  headers: HttpHeader[];
+  body?: string;
+}
+
+interface HttpResponseInfo {
+  ok: boolean;
+  status?: number;
+  statusText?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  timeMs: number;
+  size?: number;
+  error?: string;
+}
+
+ipcMain.handle(
+  'http:request',
+  async (_e, req: HttpRequestArgs): Promise<HttpResponseInfo> => {
+    const start = Date.now();
+    try {
+      const headerObj: Record<string, string> = {};
+      for (const h of req.headers ?? []) {
+        if (h.enabled !== false && h.key.trim()) {
+          headerObj[h.key.trim()] = h.value;
+        }
+      }
+      const init: RequestInit = {
+        method: req.method,
+        headers: headerObj,
+      };
+      const upper = req.method.toUpperCase();
+      if (req.body && upper !== 'GET' && upper !== 'HEAD') {
+        init.body = req.body;
+      }
+      const res = await fetch(req.url, init);
+      const body = await res.text();
+      const respHeaders: Record<string, string> = {};
+      res.headers.forEach((v, k) => {
+        respHeaders[k] = v;
+      });
+      return {
+        ok: true,
+        status: res.status,
+        statusText: res.statusText,
+        headers: respHeaders,
+        body,
+        size: new TextEncoder().encode(body).length,
+        timeMs: Date.now() - start,
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: (e as Error).message,
+        timeMs: Date.now() - start,
+      };
+    }
+  },
+);
+
+// =====================================================================
+// Chat history archive — every chat conversation persists as its own JSON
+// file under ~/.marko/chats/. Tabs save on each turn; closing a tab doesn't
+// delete the archive, so the user can browse / reopen later.
+// =====================================================================
+
+async function chatsDir(): Promise<string> {
+  const dir = path.join(await ensureMarkoDir(), 'chats');
+  await fs.mkdir(dir, { recursive: true });
+  return dir;
+}
+
+interface ChatHistoryEntry {
+  id: string;
+  title: string;
+  providerId: string;
+  model: string;
+  messageCount: number;
+  updatedAt: number; // epoch ms
+  preview: string; // first ~120 chars of last user message
+}
+
+ipcMain.handle('chat-history:list', async (): Promise<ChatHistoryEntry[]> => {
+  try {
+    const dir = await chatsDir();
+    const files = await fs.readdir(dir);
+    const entries: ChatHistoryEntry[] = [];
+    for (const f of files) {
+      if (!f.endsWith('.json')) continue;
+      try {
+        const raw = await fs.readFile(path.join(dir, f), 'utf8');
+        const obj = JSON.parse(raw);
+        entries.push({
+          id: obj.id ?? f.replace(/\.json$/, ''),
+          title: obj.title ?? 'Untitled',
+          providerId: obj.providerId ?? '',
+          model: obj.model ?? '',
+          messageCount: Array.isArray(obj.messages) ? obj.messages.length : 0,
+          updatedAt: obj.updatedAt ?? 0,
+          preview: obj.preview ?? '',
+        });
+      } catch {
+        // skip malformed
+      }
+    }
+    entries.sort((a, b) => b.updatedAt - a.updatedAt);
+    return entries;
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle(
+  'chat-history:save',
+  async (_e, id: string, data: unknown): Promise<{ ok: boolean }> => {
+    try {
+      const dir = await chatsDir();
+      const file = path.join(dir, `${id}.json`);
+      const tmp = file + '.tmp';
+      await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
+      await fs.rename(tmp, file);
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  },
+);
+
+ipcMain.handle('chat-history:load', async (_e, id: string): Promise<string | null> => {
+  try {
+    const dir = await chatsDir();
+    return await fs.readFile(path.join(dir, `${id}.json`), 'utf8');
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle(
+  'chat-history:delete',
+  async (_e, id: string): Promise<{ ok: boolean }> => {
+    try {
+      const dir = await chatsDir();
+      await fs.rm(path.join(dir, `${id}.json`), { force: true });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  },
+);

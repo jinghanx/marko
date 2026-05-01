@@ -192,6 +192,12 @@ function KindIcon({ kind }: { kind: Tab['kind'] }) {
       return <GitGlyph />;
     case 'excalidraw':
       return <DrawGlyph />;
+    case 'chat':
+      return <ChatGlyph />;
+    case 'search':
+      return <SearchGlyph />;
+    case 'http':
+      return <HttpGlyph />;
     case 'code':
     default:
       return <CodeGlyph />;
@@ -273,6 +279,40 @@ function ProcessGlyph() {
   return (
     <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
       <path d="M2 12 L5 8 L8 10 L11 5 L14 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function HttpGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <path d="M2 5 L8 5 L8 11 L14 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11 8 L14 11 L11 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SearchGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 10 L13.5 13.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChatGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <path
+        d="M2 4 a1 1 0 0 1 1 -1 h10 a1 1 0 0 1 1 1 v6 a1 1 0 0 1 -1 1 h-7 l-3 2.5 v-2.5 h-0 a1 1 0 0 1 -1 -1 z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <circle cx="6" cy="7" r="0.9" fill="currentColor" />
+      <circle cx="8.5" cy="7" r="0.9" fill="currentColor" />
+      <circle cx="11" cy="7" r="0.9" fill="currentColor" />
     </svg>
   );
 }

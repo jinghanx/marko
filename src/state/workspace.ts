@@ -15,7 +15,10 @@ export type TabKind =
   | 'terminal'
   | 'process'
   | 'git'
-  | 'excalidraw';
+  | 'excalidraw'
+  | 'chat'
+  | 'search'
+  | 'http';
 
 export interface Tab {
   id: string;
@@ -980,7 +983,11 @@ export function serializeWorkspace(): Snapshot {
     // lose work. File-backed tabs re-read from disk on hydrate.
     if (
       !tab.filePath &&
-      (tab.kind === 'markdown' || tab.kind === 'code' || tab.kind === 'excalidraw')
+      (tab.kind === 'markdown' ||
+        tab.kind === 'code' ||
+        tab.kind === 'excalidraw' ||
+        tab.kind === 'chat' ||
+        tab.kind === 'http')
     ) {
       persisted.scratchContent = tab.content;
     }

@@ -10,6 +10,10 @@ import {
   openProcessTab,
   openGitTab,
   openExcalidrawTab,
+  openChatTab,
+  openChatHistoryTab,
+  openSearchTab,
+  openHttpTab,
   withReplace,
 } from '../lib/actions';
 
@@ -40,6 +44,26 @@ const COMMANDS: Command[] = [
     keywords: ['whiteboard', 'draw', 'excalidraw', 'sketch', 'canvas'],
     label: 'Open Whiteboard (Excalidraw)',
     run: () => openExcalidrawTab(),
+  },
+  {
+    keywords: ['chat', 'ai', 'assistant', 'gpt', 'llm'],
+    label: 'Open AI Chat',
+    run: () => openChatTab(),
+  },
+  {
+    keywords: ['history', 'chats', 'past'],
+    label: 'Open Chat History',
+    run: () => openChatHistoryTab(),
+  },
+  {
+    keywords: ['search', 'find', 'grep', 'rg'],
+    label: 'Find in Files (ripgrep)',
+    run: () => openSearchTab(),
+  },
+  {
+    keywords: ['http', 'request', 'rest', 'api', 'curl', 'postman'],
+    label: 'Open HTTP Client',
+    run: () => openHttpTab(),
   },
   {
     keywords: ['notes', 'note', 'scratchpad'],

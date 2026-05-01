@@ -144,6 +144,35 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
     });
   }, [tabContent]);
 
+  // Listen for goto-line events from search results (and any future caller).
+  // Retries briefly if the editor view isn't mounted yet — the event often
+  // fires moments after `openFileFromPath` triggered our mount.
+  useEffect(() => {
+    if (!filePath) return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { path?: string; line?: number };
+      if (!detail || detail.path !== filePath || !detail.line) return;
+      const tryJump = (attempt = 0) => {
+        const view = viewRef.current;
+        if (!view) {
+          if (attempt < 12) setTimeout(() => tryJump(attempt + 1), 50);
+          return;
+        }
+        const total = view.state.doc.lines;
+        const lineNum = Math.max(1, Math.min(detail.line!, total));
+        const pos = view.state.doc.line(lineNum);
+        view.dispatch({
+          selection: { anchor: pos.from, head: pos.from },
+          effects: EditorView.scrollIntoView(pos.from, { y: 'center' }),
+        });
+        view.focus();
+      };
+      tryJump();
+    };
+    window.addEventListener('marko:goto-line', handler);
+    return () => window.removeEventListener('marko:goto-line', handler);
+  }, [filePath]);
+
   const focusToken = useWorkspace((s) => s.focusToken);
   const isActive = useWorkspace((s) => {
     const session = getActiveSession(s);

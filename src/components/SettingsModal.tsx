@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { settings, useSettings, type ThemeMode } from '../state/settings';
 import { EDITOR_THEMES, type EditorTheme } from '../lib/editorTheme';
 import { LIGHT_THEMES, DARK_THEMES } from '../lib/themes';
@@ -164,6 +164,8 @@ export function SettingsModal({ open, onClose }: Props) {
               </label>
             </Row>
           </Section>
+
+          <AiProvidersSection />
         </div>
 
         <div className="modal-footer">
@@ -313,5 +315,222 @@ function FontSelect({
         />
       )}
     </div>
+  );
+}
+
+function AiProvidersSection() {
+  const [providers, setProviders] = useState<import('../types/marko').AiProvider[]>([]);
+  const [haveKey, setHaveKey] = useState<Record<string, boolean>>({});
+  const [editing, setEditing] = useState<string | null>(null);
+  const [keyInput, setKeyInput] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({
+    name: '',
+    baseURL: '',
+    defaultModel: 'gpt-4o-mini',
+    needsKey: true,
+  });
+
+  const load = async () => {
+    const list = await window.marko.aiProviders();
+    setProviders(list);
+    const flags: Record<string, boolean> = {};
+    for (const p of list) {
+      if (p.needsKey) flags[p.id] = await window.marko.aiHasKey(p.id);
+    }
+    setHaveKey(flags);
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const saveKey = async (id: string) => {
+    if (!keyInput.trim()) return;
+    const r = await window.marko.aiSetKey(id, keyInput.trim());
+    if (r.ok) {
+      setEditing(null);
+      setKeyInput('');
+      await load();
+    } else {
+      window.alert(r.error ?? 'Failed to save key');
+    }
+  };
+
+  const removeKey = async (id: string) => {
+    if (!window.confirm('Remove API key?')) return;
+    await window.marko.aiDeleteKey(id);
+    await load();
+  };
+
+  const removeProvider = async (id: string) => {
+    if (!window.confirm('Remove this provider?')) return;
+    await window.marko.aiProviderDelete(id);
+    await load();
+  };
+
+  const saveDraft = async () => {
+    if (!draft.name.trim() || !draft.baseURL.trim()) return;
+    const id = `custom-${Date.now()}`;
+    await window.marko.aiProviderSave({
+      id,
+      name: draft.name.trim(),
+      baseURL: draft.baseURL.trim(),
+      defaultModel: draft.defaultModel.trim(),
+      needsKey: draft.needsKey,
+      isLocal: !draft.needsKey,
+    });
+    setAdding(false);
+    setDraft({ name: '', baseURL: '', defaultModel: 'gpt-4o-mini', needsKey: true });
+    await load();
+  };
+  const cancelDraft = () => {
+    setAdding(false);
+    setDraft({ name: '', baseURL: '', defaultModel: 'gpt-4o-mini', needsKey: true });
+  };
+
+  return (
+    <Section label="AI">
+      <div className="ai-providers">
+        {providers.map((p) => (
+          <div
+            key={p.id}
+            className={`ai-provider-row${editing === p.id ? ' ai-provider-row--editing' : ''}`}
+          >
+            <div className="ai-provider-top">
+              <div className="ai-provider-info">
+                <div className="ai-provider-name">
+                  {p.name}
+                  {p.isLocal && <span className="ai-provider-tag">local</span>}
+                  {p.needsKey && (
+                    <span className={`ai-provider-tag ${haveKey[p.id] ? 'ai-provider-tag--ok' : 'ai-provider-tag--warn'}`}>
+                      {haveKey[p.id] ? 'key set' : 'no key'}
+                    </span>
+                  )}
+                </div>
+                <div className="ai-provider-url">
+                  {p.baseURL} · default: <code>{p.defaultModel}</code>
+                </div>
+              </div>
+              <div className="ai-provider-actions">
+                {p.needsKey && editing !== p.id && (
+                  <>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        setEditing(p.id);
+                        setKeyInput('');
+                      }}
+                    >
+                      {haveKey[p.id] ? 'Replace key' : 'Set key'}
+                    </button>
+                    {haveKey[p.id] && (
+                      <button className="btn btn-ghost" onClick={() => void removeKey(p.id)}>
+                        Remove key
+                      </button>
+                    )}
+                  </>
+                )}
+                {p.id.startsWith('custom-') && (
+                  <button className="btn btn-ghost" onClick={() => void removeProvider(p.id)}>
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+            {editing === p.id && (
+              <div className="ai-key-edit">
+                <input
+                  type="password"
+                  className="ai-key-input"
+                  value={keyInput}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void saveKey(p.id);
+                    if (e.key === 'Escape') {
+                      setEditing(null);
+                      setKeyInput('');
+                    }
+                  }}
+                  placeholder="paste API key"
+                  autoFocus
+                />
+                <button
+                  className="btn btn-primary"
+                  onClick={() => void saveKey(p.id)}
+                  disabled={!keyInput.trim()}
+                >
+                  Save
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setEditing(null);
+                    setKeyInput('');
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {adding ? (
+          <div className="ai-provider-row ai-provider-form">
+            <div className="ai-form-grid">
+              <label className="ai-form-row">
+                <span>Name</span>
+                <input
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                  placeholder="My Custom Provider"
+                  autoFocus
+                />
+              </label>
+              <label className="ai-form-row">
+                <span>Base URL</span>
+                <input
+                  value={draft.baseURL}
+                  onChange={(e) => setDraft({ ...draft, baseURL: e.target.value })}
+                  placeholder="http://localhost:8080/v1"
+                />
+              </label>
+              <label className="ai-form-row">
+                <span>Default model</span>
+                <input
+                  value={draft.defaultModel}
+                  onChange={(e) => setDraft({ ...draft, defaultModel: e.target.value })}
+                  placeholder="gpt-4o-mini"
+                />
+              </label>
+              <label className="ai-form-row ai-form-row--check">
+                <input
+                  type="checkbox"
+                  checked={draft.needsKey}
+                  onChange={(e) => setDraft({ ...draft, needsKey: e.target.checked })}
+                />
+                <span>Requires API key</span>
+              </label>
+              <div className="ai-form-actions">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => void saveDraft()}
+                  disabled={!draft.name.trim() || !draft.baseURL.trim()}
+                >
+                  Add
+                </button>
+                <button className="btn btn-ghost" onClick={cancelDraft}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button className="btn btn-ghost ai-add-btn" onClick={() => setAdding(true)}>
+            + Add provider
+          </button>
+        )}
+      </div>
+    </Section>
   );
 }

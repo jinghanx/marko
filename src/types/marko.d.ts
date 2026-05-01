@@ -69,6 +69,78 @@ export interface GitLogEntry {
   parents: string[];
 }
 
+export interface AiProvider {
+  id: string;
+  name: string;
+  baseURL: string;
+  defaultModel: string;
+  needsKey: boolean;
+  isLocal: boolean;
+  extraHeaders?: Record<string, string>;
+}
+
+export interface AiChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface AiChatStartArgs {
+  providerId: string;
+  model: string;
+  messages: AiChatMessage[];
+  systemPrompt?: string;
+}
+
+export interface SearchArgs {
+  rootDir: string;
+  query: string;
+  caseSensitive?: boolean;
+  regex?: boolean;
+  wholeWord?: boolean;
+  glob?: string;
+}
+
+export interface SearchMatch {
+  path: string;
+  lineNumber: number;
+  text: string;
+  submatches: Array<{ start: number; end: number }>;
+}
+
+export interface HttpHeader {
+  key: string;
+  value: string;
+  enabled: boolean;
+}
+
+export interface HttpRequestArgs {
+  method: string;
+  url: string;
+  headers: HttpHeader[];
+  body?: string;
+}
+
+export interface HttpResponseInfo {
+  ok: boolean;
+  status?: number;
+  statusText?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  timeMs: number;
+  size?: number;
+  error?: string;
+}
+
+export interface ChatHistoryEntry {
+  id: string;
+  title: string;
+  providerId: string;
+  model: string;
+  messageCount: number;
+  updatedAt: number;
+  preview: string;
+}
+
 export interface MarkoApi {
   readFile(filePath: string): Promise<string>;
   writeFile(filePath: string, content: string): Promise<boolean>;
@@ -125,6 +197,28 @@ export interface MarkoApi {
   gitStashDrop(repoDir: string, ref: string): Promise<{ ok: boolean; error?: string }>;
   gitStashClear(repoDir: string): Promise<{ ok: boolean; error?: string }>;
   gitDeleteBranch(repoDir: string, name: string): Promise<{ ok: boolean; error?: string }>;
+  aiProviders(): Promise<AiProvider[]>;
+  aiProviderSave(p: AiProvider): Promise<{ ok: boolean; error?: string }>;
+  aiProviderDelete(id: string): Promise<{ ok: boolean }>;
+  aiSetKey(id: string, key: string): Promise<{ ok: boolean; error?: string }>;
+  aiHasKey(id: string): Promise<boolean>;
+  aiDeleteKey(id: string): Promise<{ ok: boolean }>;
+  aiChatStart(reqId: string, args: AiChatStartArgs): Promise<{ ok: boolean; error?: string }>;
+  aiChatCancel(reqId: string): Promise<{ ok: boolean }>;
+  onAiChatChunk(reqId: string, handler: (chunk: string) => void): () => void;
+  onAiChatDone(reqId: string, handler: (r: { ok: boolean; error?: string }) => void): () => void;
+  searchStart(reqId: string, args: SearchArgs): Promise<{ ok: boolean; error?: string }>;
+  searchCancel(reqId: string): Promise<{ ok: boolean }>;
+  onSearchMatch(reqId: string, handler: (m: SearchMatch) => void): () => void;
+  onSearchDone(
+    reqId: string,
+    handler: (r: { ok: boolean; error?: string; exitCode?: number | null }) => void,
+  ): () => void;
+  httpRequest(req: HttpRequestArgs): Promise<HttpResponseInfo>;
+  chatHistoryList(): Promise<ChatHistoryEntry[]>;
+  chatHistorySave(id: string, data: unknown): Promise<{ ok: boolean }>;
+  chatHistoryLoad(id: string): Promise<string | null>;
+  chatHistoryDelete(id: string): Promise<{ ok: boolean }>;
   gitApplyPatch(repoDir: string, patch: string, opts: { cached?: boolean; reverse?: boolean }): Promise<{ ok: boolean; error?: string }>;
   gitLog(repoDir: string, opts?: { limit?: number; ref?: string }): Promise<{ ok: boolean; commits?: GitLogEntry[]; error?: string }>;
   gitShow(repoDir: string, hash: string): Promise<{ ok: boolean; diff?: string; error?: string }>;

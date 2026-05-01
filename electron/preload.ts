@@ -119,6 +119,70 @@ const api = {
   gitStashClear: (repoDir: string) => ipcRenderer.invoke('git:stashClear', repoDir),
   gitDeleteBranch: (repoDir: string, name: string) =>
     ipcRenderer.invoke('git:deleteBranch', repoDir, name),
+
+  // ---------- AI chat ----------
+  aiProviders: () => ipcRenderer.invoke('ai:providers'),
+  aiProviderSave: (p: unknown) => ipcRenderer.invoke('ai:provider-save', p),
+  aiProviderDelete: (id: string) => ipcRenderer.invoke('ai:provider-delete', id),
+  aiSetKey: (id: string, key: string) => ipcRenderer.invoke('ai:set-key', id, key),
+  aiHasKey: (id: string) => ipcRenderer.invoke('ai:has-key', id),
+  aiDeleteKey: (id: string) => ipcRenderer.invoke('ai:delete-key', id),
+  aiChatStart: (reqId: string, args: unknown) =>
+    ipcRenderer.invoke('ai:chat-start', reqId, args),
+  aiChatCancel: (reqId: string) => ipcRenderer.invoke('ai:chat-cancel', reqId),
+  onAiChatChunk: (reqId: string, handler: (chunk: string) => void) => {
+    const ch = `ai:chat:chunk:${reqId}`;
+    const listener = (_e: unknown, chunk: string) => handler(chunk);
+    ipcRenderer.on(ch, listener);
+    return () => ipcRenderer.removeListener(ch, listener);
+  },
+  onAiChatDone: (
+    reqId: string,
+    handler: (result: { ok: boolean; error?: string }) => void,
+  ) => {
+    const ch = `ai:chat:done:${reqId}`;
+    const listener = (_e: unknown, r: { ok: boolean; error?: string }) => handler(r);
+    ipcRenderer.on(ch, listener);
+    return () => ipcRenderer.removeListener(ch, listener);
+  },
+
+  // ---------- Find-in-files (ripgrep) ----------
+  searchStart: (reqId: string, args: unknown) =>
+    ipcRenderer.invoke('search:start', reqId, args),
+  searchCancel: (reqId: string) => ipcRenderer.invoke('search:cancel', reqId),
+  onSearchMatch: (
+    reqId: string,
+    handler: (m: {
+      path: string;
+      lineNumber: number;
+      text: string;
+      submatches: Array<{ start: number; end: number }>;
+    }) => void,
+  ) => {
+    const ch = `search:match:${reqId}`;
+    const listener = (_e: unknown, m: Parameters<typeof handler>[0]) => handler(m);
+    ipcRenderer.on(ch, listener);
+    return () => ipcRenderer.removeListener(ch, listener);
+  },
+  onSearchDone: (
+    reqId: string,
+    handler: (r: { ok: boolean; error?: string; exitCode?: number | null }) => void,
+  ) => {
+    const ch = `search:done:${reqId}`;
+    const listener = (_e: unknown, r: Parameters<typeof handler>[0]) => handler(r);
+    ipcRenderer.on(ch, listener);
+    return () => ipcRenderer.removeListener(ch, listener);
+  },
+
+  // ---------- HTTP client ----------
+  httpRequest: (req: unknown) => ipcRenderer.invoke('http:request', req),
+
+  // ---------- Chat history archive ----------
+  chatHistoryList: () => ipcRenderer.invoke('chat-history:list'),
+  chatHistorySave: (id: string, data: unknown) =>
+    ipcRenderer.invoke('chat-history:save', id, data),
+  chatHistoryLoad: (id: string) => ipcRenderer.invoke('chat-history:load', id),
+  chatHistoryDelete: (id: string) => ipcRenderer.invoke('chat-history:delete', id),
   gitApplyPatch: (
     repoDir: string,
     patch: string,

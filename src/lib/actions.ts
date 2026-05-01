@@ -109,6 +109,41 @@ export function openExcalidrawTab(opts: { focus?: boolean } = {}) {
   return tab;
 }
 
+export function openChatTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const tab = workspace.openNewTab({ kind: 'chat', title: 'Chat' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
+/** Reveal an existing chat tab, or open a fresh one. The chat tab itself
+ *  has a sidebar (toggled with the "History" button) for browsing past
+ *  conversations — there is no separate history tab. */
+export function openChatHistoryTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const existing = workspace.getState().tabs.find((t) => t.kind === 'chat');
+  if (existing) {
+    workspace.revealTab(existing.id);
+    if (focus) workspace.requestEditorFocus();
+    return existing;
+  }
+  return openChatTab(opts);
+}
+
+export function openSearchTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const tab = workspace.openNewTab({ kind: 'search', title: 'Search' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
+export function openHttpTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const tab = workspace.openNewTab({ kind: 'http', title: 'HTTP' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
 export function openUrlInTab(rawUrl: string, opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? true;
   const url = normalizeUrl(rawUrl);

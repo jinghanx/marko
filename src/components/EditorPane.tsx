@@ -9,6 +9,9 @@ import { CsvViewer } from './CsvViewer';
 import { JsonViewer } from './JsonViewer';
 import { DiffViewer } from './DiffViewer';
 import { ExcalidrawViewer } from './ExcalidrawViewer';
+import { ChatView } from './ChatView';
+import { SearchView } from './SearchView';
+import { HttpClient } from './HttpClient';
 import { FolderView } from './FolderView';
 import { WebView } from './WebView';
 import { Terminal } from './Terminal';
@@ -119,6 +122,13 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
               initialValue={tab.content}
               filePath={tab.filePath}
             />
+          )}
+          {tab.kind === 'chat' && (
+            <ChatView tabId={tab.id} initialValue={tab.content} />
+          )}
+          {tab.kind === 'search' && <SearchView />}
+          {tab.kind === 'http' && (
+            <HttpClient tabId={tab.id} initialValue={tab.content} />
           )}
           {tab.kind === 'folder' && tab.filePath && (
             <FolderView folderPath={tab.filePath} tabId={tab.id} />

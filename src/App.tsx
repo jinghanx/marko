@@ -10,7 +10,7 @@ import { PathInput } from './components/PathInput';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { SessionStrip } from './components/SessionStrip';
 import { NowPlaying } from './components/NowPlaying';
-import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab } from './lib/actions';
+import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab } from './lib/actions';
 import { uiBus } from './lib/uiBus';
 import { resetWorkspaceAndReload } from './lib/persistence';
 
@@ -78,6 +78,23 @@ export function App() {
       window.marko.onMenu('menu:toggle-outline', () => workspace.toggleOutline()),
       window.marko.onMenu('menu:toggle-markdown-mode', () => workspace.toggleMarkdownViewMode()),
       window.marko.onMenu('menu:preferences', () => setModal({ kind: 'settings' })),
+      window.marko.onMenu('menu:find-in-files', () => {
+        // Reuse an existing Search tab in the active session if one exists,
+        // otherwise open a new one.
+        const s = workspace.getState();
+        const session = getActiveSession(s);
+        const leaves = getAllLeaves(session.root);
+        for (const leaf of leaves) {
+          for (const id of leaf.tabIds) {
+            const tab = s.tabs.find((t) => t.id === id);
+            if (tab?.kind === 'search') {
+              workspace.revealTab(tab.id);
+              return;
+            }
+          }
+        }
+        openSearchTab();
+      }),
       window.marko.onMenu('menu:quick-open', () => setModal({ kind: 'palette', replace: false })),
       window.marko.onMenu('menu:quick-open-replace', () => setModal({ kind: 'palette', replace: true })),
       window.marko.onMenu('menu:goto-path', () => setModal({ kind: 'path', replace: false })),

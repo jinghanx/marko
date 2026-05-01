@@ -20,6 +20,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { keys: '⌘⇧O', label: 'open folder…' },
       { keys: '⌘P', label: 'quick open' },
       { keys: '⌘⇧P', label: 'quick open (replace tab)' },
+      { keys: '⌘⇧F', label: 'find in files' },
       { keys: '⌘T', label: 'go to path / command' },
       { keys: '⌘⇧T', label: 'go to path (replace tab)' },
       { keys: '⌘S', label: 'save' },

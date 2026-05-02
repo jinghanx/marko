@@ -1868,3 +1868,107 @@ button {
     align-items: flex-start;
   }
 }
+
+/* ---------- Mobile polish ----------
+ *  Final pass for narrow viewports. Stacks the multi-column mocks,
+ *  tightens hero spacing, and prevents the giant comic numbers from
+ *  blowing out the horizontal axis. Anything that doesn't survive
+ *  scaling cleanly is just hidden on phones. */
+@media (max-width: 720px) {
+  /* Hero — drop the perspective tilt and dial back paddings. */
+  .window-demo { padding: 16px 12px 40px; }
+  .window-frame { transform: none; border-radius: 10px; }
+  .window-tabs { overflow-x: auto; scrollbar-width: none; }
+  .window-tabs::-webkit-scrollbar { display: none; }
+
+  /* Story hero — keep the comic feel but stop the numbers wrapping. */
+  .hero--story { padding: 36px 16px 24px; }
+  .story-stack { font-size: 16px; }
+  .story-stack li { padding-left: 12px; }
+  .app { font-size: 13px; padding: 1px 8px; }
+  .story-bubble {
+    margin: 16px 0;
+    padding: 14px 18px;
+    transform: rotate(-0.6deg);
+  }
+  .story-bubble::before,
+  .story-bubble::after { left: 24px; }
+  .story-tally {
+    flex-wrap: nowrap;
+    gap: 12px;
+    padding: 14px 0 8px;
+  }
+  .story-num { font-size: clamp(40px, 14vw, 64px); }
+  .story-num--ram { font-size: clamp(28px, 10vw, 48px); }
+  .story-num-label { font-size: 10px; }
+  .story-punchline { gap: 12px; flex-wrap: wrap; }
+  .story-marko-icon { width: 56px; height: 56px; }
+  .story .brand-name { font-size: clamp(44px, 14vw, 72px); }
+
+  /* Mock chrome — hide the launcher mock's pointer dot which uses a
+   *  blend mode that reads weird at small sizes. */
+  .mock-launcher-pointer { display: none; }
+
+  /* Git mock — sidebar above diff. */
+  .mock-git-body { grid-template-columns: 1fr; min-height: 0; }
+  .mock-git-files { border-right: 0; border-bottom: 1px solid var(--border); }
+  .mock-git-diff { font-size: 11px; }
+
+  /* Chat mock — drop the history sidebar; one chat is enough at this
+   *  size and the screenshot still tells the story. */
+  .mock-chat-body { grid-template-columns: 1fr; min-height: 0; }
+  .mock-chat-side { display: none; }
+  .mock-chat-code { font-size: 11px; overflow-x: auto; }
+
+  /* Find mock — let long match lines scroll horizontally. */
+  .mock-find-toolbar { flex-wrap: wrap; gap: 6px; }
+  .mock-find-match { overflow-x: auto; }
+
+  /* Layout/splits mock — collapse to a single-pane preview. The whole
+   *  point is that splits exist; multi-column nesting at 320px reads
+   *  as noise rather than illustration. */
+  .mock-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 4px 1fr;
+  }
+  .mock-layout-split {
+    height: 4px;
+    width: 100%;
+  }
+
+  /* Term mock — long ai-prompt line should not push the panel wider. */
+  .mock-term { font-size: 11px; }
+  .mock-term-line { white-space: pre-wrap; word-break: break-word; }
+
+  /* Tab kinds cloud — already auto-fill but tighten the gap. */
+  .kinds-cloud { padding: 50px 16px; }
+  .kinds-grid { gap: 8px; }
+  .kind-card { padding: 14px 10px; }
+
+  /* Mid CTA — pull padding in so the giant `15` doesn't wrap awkwardly. */
+  .cta-band { padding: 50px 16px; }
+  .cta-band-inner { padding: 36px 20px; }
+  .cta-band h2 .num { font-size: 1.2em; }
+
+  /* Showcase tag rotations look pasted-on at desktop sizes; on mobile
+   *  the slight tilt overflows the narrow column — flatten it. */
+  .showcase-tag { transform: rotate(0); }
+}
+
+/* Phones — even tighter. Drop story line-height a touch and shrink the
+ *  Marko punchline so it fits 320px. */
+@media (max-width: 420px) {
+  .hero--story { padding: 28px 14px 20px; }
+  .story { gap: 10px; font-size: 18px; }
+  .story-line--lead { font-size: clamp(24px, 8vw, 32px); }
+  .story-time { font-size: 24px; }
+  .story-tally-item { gap: 0; }
+  .story-num { font-size: clamp(36px, 13vw, 56px); }
+  .story-num--ram { font-size: clamp(24px, 9vw, 42px); }
+  .story-num-label { letter-spacing: 0.04em; }
+  .story-bubble p { font-size: 22px; }
+  .story-marko-icon { width: 48px; height: 48px; }
+  .story .brand-name { font-size: clamp(40px, 13vw, 60px); }
+  .cta-row { gap: 8px; width: 100%; }
+  .cta-row .btn { flex: 1 1 auto; justify-content: center; }
+}

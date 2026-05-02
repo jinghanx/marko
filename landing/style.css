@@ -903,6 +903,11 @@ button {
   .showcase--reverse .showcase-mock {
     order: initial;
   }
+  /* Stop the mock column from being min-content-sized — without this,
+   *  any unbreakable child (long <pre>, code blocks, mono text) pushes
+   *  the grid column past the viewport edge. */
+  .showcase-mock { min-width: 0; }
+  .mock { min-width: 0; max-width: 100%; }
 }
 
 .showcase-text { max-width: 480px; }
@@ -1915,10 +1920,35 @@ button {
   .mock-git-diff { font-size: 11px; }
 
   /* Chat mock — drop the history sidebar; one chat is enough at this
-   *  size and the screenshot still tells the story. */
-  .mock-chat-body { grid-template-columns: 1fr; min-height: 0; }
+   *  size and the screenshot still tells the story.
+   *  The min-width: 0 chain is essential: the long <pre> content and
+   *  long input-placeholder line forced the whole grid column wider
+   *  than the viewport. Grid/flex items default to min-content sizing
+   *  unless told otherwise, so we break that chain at every parent. */
+  .mock-chat-body {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    min-width: 0;
+  }
   .mock-chat-side { display: none; }
-  .mock-chat-code { font-size: 11px; overflow-x: auto; }
+  .mock-chat-main { min-width: 0; }
+  .mock-chat-msg { min-width: 0; }
+  .mock-chat-body-text { word-break: break-word; }
+  .mock-chat-code {
+    font-size: 11px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .mock-chat-code pre { font-size: 10.5px; }
+  .mock-chat-input {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .mock-chat-input-text {
+    min-width: 0;
+    word-break: break-word;
+    font-size: 11.5px;
+  }
 
   /* Find mock — let long match lines scroll horizontally. */
   .mock-find-toolbar { flex-wrap: wrap; gap: 6px; }

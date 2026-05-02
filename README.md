@@ -38,7 +38,7 @@ Internal commands wake Marko's main window when needed; external apps and the ca
 | Tab | What it is |
 |---|---|
 | **Markdown** | Milkdown Crepe WYSIWYG · slash commands · drag handles · GFM tables · math · raw / split / rendered modes |
-| **Code** | CodeMirror 6 · 30+ languages · vim mode · cross-pane edit sync · jump-to-line via search results / terminal |
+| **Code** | CodeMirror 6 · 30+ languages · vim & emacs keymaps · cross-pane edit sync · jump-to-line via search results / terminal |
 | **Image** | Fit / 100 % toggle · folder thumbnails · Quick Look on Space |
 | **Media** | Streaming `<video>` / `<audio>` for mp3 / mp4 / mov / webm · range-request seek · "Now Playing" pill in the titlebar |
 | **PDF** | Chromium's built-in PDF plugin · zoom, search, page nav, print, download |

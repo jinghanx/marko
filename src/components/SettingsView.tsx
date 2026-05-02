@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { settings, useSettings, type ThemeMode, SEARCH_ENGINES, type SearchEngineId } from '../state/settings';
+import { settings, useSettings, type ThemeMode, type EditorKeymap, SEARCH_ENGINES, type SearchEngineId } from '../state/settings';
 import { EDITOR_THEMES, type EditorTheme } from '../lib/editorTheme';
 import { LIGHT_THEMES, DARK_THEMES } from '../lib/themes';
 
@@ -126,16 +126,21 @@ export function SettingsView() {
           </Section>
 
           <Section label="Editor">
-            <Row label="Vim mode">
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={s.vimMode}
-                  onChange={(e) => settings.update({ vimMode: e.target.checked })}
-                />
-                <span className="toggle-track" />
-                <span className="toggle-hint">Applies to code & text files (not markdown).</span>
-              </label>
+            <Row label="Keymap">
+              <div className="seg-with-hint">
+                <div className="seg-control">
+                  {(['default', 'vim', 'emacs'] as EditorKeymap[]).map((k) => (
+                    <button
+                      key={k}
+                      className={`seg-control-item${s.editorKeymap === k ? ' seg-control-item--active' : ''}`}
+                      onClick={() => settings.update({ editorKeymap: k })}
+                    >
+                      {k === 'default' ? 'Default' : k === 'vim' ? 'Vim' : 'Emacs'}
+                    </button>
+                  ))}
+                </div>
+                <span className="toggle-hint">Applies to code &amp; text files (not markdown).</span>
+              </div>
             </Row>
           </Section>
 

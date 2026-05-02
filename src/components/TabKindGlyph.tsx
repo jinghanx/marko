@@ -25,9 +25,20 @@ export function TabKindGlyph({ kind }: { kind: TabKind }) {
     case 'clipboard': return <ClipboardGlyph />;
     case 'settings': return <SettingsGlyph />;
     case 'sqlite': return <SqliteGlyph />;
+    case 'music': return <MusicGlyph />;
     case 'code':
     default: return <CodeGlyph />;
   }
+}
+
+export function MusicGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <path d="M6.5 11.5 V4 L13 2.5 V10" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+      <ellipse cx="5" cy="11.5" rx="1.8" ry="1.5" stroke="currentColor" strokeWidth="1.4" />
+      <ellipse cx="11.5" cy="10" rx="1.8" ry="1.5" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
 }
 
 function FileBase() {

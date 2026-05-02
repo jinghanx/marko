@@ -21,6 +21,7 @@ import { WebView } from './WebView';
 import { Terminal } from './Terminal';
 import { ProcessViewer } from './ProcessViewer';
 import { GitView } from './GitView';
+import { MusicView } from './MusicView';
 import { MarkdownSplitView } from './MarkdownSplitView';
 import { WelcomeScreen } from './WelcomeScreen';
 
@@ -149,6 +150,7 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
           {tab.kind === 'terminal' && <Terminal tabId={tab.id} />}
           {tab.kind === 'process' && <ProcessViewer />}
           {tab.kind === 'git' && <GitView />}
+          {tab.kind === 'music' && <MusicView tabId={tab.id} initialValue={tab.content} />}
           {tab.kind === 'binary' && (
             <div className="binary-hint">
               <div className="binary-icon">⌬</div>

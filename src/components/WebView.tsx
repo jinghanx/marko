@@ -45,6 +45,19 @@ export function WebView({ tabId, url }: Props) {
     });
   }, [isActive]);
 
+  // Cmd+R: refresh just this page, never the whole app. Only the active
+  // web tab reacts; other tab kinds let the bus event fall on the floor.
+  useEffect(() => {
+    if (!isActive) return;
+    return uiBus.on('reload-page', () => {
+      try {
+        wvRef.current?.reload();
+      } catch {
+        // webview not yet attached
+      }
+    });
+  }, [isActive]);
+
   useEffect(() => {
     const wv = wvRef.current;
     if (!wv) return;

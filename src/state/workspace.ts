@@ -22,7 +22,8 @@ export type TabKind =
   | 'clipboard'
   | 'settings'
   | 'sqlite'
-  | 'shortcuts';
+  | 'shortcuts'
+  | 'music';
 
 export interface Tab {
   id: string;

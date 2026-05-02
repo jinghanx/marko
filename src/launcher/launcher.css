@@ -267,6 +267,7 @@ html, body, #launcher-root {
 .launcher-row-tabicon--http { color: #2ea043; }
 .launcher-row-tabicon--clipboard { color: #d97757; }
 .launcher-row-tabicon--settings { color: var(--text-muted); }
+.launcher-row-tabicon--music { color: #b56eff; }
 .launcher-row-icon {
   width: 22px;
   height: 22px;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Marko — editor · finder · browser · terminal · git · AI · whiteboard</title>
-    <meta name="description" content="A keyboard-driven macOS workspace: markdown, code, Finder-style folders, embedded browser, terminal, full Git client, streaming AI chat, find-in-files, HTTP client, whiteboard, PDF, CSV, JSON, diff — 18 tab kinds, recursive split panes, tmux-style sessions, all in one window." />
+    <meta name="description" content="A keyboard-driven macOS workspace: markdown, code, Finder-style folders, embedded browser, terminal, full Git client, streaming AI chat, find-in-files, HTTP client, whiteboard, PDF, CSV, JSON, diff — recursive split panes, tmux-style sessions, all in one window." />
     <meta property="og:title" content="Marko — one window for everything" />
     <meta property="og:description" content="Editor, finder, browser, terminal, Git, AI chat, whiteboard, and a long tail of dev tabs in a single keyboard-driven macOS app." />
     <meta property="og:image" content="/icon.png" />
@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=Bangers&family=Permanent+Marker&family=Caveat:wght@400;700&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -34,27 +34,65 @@
       </div>
     </nav>
 
-    <header class="hero">
+    <header class="hero hero--story">
       <div class="hero-bg" aria-hidden="true"></div>
-      <div class="hero-inner">
-        <img class="hero-icon" src="/icon.png" alt="Marko app icon" width="120" height="120" />
-        <h1>One window for everything.</h1>
-        <p class="tagline">
-          <span>editor</span>
-          <span class="dot">✦</span>
-          <span>finder</span>
-          <span class="dot">✦</span>
-          <span>terminal</span>
-          <span class="dot">✦</span>
-          <span>git</span>
-          <span class="dot">✦</span>
-          <span>AI</span>
+      <div class="story">
+        <p class="story-time">6:47 AM<span class="story-coffee">☕</span></p>
+
+        <p class="story-line story-line--lead">
+          <span class="story-eddie">Eddie</span> opens his laptop.
         </p>
-        <p class="subhead">
-          A keyboard-driven macOS workspace. 18 tab kinds — markdown, code, folder, browser,
-          terminal, full Git client, streaming AI chat, find-in-files, HTTP client, whiteboard,
-          PDF, CSV, JSON, diff — under recursive split panes and tmux-style sessions.
+        <p class="story-line">
+          He has <em class="story-mark story-mark--yellow">one</em> pull request to review.
         </p>
+        <p class="story-line story-aside">That's it. <span class="story-strike">Easy day.</span> One PR.</p>
+
+        <ul class="story-stack">
+          <li>He opens <span class="app app--bear">Bear</span> for the spec.</li>
+          <li>Then <span class="app app--cursor">Cursor</span> for the actual code.</li>
+          <li>Then <span class="app app--tower">Tower</span> for the diff.</li>
+          <li>Then <span class="app app--terminal">Terminal</span> — Tower hides things.</li>
+          <li>Then <span class="app app--chrome">Chrome</span>, for Stack&nbsp;Overflow.</li>
+          <li>Then <span class="app app--chatgpt">ChatGPT</span>, because Stack&nbsp;Overflow's top answer is from <em>2014</em>.</li>
+          <li>Then <span class="app app--postman">Postman</span> to hit the API.</li>
+          <li>Then <span class="app app--finder">Finder</span> to find the test fixture.</li>
+          <li>Then <span class="app app--excalidraw">Excalidraw</span> to sketch the bug.</li>
+          <li>Then <span class="app app--claude">Claude Code</span> to debug it with an AI that's actually seen the source.</li>
+          <li>Then <span class="app app--notion">Notion</span>, because someone said <em>"write it up."</em></li>
+          <li>Then <span class="app app--spotify">Spotify</span>. Somehow it's <strong>1 PM</strong>.</li>
+        </ul>
+
+        <p class="story-line story-aside">Eddie's coffee is cold. The PR is not reviewed.</p>
+
+        <div class="story-tally">
+          <div class="story-tally-item">
+            <span class="story-num">47</span>
+            <span class="story-num-label">browser tabs</span>
+          </div>
+          <div class="story-tally-item">
+            <span class="story-num">14</span>
+            <span class="story-num-label">open apps</span>
+          </div>
+          <div class="story-tally-item">
+            <span class="story-num story-num--ram">0.6 GB</span>
+            <span class="story-num-label">RAM available</span>
+          </div>
+        </div>
+
+        <p class="story-line story-aside">His MacBook fan sounds like an aircraft taking off.</p>
+
+        <div class="story-bubble">
+          <p>"Why is this not just <em>one window?</em>"</p>
+        </div>
+
+        <p class="story-punchline">
+          <img src="/icon.png" alt="" class="story-marko-icon" width="80" height="80" />
+          <span class="story-marko-text">
+            <span class="brand-name">Marko</span>
+            <span class="story-marko-tag">heard him.</span>
+          </span>
+        </p>
+
         <div class="cta-row" id="download">
           <a
             id="primary-download"
@@ -138,13 +176,13 @@
           </aside>
           <main class="demo-main">
             <h2 class="demo-h">Marko</h2>
-            <p class="demo-p"><em>One window for everything.</em></p>
-            <p class="demo-p">A keyboard-driven workspace.</p>
+            <p class="demo-p"><em>An app that doesn't know what it is.</em></p>
+            <p class="demo-p">Keyboard-driven. Vaguely overstuffed. On purpose.</p>
             <ul class="demo-list">
-              <li>WYSIWYG markdown</li>
-              <li>Finder-style folder browser</li>
-              <li>Code editor with vim mode</li>
-              <li>Embedded browser &amp; terminal</li>
+              <li>WYSIWYG markdown — yes, even the tables</li>
+              <li>Finder-style folders that fit in a tab</li>
+              <li>Code editor with vim and emacs keymaps (because both camps asked)</li>
+              <li>Browser and terminal in the same window as this</li>
             </ul>
           </main>
           <aside class="demo-outline">
@@ -162,22 +200,23 @@
     <section class="showcase" id="features">
       <div class="showcase-text">
         <span class="showcase-tag">Launcher</span>
-        <h2>One hotkey for everything.</h2>
+        <h2>Spotlight, but for <em>our</em> app.</h2>
         <p>
-          A Spotlight-style mini-window you wake from anywhere with <kbd>⌘⌥Space</kbd> — even when Marko isn't focused, even when its window is closed.
-          Run a Marko command, launch any macOS app, search the web, or do quick math.
+          Yes, Raycast exists. Yes, Alfred exists. Built one anyway — wakes with <kbd>⌘⌥Space</kbd>, opens
+          any app in <code>/Applications</code>, runs Marko commands, computes math, falls back to web search.
+          Took a weekend. Felt great.
         </p>
         <ul class="showcase-list">
-          <li>Type any command name to wake the right Marko tab — <code>chat</code>, <code>git</code>, <code>find</code>, <code>http</code>, <code>terminal</code>…</li>
-          <li>Type an app name to open it (Chrome, Slack, Figma — anything in <code>/Applications</code>)</li>
-          <li>Type a math expression to compute it inline; <kbd>↵</kbd> copies the result</li>
-          <li>Anything else falls through to a web search in your configured engine</li>
+          <li>Type a command name to wake the right Marko tab — <code>chat</code>, <code>git</code>, <code>find</code>, <code>http</code>, <code>terminal</code>…</li>
+          <li>Type an app name to open it. Chrome, Slack, Figma. The dock, but smaller and with vibes.</li>
+          <li>Type math, hit <kbd>↵</kbd>, the result is on your clipboard. Calculator.app stays minimized.</li>
+          <li>A hand-rendered text caret that <em>glides</em> between positions, plus a custom pointer dot. Completely unnecessary. We love it.</li>
         </ul>
       </div>
       <div class="showcase-mock">
         <div class="mock mock--launcher">
           <div class="mock-launcher-input">
-            <span class="mock-launcher-cursor">chro</span><span class="mock-launcher-caret"></span>
+            <span class="mock-launcher-cursor">chro</span><span class="mock-launcher-caret" aria-hidden="true"></span>
           </div>
           <div class="mock-launcher-section">Calculator</div>
           <div class="mock-launcher-section-faded">— no math input —</div>
@@ -194,6 +233,9 @@
             <span class="mock-launcher-name">Google Chrome</span>
             <span class="mock-launcher-sub">/Applications/Google Chrome.app</span>
             <span class="mock-launcher-tag mock-launcher-tag--active">App</span>
+            <!-- Custom pointer dot — anchored inside the active row to
+                 suggest the in-app red-dot cursor (mix-blend difference). -->
+            <span class="mock-launcher-pointer" aria-hidden="true"></span>
           </div>
           <div class="mock-launcher-row">
             <span class="mock-launcher-avatar" style="background: hsl(28 60% 45%)">CH</span>
@@ -222,16 +264,16 @@
     <section class="showcase showcase--reverse">
       <div class="showcase-text">
         <span class="showcase-tag">Git</span>
-        <h2>A full Git client without leaving the window.</h2>
+        <h2>A Git client. Not Tower. Not Fork. <em>Right there.</em></h2>
         <p>
-          Status with <strong>hunk-level</strong> and <strong>line-level</strong> stage / unstage / discard.
-          Branches, stashes, tags. Commit history with cherry-pick. Fetch, pull, push.
-          Source-tree-equivalent — no separate app, no terminal incantations.
+          We rebuilt SourceTree. In our app. <strong>Hunk-level</strong> and <strong>line-level</strong> stage,
+          unstage, discard. Branches, stashes, tags. Commit history with cherry-pick. Fetch, pull, push.
+          The world did not need this. We made it anyway. It's actually pretty good.
         </p>
         <ul class="showcase-list">
-          <li>Click any line in a hunk to stage just that line</li>
-          <li>Drop other branches in one click; current + main/master/develop are kept</li>
-          <li>History view with cherry-pick · branches with merge / rebase</li>
+          <li>Click a single line in a hunk to stage just that line. Yes, just that line.</li>
+          <li>"Delete every branch except current and main" in one click. The healthiest button you'll press today.</li>
+          <li>Cherry-pick from history view. Merge / rebase from branches. No terminal incantations required.</li>
         </ul>
       </div>
       <div class="showcase-mock">
@@ -296,16 +338,16 @@
     <section class="showcase">
       <div class="showcase-text">
         <span class="showcase-tag">AI Chat</span>
-        <h2>Streaming chat that knows your code.</h2>
+        <h2>A chat tab. <em>It's not Cursor.</em></h2>
         <p>
-          OpenAI, OpenRouter, Anthropic, Ollama, LM Studio — anything OpenAI-compatible. API keys
-          encrypted via macOS Keychain.
-          Attach files for context (drag-drop, dialog, or open-tab picker), so the model sees your actual code.
+          OpenAI, OpenRouter, Anthropic, Ollama, LM Studio — anything OpenAI-compatible. Bring your own key
+          (Keychain-encrypted). Drag a file in for context. The model gets your actual code.
+          Will not write your PR for you. Will help you procrastinate writing it.
         </p>
         <ul class="showcase-list">
-          <li>Markdown-rendered replies with copy-buttons on every code block</li>
-          <li>History sidebar — past chats persist and reopen instantly</li>
-          <li>Per-chat system prompt · live token estimate · export to markdown</li>
+          <li>Markdown replies. Copy buttons on every code block. The bare minimum, executed.</li>
+          <li>History sidebar that actually persists — open it tomorrow, it's still there</li>
+          <li>Per-chat system prompt · live token estimate · export to markdown when you inevitably want to keep one</li>
         </ul>
       </div>
       <div class="showcase-mock">
@@ -379,16 +421,16 @@
     <section class="showcase showcase--reverse">
       <div class="showcase-text">
         <span class="showcase-tag">Terminal</span>
-        <h2>A terminal that types commands for you.</h2>
+        <h2>A real terminal. Now also <em>haunted</em> by an LLM.</h2>
         <p>
-          xterm.js + node-pty + your real <code>$SHELL</code>. Press <kbd class="inline-kbd">⌘I</kbd>
-          and describe what you want — the AI types the command into your prompt for review.
-          Hit Enter to run. No surprise execution.
+          xterm.js + node-pty + your actual <code>$SHELL</code>, with all your aliases and prompts intact.
+          Press <kbd class="inline-kbd">⌘I</kbd>, describe what you want, watch the AI type into your prompt.
+          You hit Enter. Nothing runs without you. We're not monsters.
         </p>
         <ul class="showcase-list">
-          <li>Click any file path in output to open it in the editor (with line jump)</li>
-          <li>⌘F search scrollback · ⌘K clear · ⌘-click URLs</li>
-          <li>Themes match the app's color scheme — ANSI palette derived from each theme</li>
+          <li>Click a file path in output to open it in a side pane at the right line. Magic.</li>
+          <li>⌘F to search scrollback · ⌘K to clear · ⌘-click URLs. Standard issue.</li>
+          <li>The ANSI palette is derived from your theme, so the terminal stops looking like it's from a different app</li>
         </ul>
       </div>
       <div class="showcase-mock">
@@ -421,10 +463,11 @@
     <section class="showcase">
       <div class="showcase-text">
         <span class="showcase-tag">Find in files</span>
-        <h2>Ripgrep, grouped, jumpable.</h2>
+        <h2>It's just <em>ripgrep.</em> With a UI.</h2>
         <p>
-          <kbd class="inline-kbd">⌘⇧F</kbd> → query, glob, regex/word/case toggles.
-          Results stream in grouped by file. Click any match to open the file at that line.
+          <kbd class="inline-kbd">⌘⇧F</kbd>, then a query, glob, and the usual regex/word/case toggles.
+          Results stream in grouped by file. Click a match to open the file at that line.
+          Calling it "novel" would be a stretch. Calling it "fast" would not.
         </p>
       </div>
       <div class="showcase-mock">
@@ -460,16 +503,17 @@
     <section class="showcase showcase--reverse">
       <div class="showcase-text">
         <span class="showcase-tag">Layout</span>
-        <h2>Splits to the depth you want. Sessions for parallel projects.</h2>
+        <h2>Splits nested as deep as you'll <em>regret.</em></h2>
         <p>
-          Split horizontally (<kbd class="inline-kbd">⌘\</kbd>) or vertically (<kbd class="inline-kbd">⌘=</kbd>),
-          nest as deep as you want. Tmux-style sessions give each project its own pane tree and workspace root.
-          Everything — sessions, panes, open tabs, scratch buffers — survives restart.
+          Split horizontally (<kbd class="inline-kbd">⌘\</kbd>), split vertically (<kbd class="inline-kbd">⌘=</kbd>),
+          recurse until the panes are postage stamps. Tmux-style workspaces give each project its own pane tree
+          and root folder. Everything survives restart — workspaces, panes, tabs, the URL the browser tab was just on.
+          We probably went too far. You'll like it.
         </p>
         <ul class="showcase-list">
-          <li>Drag tabs to reorder, drag-drop into the chat as context</li>
-          <li>"Now Playing" pill in the titlebar surfaces audio/video from any tab in any session</li>
-          <li>Cross-pane edit sync: same file open twice, edits appear live in both</li>
+          <li>Drag tabs to reorder. Drag them between panes. Drag them into the chat as context. Just drag everything.</li>
+          <li>"Now Playing" pill in the titlebar finds audio/video from any tab in any workspace, so you can pause it</li>
+          <li>Same file open in two panes? Edits appear in both. We didn't have to. We did anyway.</li>
         </ul>
       </div>
       <div class="showcase-mock">
@@ -528,8 +572,8 @@
     <!-- Tab kinds cloud -->
     <section class="kinds-cloud">
       <header class="section-head">
-        <h2>Eighteen tab kinds, addressable by one keystroke.</h2>
-        <p>Type <kbd class="inline-kbd">⌘T</kbd>, then a hint. The whole app opens to the right tool.</p>
+        <h2><em>One keystroke.</em> Whichever tab you needed.</h2>
+        <p>Hit <kbd class="inline-kbd">⌘T</kbd>, type a hint, the right tool opens. We keep adding kinds. We'll stop eventually.</p>
       </header>
       <div class="kinds-grid">
         <div class="kind-card"><span class="kind-icon">📝</span><span class="kind-name">Markdown</span></div>
@@ -555,8 +599,8 @@
 
     <section class="cta-band">
       <div class="cta-band-inner">
-        <h2>Stop alt-tabbing between fifteen apps.</h2>
-        <p>Drop Marko into Applications and try it for an afternoon.</p>
+        <h2>Replace <span class="num">15</span> apps with <em>one</em> slightly worse app.</h2>
+        <p>Drop it into Applications. Give it an afternoon. We're not asking for forever.</p>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-arm64.dmg">
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">

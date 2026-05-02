@@ -4,6 +4,8 @@ import { applyThemeToDom, getTheme, DEFAULT_LIGHT_ID, DEFAULT_DARK_ID } from '..
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
+export type EditorKeymap = 'default' | 'vim' | 'emacs';
+
 export type FolderSortKey = 'name' | 'modified' | 'created' | 'size' | 'type';
 export type SortDirection = 'asc' | 'desc';
 
@@ -63,7 +65,10 @@ export interface Settings {
   codeFont: string;
   fontSize: number;
   maxContentWidth: number; // 0 = no cap
-  vimMode: boolean;
+  /** Modal keymap layered on top of the code editor's default bindings.
+   *  'default' = no modal layer; 'vim' / 'emacs' wire the corresponding
+   *  CodeMirror extension. Markdown editor is unaffected. */
+  editorKeymap: EditorKeymap;
   folderSort: FolderSort;
   /** Icon size for the finder/folder grid, in px (square). */
   folderIconSize: number;
@@ -94,7 +99,7 @@ export const DEFAULT_SETTINGS: Settings = {
   codeFont: `'SF Mono', Menlo, Monaco, Consolas, monospace`,
   fontSize: 17,
   maxContentWidth: 0,
-  vimMode: false,
+  editorKeymap: 'default',
   folderSort: { key: 'name', direction: 'asc', foldersFirst: true },
   folderIconSize: 72,
   showHiddenFiles: false,
@@ -112,7 +117,14 @@ function load(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<Settings>;
+    const parsed = JSON.parse(raw) as Partial<Settings> & { vimMode?: boolean };
+    // Migrate legacy `vimMode: boolean` → `editorKeymap`. Users who had
+    // vimMode enabled keep their modal editing; everyone else lands on
+    // the new default of no modal layer.
+    if (parsed.editorKeymap === undefined && typeof parsed.vimMode === 'boolean') {
+      parsed.editorKeymap = parsed.vimMode ? 'vim' : 'default';
+    }
+    delete parsed.vimMode;
     return { ...DEFAULT_SETTINGS, ...parsed };
   } catch {
     return DEFAULT_SETTINGS;

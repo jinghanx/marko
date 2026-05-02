@@ -4,9 +4,10 @@ import { EditorState, Compartment, Annotation } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { vim } from '@replit/codemirror-vim';
+import { emacs } from '@replit/codemirror-emacs';
 import { workspace, useWorkspace, findLeaf, getActiveSession } from '../state/workspace';
 import { findLanguage } from '../lib/fileType';
-import { useSettings } from '../state/settings';
+import { useSettings, type EditorKeymap } from '../state/settings';
 import { installVimOverrides } from '../lib/vimSetup';
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language';
 import { classHighlighter } from '@lezer/highlight';
@@ -51,23 +52,27 @@ interface Props {
 export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const vimCompartmentRef = useRef<Compartment | null>(null);
-  const vimMode = useSettings().vimMode;
+  // The compartment swaps in the chosen modal-keymap extension when the
+  // user toggles editorKeymap. Vim/emacs keymaps must come before
+  // basicSetup so their bindings take precedence over CM6 defaults.
+  const keymapCompartmentRef = useRef<Compartment | null>(null);
+  const keymapMode = useSettings().editorKeymap;
+  const keymapExtension = (k: EditorKeymap) =>
+    k === 'vim' ? vim() : k === 'emacs' ? emacs() : [];
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
 
     const langCompartment = new Compartment();
-    const vimCompartment = new Compartment();
-    vimCompartmentRef.current = vimCompartment;
+    const keymapCompartment = new Compartment();
+    keymapCompartmentRef.current = keymapCompartment;
 
     const view = new EditorView({
       state: EditorState.create({
         doc: initialValue,
         extensions: [
-          // vim must come before basicSetup so its keymap takes precedence
-          vimCompartment.of(vimMode ? vim() : []),
+          keymapCompartment.of(keymapExtension(keymapMode)),
           basicSetup,
           // Theme-driven syntax highlighting — emits `.tok-*` classes so our
           // CSS variables (set per active color theme) drive the colors.
@@ -113,19 +118,19 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
     return () => {
       view.destroy();
       viewRef.current = null;
-      vimCompartmentRef.current = null;
+      keymapCompartmentRef.current = null;
     };
   }, [tabId, filePath]);
 
-  // Live-toggle vim mode on existing editor.
+  // Live-toggle the modal keymap on existing editor without remounting.
   useEffect(() => {
     const view = viewRef.current;
-    const compartment = vimCompartmentRef.current;
+    const compartment = keymapCompartmentRef.current;
     if (!view || !compartment) return;
     view.dispatch({
-      effects: compartment.reconfigure(vimMode ? vim() : []),
+      effects: compartment.reconfigure(keymapExtension(keymapMode)),
     });
-  }, [vimMode]);
+  }, [keymapMode]);
 
   // Cross-pane sync: when the workspace tab.content changes from outside this
   // editor (e.g., the same file open in another pane is being edited), pull

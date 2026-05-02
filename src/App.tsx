@@ -119,6 +119,9 @@ export function App() {
       window.marko.onMenu('menu:goto-path-replace', () => setModal({ kind: 'path', replace: true })),
       window.marko.onMenu('menu:new-terminal', () => openTerminalTab()),
       window.marko.onMenu('menu:focus-address', () => uiBus.emit('focus-address')),
+      // ⌘R: only the active web tab listens — non-web tabs no-op so the
+      // keystroke can never reload the whole BrowserWindow by accident.
+      window.marko.onMenu('menu:reload-page', () => uiBus.emit('reload-page')),
       window.marko.onMenu('menu:process-viewer', () => openProcessTab()),
       window.marko.onMenu('menu:open-clipboard', () => openClipboardTab()),
       window.marko.onMenu('menu:show-shortcuts', () => openShortcutsTab()),

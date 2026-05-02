@@ -963,6 +963,7 @@ button {
 .pathinput-tabicon--http { color: #2ea043; }
 .pathinput-tabicon--clipboard { color: #d97757; }
 .pathinput-tabicon--settings { color: var(--text-muted); }
+.pathinput-tabicon--music { color: #b56eff; }
 
 /* Drag-reorder feedback for file tabs. */
 .tab--dragging { opacity: 0.4; }
@@ -5424,6 +5425,609 @@ button {
   width: min(640px, 100%);
 }
 
+/* Music / radio tab — analog-mixer aesthetic. Dark brushed panel, LED
+ *  indicators, vertical channel strips, real VU meter and a vertical
+ *  master fader. The hidden <audio> drives playback; the rest is style.
+ *  Self-contained palette so the panel reads as a piece of hardware
+ *  regardless of the active app theme — light themes still see a dark
+ *  console, like a rack-mounted unit sitting inside a bright office. */
+.mixer {
+  --panel: #15161a;
+  --panel-2: #1c1d22;
+  --panel-3: #232429;
+  --panel-edge: #08080b;
+  --rail-line: rgba(255, 255, 255, 0.06);
+  --etch: rgba(255, 255, 255, 0.04);
+  --label: #8a8f96;
+  --label-dim: #5b6068;
+  --readout: #cdd2da;
+  --led-green: #2dd96f;
+  --led-amber: #f3b41f;
+  --led-red: #ff4d4d;
+  --led-off: #2a2c33;
+
+  display: grid;
+  /* rail · bay (auto) · spectrum (1fr fills the dead space) ·
+   *  master · optional error · credit. The audio element sits
+   *  outside flow via display:none, so it never claims a row. */
+  grid-template-rows: auto auto 1fr auto auto;
+  height: 100%;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255,255,255,0.04), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(255,255,255,0.025), transparent 50%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+  color: var(--readout);
+  font-family: 'SF Mono', Menlo, Monaco, 'Roboto Mono', monospace;
+  overflow: hidden;
+  /* Brushed-metal sheen runs across the whole panel. Drawn as a layered
+   *  repeating gradient with very low alpha. */
+  position: relative;
+}
+.mixer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    rgba(255,255,255,0.012) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+  mix-blend-mode: overlay;
+}
+
+/* Top rail — input source selector. Rounded inset panel with a label
+ *  and a row of LED-buttons. */
+.mixer-rail {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 22px;
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2));
+  border-bottom: 1px solid var(--panel-edge);
+  box-shadow: 0 1px 0 var(--rail-line) inset;
+}
+.mixer-rail-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--label-dim);
+}
+.mixer-vibes {
+  display: flex;
+  gap: 8px;
+}
+.mixer-vibe {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: linear-gradient(180deg, #1f2026, #161718);
+  border: 1px solid #0a0a0c;
+  border-radius: 4px;
+  color: var(--label);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 -1px 0 rgba(0,0,0,0.5) inset,
+    0 1px 2px rgba(0,0,0,0.4);
+  transition: color 80ms, transform 60ms;
+}
+.mixer-vibe:hover { color: var(--readout); }
+.mixer-vibe:active { transform: translateY(1px); }
+.mixer-vibe--active {
+  color: var(--readout);
+  background: linear-gradient(180deg, #2a2c34, #1d1e22);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 -1px 0 rgba(0,0,0,0.5) inset,
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 1px 2px rgba(0,0,0,0.45);
+}
+
+/* LED — small dot used in many places. Off by default, lit by parent
+ *  modifier. The lit version glows via box-shadow. */
+.mixer-led {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--led-off);
+  box-shadow:
+    inset 0 0 1px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.mixer-vibe--active .mixer-led {
+  background: var(--led-amber);
+  box-shadow:
+    inset 0 0 1px rgba(0,0,0,0.4),
+    0 0 6px rgba(243,180,31,0.7);
+}
+
+/* Channel strip bay — one strip per station. Horizontal scroll if too
+ *  many fit; on most widths the four-stations-per-vibe count fits. */
+.mixer-bay {
+  display: flex;
+  gap: 10px;
+  padding: 16px 22px;
+  overflow-x: auto;
+  /* No stretch — strips size to their content. */
+  align-items: flex-start;
+}
+.mixer-bay::-webkit-scrollbar { height: 8px; }
+.mixer-bay::-webkit-scrollbar-track { background: transparent; }
+.mixer-bay::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+}
+.mixer-strip {
+  flex: 0 0 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2));
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--label);
+  font-family: inherit;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.05) inset,
+    0 8px 14px rgba(0,0,0,0.35);
+  transition: transform 80ms, box-shadow 100ms, border-color 100ms;
+}
+.mixer-strip:hover {
+  border-color: rgba(255,255,255,0.10);
+}
+.mixer-strip:active { transform: translateY(1px); }
+.mixer-strip-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--led-off);
+  box-shadow:
+    inset 0 0 1px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.mixer-strip--active .mixer-strip-led {
+  background: var(--led-amber);
+  box-shadow:
+    inset 0 0 1px rgba(0,0,0,0.4),
+    0 0 8px rgba(243,180,31,0.85);
+}
+.mixer-strip--live .mixer-strip-led {
+  background: var(--led-green);
+  box-shadow:
+    inset 0 0 1px rgba(0,0,0,0.4),
+    0 0 10px rgba(45,217,111,0.9);
+  animation: mixer-pulse 1.6s ease-in-out infinite;
+}
+@keyframes mixer-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.4); }
+}
+.mixer-strip-num {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--label-dim);
+  padding: 2px 6px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.mixer-strip-bars {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  height: 60px;
+  padding: 4px 6px;
+  background: rgba(0,0,0,0.45);
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.03);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+}
+.mixer-strip-bars span {
+  display: block;
+  width: 22px;
+  height: 4px;
+  border-radius: 1px;
+  background: var(--led-off);
+  opacity: 0.6;
+}
+.mixer-strip--live .mixer-strip-bars span {
+  background: var(--led-green);
+  opacity: 0.6;
+  animation: mixer-bar 1.2s ease-in-out infinite;
+}
+.mixer-strip--live .mixer-strip-bars span:nth-child(1) { animation-delay: 0.0s; }
+.mixer-strip--live .mixer-strip-bars span:nth-child(2) { animation-delay: 0.1s; }
+.mixer-strip--live .mixer-strip-bars span:nth-child(3) { animation-delay: 0.2s; }
+.mixer-strip--live .mixer-strip-bars span:nth-child(4) { animation-delay: 0.3s; }
+.mixer-strip--live .mixer-strip-bars span:nth-child(5) { animation-delay: 0.4s; background: var(--led-amber); }
+.mixer-strip--live .mixer-strip-bars span:nth-child(6) { animation-delay: 0.5s; background: var(--led-amber); }
+.mixer-strip--live .mixer-strip-bars span:nth-child(7) { animation-delay: 0.6s; background: var(--led-amber); }
+.mixer-strip--live .mixer-strip-bars span:nth-child(8) { animation-delay: 0.7s; background: var(--led-red); }
+@keyframes mixer-bar {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+.mixer-strip-name {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--readout);
+  text-align: center;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.mixer-strip--active .mixer-strip-name { color: var(--readout); }
+.mixer-strip-vibe {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--label-dim);
+  text-transform: uppercase;
+}
+
+/* Spectrum panel — fills the empty middle of the console with a wide
+ *  frequency display, the way a real mixer's master section often has a
+ *  graphic-EQ or analyzer screen. Inset bezel + faint horizontal grid
+ *  lines so it reads as a backlit panel, not a generic rectangle. */
+.mixer-spectrum {
+  display: flex;
+  padding: 0 22px 16px;
+  min-height: 0;
+}
+.mixer-spectrum-frame {
+  flex: 1;
+  position: relative;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(45,217,111,0.06), transparent 60%),
+    linear-gradient(180deg, #0a0c0e, #06070a);
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(0,0,0,0.6),
+    inset 0 0 24px rgba(0,0,0,0.55);
+  overflow: hidden;
+  min-height: 120px;
+}
+.mixer-spectrum-canvas {
+  position: absolute;
+  inset: 12px 14px 18px 14px;
+  width: calc(100% - 28px);
+  height: calc(100% - 30px);
+  display: block;
+}
+.mixer-spectrum-grid {
+  position: absolute;
+  inset: 12px 14px 18px 14px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 19px, rgba(255,255,255,0.025) 19px 20px),
+    repeating-linear-gradient(90deg, transparent 0 49px, rgba(255,255,255,0.018) 49px 50px);
+  pointer-events: none;
+}
+.mixer-spectrum-label {
+  position: absolute;
+  bottom: 4px;
+  left: 14px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--label-dim);
+  text-transform: uppercase;
+}
+
+/* Master section — bottom rail, wider and richer than the top.
+ *  Grid: LCD readout · transport · VU meters · master fader. */
+.mixer-master {
+  display: grid;
+  /* Cap the LCD so it can breathe but never dwarfs the meters. */
+  grid-template-columns: minmax(280px, 480px) auto auto auto;
+  justify-content: start;
+  align-items: stretch;
+  gap: 14px;
+  padding: 14px 22px;
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2) 80%, #131418);
+  border-top: 1px solid var(--panel-edge);
+  box-shadow: 0 1px 0 var(--rail-line) inset;
+}
+
+/* LCD readout — backlit-display feel. Inset panel, segment-y typography. */
+.mixer-lcd {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 16px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(45,217,111,0.05), transparent 70%),
+    linear-gradient(180deg, #0c0e10, #08090b);
+  border: 1px solid #050507;
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(0,0,0,0.6),
+    inset 0 -1px 0 rgba(255,255,255,0.02),
+    inset 0 0 18px rgba(0,0,0,0.6);
+  min-width: 260px;
+}
+.mixer-lcd-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--label-dim);
+}
+.mixer-lcd-status .mixer-led {
+  width: 7px;
+  height: 7px;
+}
+.mixer-lcd-status--on-air { color: var(--led-green); }
+.mixer-lcd-status--on-air .mixer-led {
+  background: var(--led-green);
+  box-shadow: inset 0 0 1px rgba(0,0,0,0.4), 0 0 6px rgba(45,217,111,0.85);
+  animation: mixer-pulse 1.5s ease-in-out infinite;
+}
+.mixer-lcd-status--cueing { color: var(--led-amber); }
+.mixer-lcd-status--cueing .mixer-led {
+  background: var(--led-amber);
+  box-shadow: 0 0 6px rgba(243,180,31,0.7);
+  animation: mixer-pulse 0.7s ease-in-out infinite;
+}
+.mixer-lcd-status--paused { color: var(--led-red); }
+.mixer-lcd-status--paused .mixer-led {
+  background: var(--led-red);
+  box-shadow: 0 0 5px rgba(255,77,77,0.55);
+}
+.mixer-lcd-station {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--readout);
+  text-shadow: 0 0 8px rgba(205,210,218,0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mixer-lcd-meta {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--label-dim);
+}
+
+/* Transport (play/pause) — chunky round button with a recessed ring. */
+.mixer-transport {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 0;
+  align-self: center;
+  background:
+    radial-gradient(circle at 30% 28%, #2c2d33, #1a1b1f 65%, #0e0f12);
+  color: #d6d8de;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 -2px 4px rgba(0,0,0,0.5) inset,
+    0 6px 14px rgba(0,0,0,0.45),
+    0 0 0 1px var(--panel-edge);
+  transition: transform 80ms, box-shadow 100ms;
+}
+.mixer-transport:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.mixer-transport:not(:disabled):hover { color: #fff; }
+.mixer-transport:not(:disabled):active { transform: translateY(1px); }
+.mixer-transport-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.05);
+  pointer-events: none;
+}
+.mixer-transport--on {
+  color: var(--led-green);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 -2px 4px rgba(0,0,0,0.5) inset,
+    0 6px 14px rgba(0,0,0,0.45),
+    0 0 0 1px rgba(45,217,111,0.55),
+    0 0 18px rgba(45,217,111,0.3);
+}
+
+/* VU meters — pair of thin canvases with a label header and dB scale. */
+.mixer-meters {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: stretch;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, #0e1014, #0a0b0e);
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  min-width: 96px;
+  box-shadow: inset 0 1px 0 rgba(0,0,0,0.5);
+}
+.mixer-meter-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--label-dim);
+  text-align: center;
+}
+.mixer-meter-pair {
+  display: flex;
+  gap: 8px;
+  padding: 6px 4px;
+  align-items: stretch;
+}
+.mixer-meter-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.mixer-meter-canvas {
+  width: 16px;
+  height: 96px;
+  background: #050608;
+  border: 1px solid #0a0a0c;
+  border-radius: 2px;
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.7);
+}
+.mixer-meter-channel {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--label-dim);
+}
+.mixer-meter-scale {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: space-between;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--label-dim);
+  text-align: center;
+  padding: 6px 0;
+}
+
+/* Master fader — vertical slider with a heavy thumb riding a track. */
+.mixer-fader {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 12px 8px;
+  background: linear-gradient(180deg, #1a1b20, #131418);
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  min-width: 76px;
+}
+.mixer-fader-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--label-dim);
+  text-align: center;
+}
+.mixer-fader-track {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 110px;
+}
+.mixer-fader-track::before {
+  /* The track groove — a thin recessed slot. */
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, #050608, #0e1014);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 4px rgba(0,0,0,0.7),
+    0 1px 0 rgba(255,255,255,0.04);
+}
+.mixer-fader-track::after {
+  /* Tick marks alongside the track. */
+  content: '';
+  position: absolute;
+  left: calc(50% + 8px);
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255,255,255,0.18) 0 1px,
+    transparent 1px 13px
+  );
+}
+.mixer-fader-input {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  width: 28px;
+  height: 110px;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+.mixer-fader-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 18px;
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, #d8dade, #a3a8b0 45%, #6c6f76 50%, #3a3c41);
+  border: 1px solid #08090b;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.4) inset,
+    0 -1px 0 rgba(0,0,0,0.4) inset,
+    0 2px 5px rgba(0,0,0,0.55);
+  cursor: grab;
+}
+.mixer-fader-input::-webkit-slider-thumb:active { cursor: grabbing; }
+.mixer-fader-readout {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--readout);
+  text-align: center;
+  padding: 2px 0;
+  background: #050608;
+  border: 1px solid var(--panel-edge);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+}
+
+.mixer-error {
+  padding: 8px 22px;
+  background: rgba(255, 77, 77, 0.1);
+  color: #ff8a8a;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  border-top: 1px solid rgba(255, 77, 77, 0.4);
+}
+
+.mixer-credit {
+  padding: 9px 22px;
+  background: var(--panel-edge);
+  border-top: 1px solid #000;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--label-dim);
+  text-align: center;
+}
+.mixer-credit a {
+  color: var(--label);
+  text-decoration: none;
+}
+.mixer-credit a:hover { color: var(--led-amber); }
+
+.mixer-spinner { animation: mixer-spin 0.9s linear infinite; }
+@keyframes mixer-spin { to { transform: rotate(360deg); } }
+
 .image-canvas img {
   display: block;
   user-select: none;
@@ -6033,6 +6637,11 @@ button {
 }
 .seg-control-item:not(.seg-control-item--active):hover {
   color: var(--text);
+}
+.seg-with-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Font select */

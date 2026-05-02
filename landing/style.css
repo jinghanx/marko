@@ -221,6 +221,9 @@ button {
   align-items: center;
   gap: 8px;
   padding: 12px 22px;
+  /* Hardcoded sans so the buttons stay crisp even when their parent
+   *  block (e.g., the story column) sets a serif body font. */
+  font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
   border-radius: 999px;
@@ -253,6 +256,323 @@ button {
   font-size: 13px;
   color: var(--text-muted);
   font-family: var(--font-mono);
+}
+
+/* ---------- Comic-style story hero ----------
+ *  Replaces the title/subhead with Eddie's day-in-the-life comic. Mixed
+ *  typography: Bangers for big numbers, Permanent Marker / Caveat for
+ *  handwritten beats, brand-coloured app pills. Slight rotations on
+ *  individual elements give the page that hand-pasted comic-strip feel
+ *  without going full Comic-Sans. */
+.hero--story {
+  padding: 56px 24px 32px;
+  text-align: left;
+  /* Faint halftone dot field — comic-page texture. */
+  background:
+    radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+    radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+    var(--bg);
+  background-size: 22px 22px, 22px 22px;
+  background-position: 0 0, 11px 11px;
+}
+.hero--story .hero-bg {
+  opacity: 0.4;
+}
+.hero--story .cta-row {
+  margin-top: 28px;
+  justify-content: flex-start;
+}
+.hero--story .hero-meta {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.story {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--font-display);
+  color: var(--text);
+  font-size: clamp(20px, 2.4vw, 26px);
+  line-height: 1.5;
+}
+
+.story-time {
+  font-family: 'Permanent Marker', cursive;
+  font-size: clamp(28px, 3.5vw, 38px);
+  color: #d97757;
+  margin: 0 0 4px;
+  transform: rotate(-2deg);
+  letter-spacing: 0.02em;
+}
+.story-coffee {
+  font-family: var(--font-display);
+  margin-left: 10px;
+  font-size: 0.9em;
+  display: inline-block;
+  transform: rotate(8deg) translateY(-2px);
+}
+
+.story-line { margin: 0; }
+.story-line--lead {
+  font-size: clamp(28px, 3.6vw, 40px);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.story-eddie {
+  font-family: 'Bangers', 'Permanent Marker', cursive;
+  font-weight: 400;
+  font-size: 1.15em;
+  letter-spacing: 0.04em;
+  color: #2d6cdf;
+  text-shadow: 2px 2px 0 #ffd400;
+  display: inline-block;
+  transform: rotate(-1deg);
+}
+
+/* Yellow-marker highlight under a key word. */
+.story-mark {
+  font-style: normal;
+  background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%);
+  padding: 0 4px;
+  font-weight: 700;
+}
+.story-mark--yellow { background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%); }
+
+.story-aside {
+  font-family: 'Caveat', cursive;
+  font-size: clamp(20px, 2.4vw, 28px);
+  color: var(--text-muted);
+  font-weight: 700;
+  transform: rotate(-0.6deg);
+  margin-left: 12px;
+}
+.story-strike {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: #ff4f5e;
+  color: #888;
+}
+
+/* The relentless app stack — punchy bulleted list with brand-coloured
+ *  pill-tags. Mild stagger via per-child rotation makes it feel taped-on. */
+.story-stack {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: clamp(17px, 1.9vw, 21px);
+  font-weight: 500;
+  color: var(--text);
+}
+.story-stack li {
+  padding-left: 14px;
+  position: relative;
+}
+.story-stack li::before {
+  content: '→';
+  position: absolute;
+  left: -4px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-weight: 700;
+}
+
+.app {
+  display: inline-block;
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.92em;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  color: #fff;
+  margin: 0 2px;
+  white-space: nowrap;
+  box-shadow: 1px 1px 0 rgba(0,0,0,0.15);
+}
+/* Each app gets its real-world brand colour and a slight rotation. The
+ *  rotations alternate so the rhythm of the list reads visually
+ *  scattered, like sticker labels stuck to a notebook. */
+.app--bear        { background: #ff4f5e; transform: rotate(-1.4deg); }
+.app--cursor      { background: #7c3aed; transform: rotate(0.8deg); }
+.app--tower       { background: #4d8fcc; transform: rotate(-0.6deg); }
+.app--terminal    { background: #1a1a1a; transform: rotate(1.1deg); }
+.app--chrome      { background: #ea4335; transform: rotate(-0.9deg); }
+.app--chatgpt     { background: #10a37f; transform: rotate(0.7deg); }
+.app--postman     { background: #ff6c37; transform: rotate(-1.2deg); }
+.app--finder      { background: #1e90ff; transform: rotate(0.4deg); }
+.app--excalidraw  { background: #6c63ff; transform: rotate(-0.8deg); }
+.app--claude      { background: #d97757; transform: rotate(1.3deg); }
+.app--notion      { background: #2f2f2f; transform: rotate(-0.5deg); }
+.app--spotify     { background: #1db954; transform: rotate(0.9deg); }
+
+/* Tally — three big numbers in a row, centered, comic punchline before
+ *  the climax. Bangers font for the comic-book feel. */
+.story-tally {
+  display: flex;
+  gap: clamp(14px, 3vw, 36px);
+  align-items: flex-end;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 18px 0 6px;
+  margin: 8px 0;
+  border-top: 2px dashed rgba(0,0,0,0.12);
+  border-bottom: 2px dashed rgba(0,0,0,0.12);
+}
+.story-tally-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.story-num {
+  font-family: 'Bangers', 'Impact', sans-serif;
+  font-size: clamp(54px, 7vw, 88px);
+  line-height: 1;
+  color: #ff4f5e;
+  letter-spacing: 0.02em;
+  text-shadow:
+    2px 2px 0 #ffd400,
+    4px 4px 0 rgba(0,0,0,0.08);
+  display: inline-block;
+  transform: rotate(-1.5deg);
+}
+.story-tally-item:nth-child(2) .story-num { transform: rotate(1deg); color: #2d6cdf; text-shadow: 2px 2px 0 #ffd400, 4px 4px 0 rgba(0,0,0,0.08); }
+.story-tally-item:nth-child(3) .story-num { transform: rotate(-0.6deg); color: #6c63ff; text-shadow: 2px 2px 0 #ffd400, 4px 4px 0 rgba(0,0,0,0.08); }
+.story-num--ram { font-size: clamp(40px, 5.5vw, 70px); }
+.story-num-label {
+  font-family: 'Permanent Marker', cursive;
+  font-size: clamp(11px, 1.2vw, 14px);
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: lowercase;
+  margin-top: 2px;
+}
+
+/* Speech bubble — yellow comic balloon with a tail. */
+.story-bubble {
+  align-self: flex-start;
+  position: relative;
+  margin: 18px 0 18px 18px;
+  padding: 18px 24px;
+  background: #fff7c2;
+  border: 2px solid #1a1a1a;
+  border-radius: 22px;
+  box-shadow: 4px 4px 0 #1a1a1a;
+  max-width: 560px;
+  transform: rotate(-1deg);
+}
+.story-bubble p {
+  margin: 0;
+  font-family: 'Caveat', cursive;
+  font-weight: 700;
+  font-size: clamp(24px, 2.8vw, 34px);
+  line-height: 1.25;
+  color: #1a1a1a;
+}
+.story-bubble p em {
+  font-style: normal;
+  background: linear-gradient(transparent 55%, #ffd400 55%, #ffd400 92%, transparent 92%);
+  padding: 0 4px;
+}
+/* Speech-bubble tail — pointing toward the punchline below. */
+.story-bubble::before,
+.story-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -22px;
+  left: 38px;
+  width: 0;
+  height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-top: 22px solid #1a1a1a;
+}
+.story-bubble::after {
+  bottom: -17px;
+  left: 41px;
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+  border-top: 18px solid #fff7c2;
+}
+
+/* Final reveal — Marko logo + brand name in big comic letters. */
+.story-punchline {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 14px 0 8px;
+  padding: 8px 0;
+}
+.story-marko-icon {
+  border-radius: 18px;
+  box-shadow: 4px 4px 0 #1a1a1a, 0 8px 22px rgba(0,0,0,0.18);
+  transform: rotate(-4deg);
+  animation: float 6s ease-in-out infinite;
+}
+.story-marko-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.story .brand-name {
+  font-family: 'Bangers', 'Impact', sans-serif;
+  font-weight: 400;
+  font-size: clamp(56px, 8vw, 96px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  text-shadow:
+    3px 3px 0 #ffd400,
+    6px 6px 0 #ff4f5e,
+    9px 9px 0 rgba(0,0,0,0.12);
+  display: inline-block;
+  transform: rotate(-2deg);
+}
+.story-marko-tag {
+  font-family: 'Permanent Marker', cursive;
+  font-size: clamp(20px, 2.4vw, 30px);
+  color: var(--text);
+  transform: rotate(-1deg);
+  display: inline-block;
+}
+
+/* Dark-mode: keep the comic feel but tone down halftone & marker yellow. */
+@media (prefers-color-scheme: dark) {
+  .hero--story {
+    background:
+      radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      var(--bg);
+    background-size: 22px 22px, 22px 22px;
+    background-position: 0 0, 11px 11px;
+  }
+  .story-bubble {
+    background: #2a2616;
+    border-color: #fff;
+    box-shadow: 4px 4px 0 #fff;
+  }
+  .story-bubble p { color: #fff7c2; }
+  .story-bubble::before { border-top-color: #fff; }
+  .story-bubble::after { border-top-color: #2a2616; }
+  .story-marko-icon { box-shadow: 4px 4px 0 #fff, 0 8px 22px rgba(0,0,0,0.4); }
+  .story-tally { border-color: rgba(255,255,255,0.12); }
+}
+
+/* Mobile: tighten everything, kill horizontal rotations that overflow. */
+@media (max-width: 640px) {
+  .story { gap: 12px; }
+  .story-stack { font-size: 16px; }
+  .app { font-size: 13px; padding: 1px 8px; }
+  .story-bubble { margin-left: 0; }
+  .story-tally { gap: 14px; padding: 14px 0; }
 }
 
 /* ---------- Window mock ---------- */
@@ -490,12 +810,17 @@ button {
   margin: 0 auto 48px;
 }
 .section-head h2 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(28px, 4vw, 44px);
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: clamp(30px, 4.4vw, 48px);
+  letter-spacing: -0.025em;
+  line-height: 1.05;
   margin: 0 0 12px;
+}
+.section-head h2 em {
+  font-style: normal;
+  background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%);
+  padding: 0 4px;
 }
 .section-head p {
   font-size: 17px;
@@ -581,26 +906,39 @@ button {
 }
 
 .showcase-text { max-width: 480px; }
+/* Showcase tag — handwritten yellow sticker with hard black border and
+ *  drop-shadow, lifted off the page like a piece of masking-tape. */
 .showcase-tag {
   display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  padding: 4px 10px;
-  border-radius: 999px;
-  margin-bottom: 14px;
+  font-family: 'Permanent Marker', cursive;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: #1a1a1a;
+  background: #ffe14a;
+  padding: 3px 14px;
+  border: 2px solid #1a1a1a;
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 #1a1a1a;
+  transform: rotate(-2deg);
+  margin-bottom: 22px;
+}
+.showcase--reverse .showcase-tag {
+  transform: rotate(1.5deg);
 }
 .showcase-text h2 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(24px, 3.4vw, 36px);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  margin: 0 0 14px;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: clamp(28px, 3.6vw, 40px);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin: 0 0 16px;
+}
+.showcase-text h2 em {
+  font-style: normal;
+  background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%);
+  padding: 0 4px;
 }
 .showcase-text p {
   font-size: 16px;
@@ -610,11 +948,19 @@ button {
 }
 .showcase-text code {
   font-family: var(--font-mono);
-  font-size: 13px;
-  background: var(--surface-2);
-  padding: 1px 6px;
-  border-radius: 5px;
-  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 700;
+  background: #1a1a1a;
+  padding: 1px 8px;
+  border-radius: 4px;
+  color: #ffe14a;
+  letter-spacing: 0.01em;
+}
+@media (prefers-color-scheme: dark) {
+  .showcase-text code {
+    background: #ffe14a;
+    color: #1a1a1a;
+  }
 }
 .showcase-list {
   margin: 0;
@@ -1287,11 +1633,29 @@ button {
   position: relative;
 }
 .cta-band h2 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(28px, 4vw, 40px);
-  letter-spacing: -0.02em;
-  margin: 0 0 8px;
+  font-family: var(--font-sans);
+  font-weight: 900;
+  font-size: clamp(30px, 4.4vw, 48px);
+  letter-spacing: -0.028em;
+  line-height: 1.05;
+  margin: 0 0 10px;
+}
+.cta-band h2 em {
+  font-style: normal;
+  background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%);
+  padding: 0 4px;
+}
+.cta-band h2 .num {
+  font-family: 'Bangers', 'Impact', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  font-size: 1.4em;
+  color: #ff4f5e;
+  text-shadow: 3px 3px 0 #ffd400;
+  display: inline-block;
+  transform: rotate(-3deg);
+  margin: 0 4px;
+  vertical-align: -0.06em;
 }
 .cta-band p {
   margin: 0 0 20px;
@@ -1341,11 +1705,12 @@ button {
 
 /* Launcher mock — Spotlight-style mini-window for the showcase. */
 .mock--launcher {
+  position: relative;
   background: #1f1f22;
   color: #f1f1f3;
   border-radius: 14px;
   padding: 0;
-  font-family: var(--font-ui);
+  font-family: var(--font-sans);
 }
 .mock-launcher-input {
   padding: 18px 22px 16px;
@@ -1355,17 +1720,37 @@ button {
 .mock-launcher-cursor {
   color: #f1f1f3;
 }
+/* Glide caret — accent bar with a soft trailing gradient to hint that
+ *  it slides between positions instead of snapping. No blink: the live
+ *  caret only blinks when idle, and the still mock reads as "typing". */
 .mock-launcher-caret {
   display: inline-block;
-  width: 1.5px;
+  width: 2px;
   height: 18px;
-  background: #ff8800;
   margin-left: 1px;
   vertical-align: middle;
-  animation: launcher-caret 1.05s steps(2) infinite;
+  background: #ff8800;
+  border-radius: 1px;
+  box-shadow:
+    -10px 0 14px -6px rgba(255, 136, 0, 0.55),
+    -22px 0 22px -12px rgba(255, 136, 0, 0.3);
 }
-@keyframes launcher-caret {
-  to { opacity: 0; }
+/* Pointer dot — sits inside the active row at roughly the spot a user
+ *  would have just hovered to before the keyboard took over. Suggests
+ *  the in-app custom cursor (small accent dot, mix-blend difference). */
+.mock-launcher-pointer {
+  position: absolute;
+  top: 50%;
+  left: 28%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: #ff8800;
+  opacity: 0.9;
+  mix-blend-mode: difference;
+  pointer-events: none;
+  box-shadow: 0 0 14px rgba(255, 136, 0, 0.45);
 }
 .mock-launcher-section {
   padding: 8px 18px 4px;
@@ -1393,6 +1778,7 @@ button {
   color: #f1f1f3;
 }
 .mock-launcher-row--active {
+  position: relative;
   background: rgba(255, 255, 255, 0.13);
 }
 .mock-launcher-icon {

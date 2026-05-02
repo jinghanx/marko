@@ -467,7 +467,15 @@ function buildMenu() {
           click: () => sendToRenderer('menu:show-shortcuts'),
         },
         { type: 'separator' },
-        { role: 'reload' },
+        // ⌘R must NOT reload the whole BrowserWindow — that wipes every
+        // open tab, every workspace, every unsaved scratch buffer. Route
+        // the keystroke to the focused tab instead: web tabs use it to
+        // refresh their page; everything else ignores it.
+        {
+          label: 'Reload Page',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => sendToRenderer('menu:reload-page'),
+        },
         { role: 'toggleDevTools' },
         { type: 'separator' },
         { role: 'resetZoom', accelerator: 'CmdOrCtrl+0' },

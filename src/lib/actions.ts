@@ -130,6 +130,22 @@ export function openHttpTab(opts: { focus?: boolean } = {}) {
   return tab;
 }
 
+/** Reveal the existing music tab if one is open in the active session,
+ *  otherwise open a fresh one. Only one stream playing at a time keeps
+ *  the now-playing pill from getting cluttered with duplicates. */
+export function openMusicTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const existing = workspace.getState().tabs.find((t) => t.kind === 'music');
+  if (existing) {
+    workspace.revealTab(existing.id);
+    if (focus) workspace.requestEditorFocus();
+    return existing;
+  }
+  const tab = workspace.openNewTab({ kind: 'music', title: 'Radio' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
 /** Reveal the existing clipboard-history tab if one is open in the active
  *  session, otherwise open a fresh one. The clipboard log is global, so
  *  multiple tabs would just show the same thing. */

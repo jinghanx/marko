@@ -15,6 +15,7 @@ export type LauncherAction =
   | { type: 'open-process' }
   | { type: 'open-notes' }
   | { type: 'open-shortcuts' }
+  | { type: 'open-music' }
   | { type: 'open-folder'; path: string }
   | { type: 'open-home-folder'; sub: string }
   | { type: 'open-app'; appPath: string }
@@ -35,7 +36,8 @@ export type LauncherIconKind =
   | 'process'
   | 'markdown'
   | 'folder'
-  | 'code';
+  | 'code'
+  | 'music';
 
 export interface LauncherCommand {
   /** First keyword is the canonical name; rest are aliases. */
@@ -112,6 +114,13 @@ export const LAUNCHER_COMMANDS: LauncherCommand[] = [
     category: 'Help',
     iconKind: 'code',
     action: { type: 'open-shortcuts' },
+  },
+  {
+    keywords: ['music', 'radio', 'tunes', 'sound', 'audio'],
+    label: 'Open Music Radio',
+    category: 'Music',
+    iconKind: 'music',
+    action: { type: 'open-music' },
   },
   {
     keywords: ['activity', 'processes', 'process', 'top', 'htop'],

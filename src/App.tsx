@@ -6,20 +6,19 @@ import { Outline } from './components/Outline';
 import { FilePalette } from './components/FilePalette';
 import { NewFilePicker } from './components/NewFilePicker';
 import { PathInput } from './components/PathInput';
-import { ShortcutsModal } from './components/ShortcutsModal';
 import { SessionStrip } from './components/SessionStrip';
 import { NowPlaying } from './components/NowPlaying';
-import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab, openClipboardTab, openSettingsTab } from './lib/actions';
+import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab, openClipboardTab, openSettingsTab, openShortcutsTab } from './lib/actions';
 import { uiBus } from './lib/uiBus';
 import { resetWorkspaceAndReload } from './lib/persistence';
+import { runLauncherAction } from './lib/runLauncherAction';
 
 // One modal at a time. Opening any modal automatically closes the others.
 type Modal =
   | null
   | { kind: 'palette'; replace: boolean }
   | { kind: 'path'; replace: boolean }
-  | { kind: 'newFile' }
-  | { kind: 'shortcuts' };
+  | { kind: 'newFile' };
 
 /** Activate the Nth tab in the currently-focused leaf. `idx === -1` means
  *  the last tab. Out-of-range indexes silently no-op (Chrome behavior). */
@@ -69,12 +68,17 @@ export function App() {
 
   useEffect(() => {
     const offs = [
+      // Launcher (global hotkey window) dispatches actions back here.
+      window.marko.onLauncherRun((action) => {
+        console.log('[marko] onLauncherRun fired with action:', action);
+        void runLauncherAction(action as Parameters<typeof runLauncherAction>[0]);
+      }),
       uiBus.on('open-palette', () => setModal({ kind: 'palette', replace: false })),
       uiBus.on('open-settings', () => openSettingsTab()),
       uiBus.on('open-process-viewer', () => openProcessTab()),
       uiBus.on('open-new-file', () => setModal({ kind: 'newFile' })),
       uiBus.on('open-path', () => setModal({ kind: 'path', replace: false })),
-      uiBus.on('open-shortcuts', () => setModal({ kind: 'shortcuts' })),
+      uiBus.on('open-shortcuts', () => openShortcutsTab()),
       window.marko.onMenu('menu:new', () => setModal({ kind: 'newFile' })),
       window.marko.onMenu('menu:open-file', () => void openFileViaDialog()),
       window.marko.onMenu('menu:open-folder', () => void openFolderViaDialog()),
@@ -117,7 +121,7 @@ export function App() {
       window.marko.onMenu('menu:focus-address', () => uiBus.emit('focus-address')),
       window.marko.onMenu('menu:process-viewer', () => openProcessTab()),
       window.marko.onMenu('menu:open-clipboard', () => openClipboardTab()),
-      window.marko.onMenu('menu:show-shortcuts', () => setModal({ kind: 'shortcuts' })),
+      window.marko.onMenu('menu:show-shortcuts', () => openShortcutsTab()),
       window.marko.onMenu('menu:split-right', () => workspace.splitFocused('horizontal')),
       window.marko.onMenu('menu:split-down', () => workspace.splitFocused('vertical')),
       window.marko.onMenu('menu:close-pane', () => workspace.closePane(workspace.getFocusedLeaf().id)),
@@ -199,7 +203,6 @@ export function App() {
         replace={modal?.kind === 'path' ? modal.replace : false}
         onClose={close}
       />
-      <ShortcutsModal open={modal?.kind === 'shortcuts'} onClose={close} />
     </div>
   );
 }

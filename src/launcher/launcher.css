@@ -1,0 +1,263 @@
+/* Launcher — frameless floating mini-window styled after Raycast.
+ *  Self-contained; doesn't depend on the main window's global.css. */
+
+:root {
+  /* Solid backgrounds — translucency made the rows hard to read against
+   *  busy desktops. Keep the shadow so the window still feels lifted. */
+  --bg: #1f1f22;
+  --bg-elev: #2c2c30;
+  --bg-row-hover: rgba(255, 255, 255, 0.06);
+  --bg-row-active: rgba(255, 255, 255, 0.13);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #f1f1f3;
+  --text-muted: #a8abb0;
+  --text-subtle: #76787c;
+  --accent: #ff8800;
+  --footer-bg: #18181b;
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --bg-elev: #f4f4f6;
+    --bg-row-hover: rgba(0, 0, 0, 0.04);
+    --bg-row-active: rgba(0, 0, 0, 0.08);
+    --border: rgba(0, 0, 0, 0.08);
+    --border-strong: rgba(0, 0, 0, 0.14);
+    --text: #1c1c1e;
+    --text-muted: #5a5d62;
+    --text-subtle: #a4a6ab;
+    --accent: #d97757;
+    --footer-bg: #f8f8fa;
+    --shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body, #launcher-root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent;
+  font-family: var(--font-ui);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.launcher {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* Input — large, frameless, prominent. Subtle separator below. */
+.launcher-input {
+  flex: 0 0 auto;
+  padding: 18px 22px 16px;
+  font-size: 18px;
+  font-weight: 400;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-ui);
+  letter-spacing: -0.005em;
+  border-bottom: 1px solid var(--border);
+}
+.launcher-input::placeholder {
+  color: var(--text-subtle);
+}
+
+/* Results scroll area. Padding gives the rows breathing room from the
+ *  bar edges. */
+.launcher-results {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 6px 8px 8px;
+  scrollbar-width: thin;
+}
+.launcher-results::-webkit-scrollbar {
+  width: 6px;
+}
+.launcher-results::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+.launcher-empty {
+  padding: 28px 22px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.launcher-section {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+.launcher-section:first-child {
+  margin-top: 2px;
+}
+.launcher-section-label {
+  padding: 8px 12px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+/* Result rows. Active row gets a full pill — no left-border accent. */
+.launcher-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: background 60ms ease-out;
+}
+.launcher-row:hover {
+  background: var(--bg-row-hover);
+}
+.launcher-row--active,
+.launcher-row--active:hover {
+  background: var(--bg-row-active);
+}
+
+.launcher-row-glyph {
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+/* Tab-kind glyphs in launcher rows wear the same per-kind colors used
+ *  on the tabs themselves. */
+.launcher-row-tabicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.launcher-row-tabicon--folder { color: var(--accent); }
+.launcher-row-tabicon--web { color: #2ea043; }
+.launcher-row-tabicon--markdown { color: #d97757; }
+.launcher-row-tabicon--terminal { color: #4caf6d; }
+.launcher-row-tabicon--process { color: #c25aa3; }
+.launcher-row-tabicon--git { color: #f0883e; }
+.launcher-row-tabicon--excalidraw { color: #6c63ff; }
+.launcher-row-tabicon--chat { color: #ec6cb9; }
+.launcher-row-tabicon--search { color: #d4a300; }
+.launcher-row-tabicon--http { color: #2ea043; }
+.launcher-row-tabicon--clipboard { color: #d97757; }
+.launcher-row-tabicon--settings { color: var(--text-muted); }
+.launcher-row-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.launcher-row-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #fff;
+  font-family: var(--font-ui);
+}
+
+.launcher-row-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.launcher-row-title {
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.launcher-row-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.launcher-row-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  transition: all 80ms ease-out;
+}
+.launcher-row--active .launcher-row-tag {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* Footer — keyboard hints. Right-aligned, monospace key glyphs. */
+.launcher-footer {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--footer-bg);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.launcher-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.launcher-footer kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+}

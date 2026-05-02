@@ -251,8 +251,37 @@ const api = {
     ipcRenderer.on('pty:exit', listener);
     return () => ipcRenderer.removeListener('pty:exit', listener);
   },
+
+  // ---------- Launcher (main window receives dispatched actions) ----------
+  onLauncherRun: (handler: (action: unknown) => void) => {
+    const listener = (_e: unknown, action: unknown) => handler(action);
+    ipcRenderer.on('launcher:run', listener);
+    return () => ipcRenderer.removeListener('launcher:run', listener);
+  },
+
+  // ---------- Application discovery (used by launcher autocomplete) ----------
+  listApps: (): Promise<{ name: string; path: string }[]> =>
+    ipcRenderer.invoke('apps:list'),
+  appIcon: (appPath: string): Promise<string | null> =>
+    ipcRenderer.invoke('apps:icon', appPath),
 };
 
 contextBridge.exposeInMainWorld('marko', api);
 
+// Launcher-window-only API. Both windows load the same preload (Electron
+// doesn't support per-window preload paths cleanly with vite-plugin-electron),
+// so this just exposes the launcher-specific helpers under a separate name
+// — only the launcher renderer uses them.
+const launcherApi = {
+  hide: () => ipcRenderer.invoke('launcher:hide'),
+  dispatch: (action: unknown) => ipcRenderer.invoke('launcher:dispatch', action),
+  onShow: (handler: () => void) => {
+    const listener = () => handler();
+    ipcRenderer.on('launcher:show', listener);
+    return () => ipcRenderer.removeListener('launcher:show', listener);
+  },
+};
+contextBridge.exposeInMainWorld('markoLauncher', launcherApi);
+
 export type MarkoApi = typeof api;
+export type MarkoLauncherApi = typeof launcherApi;

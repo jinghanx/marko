@@ -12,6 +12,7 @@ import { ExcalidrawViewer } from './ExcalidrawViewer';
 import { ChatView } from './ChatView';
 import { ClipboardView } from './ClipboardView';
 import { SettingsView } from './SettingsView';
+import { ShortcutsView } from './ShortcutsView';
 import { SqliteView } from './SqliteView';
 import { SearchView } from './SearchView';
 import { HttpClient } from './HttpClient';
@@ -132,6 +133,7 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
           {tab.kind === 'search' && <SearchView />}
           {tab.kind === 'clipboard' && <ClipboardView />}
           {tab.kind === 'settings' && <SettingsView />}
+          {tab.kind === 'shortcuts' && <ShortcutsView />}
           {tab.kind === 'sqlite' && tab.filePath && (
             <SqliteView tabId={tab.id} filePath={tab.filePath} />
           )}

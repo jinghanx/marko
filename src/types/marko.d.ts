@@ -285,6 +285,9 @@ export interface MarkoApi {
   gitCreateTag(repoDir: string, name: string, message: string): Promise<{ ok: boolean; error?: string }>;
   gitDeleteTag(repoDir: string, name: string): Promise<{ ok: boolean; error?: string }>;
   onMenu(channel: string, handler: () => void): () => void;
+  onLauncherRun(handler: (action: unknown) => void): () => void;
+  listApps(): Promise<{ name: string; path: string }[]>;
+  appIcon(appPath: string): Promise<string | null>;
 
   ptySpawn(id: string, opts: { cwd?: string; cols?: number; rows?: number }): Promise<{ ok: boolean; error?: string }>;
   ptyWrite(id: string, data: string): Promise<boolean>;
@@ -294,9 +297,16 @@ export interface MarkoApi {
   onPtyExit(id: string, handler: (exitCode: number) => void): () => void;
 }
 
+export interface MarkoLauncherApi {
+  hide(): Promise<{ ok: boolean }>;
+  dispatch(action: unknown): Promise<{ ok: boolean }>;
+  onShow(handler: () => void): () => void;
+}
+
 declare global {
   interface Window {
     marko: MarkoApi;
+    markoLauncher: MarkoLauncherApi;
   }
 }
 

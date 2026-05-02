@@ -272,7 +272,10 @@ button {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  -webkit-app-region: no-drag;
+  /* Strip itself is drag region — empty space above/between/after the
+   *  bubbles drags the window. The tabs and `+` button below explicitly
+   *  opt back to no-drag so clicks still work. */
+  -webkit-app-region: drag;
   min-width: 0;
 }
 .session-strip::-webkit-scrollbar { display: none; }
@@ -282,34 +285,45 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 10px 0 14px;
+  padding: 0 12px 0 14px;
   margin: 0;
-  border-radius: 10px;
-  font-size: 12px;
+  /* Pill-shaped sessions vs rounded-rectangle file tabs — same bubble
+   *  language but visually distinct so the user can tell at a glance
+   *  which row they're acting on. */
+  border-radius: 999px;
+  /* The strip is a drag region; tabs opt out so clicks still register. */
+  -webkit-app-region: no-drag;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
-  min-width: 80px;
+  min-width: 0;
   max-width: 200px;
-  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, var(--tab-bg));
-  transition: background 80ms ease-out;
+  background: color-mix(in srgb, var(--text) 12%, var(--tab-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, var(--tab-bg));
+  transition: background 80ms ease-out, color 80ms ease-out;
 }
 .session-tab:hover {
   color: var(--text);
-  background: color-mix(in srgb, var(--text) 30%, var(--tab-bg));
+  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
 }
+/* Active session: solid accent fill on the pill — no top stripe (pill
+ *  shape reads cleaner with a uniform colored fill). */
 .session-tab--active,
 .session-tab--active:hover {
-  background: linear-gradient(
-    to bottom,
-    var(--session-accent) 0,
-    var(--session-accent) 2px,
-    var(--tab-active-bg) 2px
-  );
-  color: var(--text);
+  background: var(--session-accent);
+  color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--session-accent) 40%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--session-accent) 70%, transparent);
+}
+.session-tab--active .session-tab-close {
+  color: rgba(255, 255, 255, 0.7);
+}
+.session-tab--active .session-tab-close:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 .session-tab-name {
   white-space: nowrap;
@@ -353,7 +367,8 @@ button {
   justify-content: center;
   width: 28px;
   margin: 0;
-  border-radius: 10px;
+  /* Match the pill shape of session tabs. */
+  border-radius: 999px;
   font-size: 14px;
   line-height: 1;
   color: var(--text-muted);
@@ -894,6 +909,26 @@ button {
 .tab-icon--chat { color: #ec6cb9; }
 .tab-icon--search { color: #d4a300; }
 .tab-icon--http { color: #2ea043; }
+
+/* ⌘T palette command rows wear the same tab-kind colors as the tabs. */
+.pathinput-tabicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.pathinput-tabicon--folder { color: var(--accent); }
+.pathinput-tabicon--web { color: #2ea043; }
+.pathinput-tabicon--markdown { color: #d97757; }
+.pathinput-tabicon--terminal { color: #4caf6d; }
+.pathinput-tabicon--process { color: #c25aa3; }
+.pathinput-tabicon--git { color: #f0883e; }
+.pathinput-tabicon--excalidraw { color: #6c63ff; }
+.pathinput-tabicon--chat { color: #ec6cb9; }
+.pathinput-tabicon--search { color: #d4a300; }
+.pathinput-tabicon--http { color: #2ea043; }
+.pathinput-tabicon--clipboard { color: #d97757; }
+.pathinput-tabicon--settings { color: var(--text-muted); }
 
 /* Drag-reorder feedback for file tabs. */
 .tab--dragging { opacity: 0.4; }
@@ -5713,6 +5748,53 @@ button {
   display: flex;
   flex-direction: column;
 }
+
+/* Shortcuts as a tab — same body styling as the modal, but laid out
+ *  inside an editor-host. Header is sticky so it stays visible during
+ *  scroll; body is the natural document flow (the editor-host scrolls). */
+.shortcuts-view {
+  background: var(--bg);
+  min-height: 100%;
+}
+.shortcuts-view-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.shortcuts-view-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+.shortcuts-view-header input {
+  flex: 1 1 auto;
+  max-width: 320px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.shortcuts-view-header input:focus {
+  border-color: var(--accent);
+}
+.shortcuts-view-body {
+  padding: 16px 24px 32px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
 .shortcuts-search {
   padding: 10px 18px;
   border-bottom: 1px solid var(--border);
@@ -5765,16 +5847,23 @@ button {
   padding: 3px 0;
 }
 .shortcuts-keys {
-  display: inline-block;
-  padding: 1px 6px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  /* macOS modifier glyphs (⌘ ⇧ ⌥ ⌃ ↵) render thin in monospace fonts.
+   *  Use the system UI font and bump the size so ⇧ is legible. */
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--text);
   background: var(--bg-muted);
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   text-align: center;
   white-space: nowrap;
+  min-width: 32px;
 }
 .shortcuts-label {
   color: var(--text-muted);

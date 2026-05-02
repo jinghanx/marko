@@ -110,6 +110,12 @@
           <span class="dot dot-red"></span>
           <span class="dot dot-yellow"></span>
           <span class="dot dot-green"></span>
+          <div class="window-sessions">
+            <span class="window-session window-session--active">marko</span>
+            <span class="window-session">scratch</span>
+            <span class="window-session">notes</span>
+            <span class="window-session-add">+</span>
+          </div>
         </div>
         <div class="window-tabs">
           <span class="window-tab window-tab--folder"><span class="tab-glyph">📁</span>marko</span>
@@ -118,6 +124,7 @@
           <span class="window-tab window-tab--term"><span class="tab-glyph">▍</span>zsh</span>
           <span class="window-tab"><span class="tab-glyph">⎇</span>git</span>
           <span class="window-tab"><span class="tab-glyph">✨</span>chat</span>
+          <span class="window-tab-add">+</span>
         </div>
         <div class="window-body">
           <aside class="demo-sidebar">
@@ -151,8 +158,68 @@
       </div>
     </section>
 
+    <!-- Showcase: Global launcher -->
+    <section class="showcase" id="features">
+      <div class="showcase-text">
+        <span class="showcase-tag">Launcher</span>
+        <h2>One hotkey for everything.</h2>
+        <p>
+          A Spotlight-style mini-window you wake from anywhere with <kbd>⌘⌥Space</kbd> — even when Marko isn't focused, even when its window is closed.
+          Run a Marko command, launch any macOS app, search the web, or do quick math.
+        </p>
+        <ul class="showcase-list">
+          <li>Type any command name to wake the right Marko tab — <code>chat</code>, <code>git</code>, <code>find</code>, <code>http</code>, <code>terminal</code>…</li>
+          <li>Type an app name to open it (Chrome, Slack, Figma — anything in <code>/Applications</code>)</li>
+          <li>Type a math expression to compute it inline; <kbd>↵</kbd> copies the result</li>
+          <li>Anything else falls through to a web search in your configured engine</li>
+        </ul>
+      </div>
+      <div class="showcase-mock">
+        <div class="mock mock--launcher">
+          <div class="mock-launcher-input">
+            <span class="mock-launcher-cursor">chro</span><span class="mock-launcher-caret"></span>
+          </div>
+          <div class="mock-launcher-section">Calculator</div>
+          <div class="mock-launcher-section-faded">— no math input —</div>
+          <div class="mock-launcher-section">Commands</div>
+          <div class="mock-launcher-row">
+            <span class="mock-launcher-icon mock-launcher-icon--chat">●</span>
+            <span class="mock-launcher-name">chat</span>
+            <span class="mock-launcher-sub">Open AI Chat</span>
+            <span class="mock-launcher-tag">AI</span>
+          </div>
+          <div class="mock-launcher-section">Applications</div>
+          <div class="mock-launcher-row mock-launcher-row--active">
+            <span class="mock-launcher-avatar" style="background: hsl(216 60% 45%)">GC</span>
+            <span class="mock-launcher-name">Google Chrome</span>
+            <span class="mock-launcher-sub">/Applications/Google Chrome.app</span>
+            <span class="mock-launcher-tag mock-launcher-tag--active">App</span>
+          </div>
+          <div class="mock-launcher-row">
+            <span class="mock-launcher-avatar" style="background: hsl(28 60% 45%)">CH</span>
+            <span class="mock-launcher-name">Chromium</span>
+            <span class="mock-launcher-sub">/Applications/Chromium.app</span>
+            <span class="mock-launcher-tag">App</span>
+          </div>
+          <div class="mock-launcher-section">Search</div>
+          <div class="mock-launcher-row">
+            <span class="mock-launcher-icon">🔍</span>
+            <span class="mock-launcher-name">Search the web for "chro"</span>
+            <span class="mock-launcher-sub">google.com</span>
+            <span class="mock-launcher-tag">Search</span>
+          </div>
+          <div class="mock-launcher-footer">
+            <span><kbd>↵</kbd> run</span>
+            <span><kbd>↑↓</kbd> select</span>
+            <span><kbd>Tab</kbd> extend</span>
+            <span><kbd>esc</kbd> hide</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Showcase: Git client -->
-    <section class="showcase showcase--reverse" id="features">
+    <section class="showcase showcase--reverse">
       <div class="showcase-text">
         <span class="showcase-tag">Git</span>
         <h2>A full Git client without leaving the window.</h2>

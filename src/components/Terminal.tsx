@@ -254,6 +254,16 @@ export function Terminal({ tabId }: Props) {
         disposeExit = window.marko.onPtyExit(ptyId, () => {
           term.writeln('\r\n\x1b[2m[shell exited]\x1b[0m');
         });
+        // Spawn cwd alone isn't always enough — many users have rc files
+        // that `cd $HOME` on shell startup, undoing the cwd we passed.
+        // Send an explicit cd after a short delay (long enough for the
+        // shell to finish reading rc files but before the user types).
+        if (rootDir) {
+          const escaped = rootDir.replace(/'/g, `'\\''`);
+          setTimeout(() => {
+            void window.marko.ptyWrite(ptyId, ` cd '${escaped}' && clear\r`);
+          }, 120);
+        }
       });
 
     const onUserInput = term.onData((data) => {

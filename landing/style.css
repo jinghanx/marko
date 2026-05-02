@@ -272,28 +272,72 @@ button {
   transform: perspective(1800px) rotateX(2.5deg);
   transform-origin: top center;
 }
+/* Title bar — traffic lights + session pills, mirroring Marko's actual UI. */
 .window-chrome {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 12px 14px;
+  padding: 8px 14px 8px 14px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
+  height: 44px;
+  box-sizing: border-box;
 }
 .window-chrome .dot {
   width: 11px;
   height: 11px;
   border-radius: 50%;
+  flex: 0 0 auto;
 }
 .dot-red { background: #ff5f57; }
 .dot-yellow { background: #febc2e; }
 .dot-green { background: #28c840; }
 
+.window-sessions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 18px;
+}
+.window-session {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent);
+}
+.window-session--active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.window-session-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent);
+  margin-left: 2px;
+}
+
+/* File-tab strip — rounded-rectangle bubbles, accent stripe on active. */
 .window-tabs {
   display: flex;
-  align-items: stretch;
-  background: var(--surface-2);
-  padding: 0 8px;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--text) 5%, var(--surface-2));
+  padding: 9px 10px 7px;
   border-bottom: 1px solid var(--border);
   font-size: 11.5px;
   color: var(--text-muted);
@@ -303,9 +347,11 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border-right: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 10px;
   white-space: nowrap;
+  background: color-mix(in srgb, var(--text) 14%, var(--surface-2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, var(--surface-2));
 }
 .window-tab .tab-glyph {
   font-family: var(--font-mono);
@@ -313,17 +359,26 @@ button {
   opacity: 0.8;
 }
 .window-tab--active {
+  position: relative;
   background: var(--surface);
   color: var(--text);
   font-weight: 600;
-  position: relative;
+  /* 2px accent stripe on top, clipped to the rounded shape via background gradient. */
+  background:
+    linear-gradient(to bottom, var(--accent) 0, var(--accent) 2px, var(--surface) 2px);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, var(--border));
 }
-.window-tab--active::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: var(--accent);
+.window-tab-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text) 14%, var(--surface-2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, var(--surface-2));
 }
 .window-tab--folder { color: var(--accent); }
 .window-tab--term .tab-glyph { color: #4caf6d; }
@@ -1070,31 +1125,30 @@ button {
   color: var(--text);
   margin-left: auto;
 }
+/* Session strip — pill-shaped sessions, matching the new in-app look. */
 .mock-session-strip {
   display: flex;
-  gap: 0;
+  align-items: center;
+  gap: 5px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
-  padding: 0 8px;
+  padding: 8px 12px;
   font-size: 11.5px;
 }
 .mock-session {
-  padding: 7px 14px;
-  border-right: 1px solid var(--border);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   color: var(--text-muted);
-  position: relative;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent);
 }
 .mock-session--active {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-}
-.mock-session--active::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
   background: #d97757;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #d97757 60%, transparent);
 }
 .mock-layout {
   display: grid;
@@ -1117,12 +1171,22 @@ button {
   flex-direction: column;
   flex: 1;
 }
+/* File-tab bar inside each pane — bubble-shaped tabs with the same
+ *  language as the in-app tabs. We only render one (active) tab per
+ *  pane in this mock, so the styling shows the active state. */
 .mock-pane-tab {
-  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  margin: 9px 10px 7px;
+  padding: 6px 12px;
+  border-radius: 10px;
   font-size: 11px;
   font-weight: 600;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  color: var(--text);
+  background:
+    linear-gradient(to bottom, #d97757 0, #d97757 2px, var(--surface) 2px);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #d97757 30%, var(--border));
+  align-self: flex-start;
 }
 .mock-pane-content { flex: 1; padding: 10px 12px; }
 .mock-pane-content--folder { background: var(--surface); }
@@ -1273,6 +1337,143 @@ button {
   font-size: 12px;
   color: var(--text-muted);
   font-family: var(--font-mono);
+}
+
+/* Launcher mock — Spotlight-style mini-window for the showcase. */
+.mock--launcher {
+  background: #1f1f22;
+  color: #f1f1f3;
+  border-radius: 14px;
+  padding: 0;
+  font-family: var(--font-ui);
+}
+.mock-launcher-input {
+  padding: 18px 22px 16px;
+  font-size: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mock-launcher-cursor {
+  color: #f1f1f3;
+}
+.mock-launcher-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 18px;
+  background: #ff8800;
+  margin-left: 1px;
+  vertical-align: middle;
+  animation: launcher-caret 1.05s steps(2) infinite;
+}
+@keyframes launcher-caret {
+  to { opacity: 0; }
+}
+.mock-launcher-section {
+  padding: 8px 18px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #76787c;
+}
+.mock-launcher-section-faded {
+  padding: 0 18px 6px;
+  font-size: 11px;
+  color: #76787c;
+  font-style: italic;
+}
+.mock-launcher-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #f1f1f3;
+}
+.mock-launcher-row--active {
+  background: rgba(255, 255, 255, 0.13);
+}
+.mock-launcher-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #a8abb0;
+}
+.mock-launcher-icon--chat { color: #ec6cb9; }
+.mock-launcher-avatar {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.04em;
+}
+.mock-launcher-name {
+  font-size: 13px;
+  color: #f1f1f3;
+  font-weight: 500;
+}
+.mock-launcher-sub {
+  grid-column: 2;
+  font-size: 11px;
+  color: #a8abb0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mock-launcher-tag {
+  grid-row: 1;
+  grid-column: 3;
+  align-self: start;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #76787c;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.mock-launcher-tag--active {
+  color: #ff8800;
+  border-color: rgba(255, 136, 0, 0.5);
+  background: rgba(255, 136, 0, 0.1);
+}
+.mock-launcher-footer {
+  display: flex;
+  gap: 18px;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #18181b;
+  font-size: 11px;
+  color: #a8abb0;
+}
+.mock-launcher-footer kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-right: 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #f1f1f3;
+  background: #2c2c30;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
 }
 
 @media (max-width: 640px) {

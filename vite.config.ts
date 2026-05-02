@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
 import { builtinModules } from 'node:module';
@@ -8,6 +9,16 @@ export default defineConfig({
     __VUE_OPTIONS_API__: 'false',
     __VUE_PROD_DEVTOOLS__: 'false',
     __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false',
+  },
+  // Two HTML entries: the main window (index.html) and the global launcher
+  // (launcher.html). Electron loads each by file path or dev-server URL.
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        launcher: resolve(__dirname, 'launcher.html'),
+      },
+    },
   },
   plugins: [
     react(),

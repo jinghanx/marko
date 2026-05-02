@@ -7,130 +7,15 @@ import {
   looksLikeUrl,
   normalizeUrl,
   openUrlInTab,
-  openTerminalTab,
-  openProcessTab,
-  openGitTab,
-  openExcalidrawTab,
-  openChatTab,
-  openSearchTab,
-  openHttpTab,
-  openClipboardTab,
-  openSettingsTab,
   withReplace,
 } from '../lib/actions';
+import { LAUNCHER_COMMANDS, type LauncherCommand } from '../shared/launcherActions';
+import { runLauncherAction } from '../lib/runLauncherAction';
+import { TabKindGlyph } from './TabKindGlyph';
 
-interface Command {
-  /** First keyword is the canonical name; rest are aliases. */
-  keywords: string[];
-  label: string;
-  /** Short tag rendered as a category label in the suggestion row. */
-  category: string;
-  run: () => void;
-}
+type Command = LauncherCommand;
 
-const COMMANDS: Command[] = [
-  {
-    keywords: ['terminal', 'term', 'shell', 'tty'],
-    label: 'Open Terminal',
-    category: 'Terminal',
-    run: () => openTerminalTab(),
-  },
-  {
-    keywords: ['chat', 'ai', 'assistant', 'gpt', 'llm'],
-    label: 'Open AI Chat',
-    category: 'AI',
-    run: () => openChatTab(),
-  },
-  {
-    keywords: ['search', 'find', 'grep', 'rg'],
-    label: 'Find in Files (ripgrep)',
-    category: 'Search',
-    run: () => openSearchTab(),
-  },
-  {
-    keywords: ['git', 'status', 'commit'],
-    label: 'Open Git (status / stage / commit)',
-    category: 'Git',
-    run: () => openGitTab(),
-  },
-  {
-    keywords: ['http', 'request', 'rest', 'api', 'curl', 'postman'],
-    label: 'Open HTTP Client',
-    category: 'HTTP',
-    run: () => openHttpTab(),
-  },
-  {
-    keywords: ['whiteboard', 'draw', 'excalidraw', 'sketch', 'canvas'],
-    label: 'Open Whiteboard (Excalidraw)',
-    category: 'Whiteboard',
-    run: () => openExcalidrawTab(),
-  },
-  {
-    keywords: ['clipboard', 'pasteboard', 'paste', 'clip'],
-    label: 'Open Clipboard History',
-    category: 'Clipboard',
-    run: () => openClipboardTab(),
-  },
-  {
-    keywords: ['settings', 'preferences', 'prefs', 'config', 'theme'],
-    label: 'Open Settings',
-    category: 'Settings',
-    run: () => openSettingsTab(),
-  },
-  {
-    keywords: ['activity', 'processes', 'process', 'top', 'htop'],
-    label: 'Open Activity (process viewer)',
-    category: 'Activity',
-    run: () => openProcessTab(),
-  },
-  {
-    keywords: ['notes', 'note', 'scratchpad'],
-    label: 'Open Notes (~/.marko/notes.txt)',
-    category: 'Notes',
-    run: async () => {
-      const file = await window.marko.notesPath();
-      await openFileFromPath(file, { focus: true });
-    },
-  },
-  // Standard macOS folders. Resolved against the home dir at run time so
-  // they keep working regardless of which user is running the app.
-  {
-    keywords: ['downloads', 'dl'],
-    label: 'Open ~/Downloads',
-    category: 'Folder',
-    run: () => openHomeFolder('Downloads'),
-  },
-  {
-    keywords: ['documents', 'docs'],
-    label: 'Open ~/Documents',
-    category: 'Folder',
-    run: () => openHomeFolder('Documents'),
-  },
-  {
-    keywords: ['desktop'],
-    label: 'Open ~/Desktop',
-    category: 'Folder',
-    run: () => openHomeFolder('Desktop'),
-  },
-  {
-    keywords: ['home', '~'],
-    label: 'Open ~ (home)',
-    category: 'Folder',
-    run: () => openHomeFolder(''),
-  },
-  {
-    keywords: ['applications', 'apps'],
-    label: 'Open /Applications',
-    category: 'Folder',
-    run: () => openFolderInEditor('/Applications', { focus: true }),
-  },
-];
-
-async function openHomeFolder(sub: string): Promise<void> {
-  const home = await window.marko.homeDir();
-  const full = sub ? `${home}/${sub}` : home;
-  await openFolderInEditor(full, { focus: true });
-}
+const COMMANDS: Command[] = LAUNCHER_COMMANDS;
 
 /** Discriminated union — every suggestion row is one of these. Note that
  *  workspace file matches are intentionally NOT here: ⌘P (Quick Open) owns
@@ -167,6 +52,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const homeDirRef = useRef<string | null>(null);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -306,14 +192,26 @@ export function PathInput({ open, replace = false, onClose }: Props) {
     if (activeIndex >= suggestions.length) setActiveIndex(0);
   }, [suggestions, activeIndex]);
 
+  // Keep the active row visible inside the scrollable results container as
+  // the user arrow-keys past the visible window. `block: 'nearest'` does
+  // the right thing automatically (no-op when in view, snap to top or
+  // bottom edge when not).
+  useEffect(() => {
+    const container = resultsRef.current;
+    if (!container) return;
+    const row = container.children[activeIndex] as HTMLElement | undefined;
+    if (!row) return;
+    row.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
+
   if (!open) return null;
 
   /** Run whatever the suggestion represents, closing the modal. */
   const runSuggestion = async (s: Suggestion) => {
     if (s.kind === 'command') {
       onClose();
-      if (replace) await withReplace(() => s.cmd.run());
-      else s.cmd.run();
+      if (replace) await withReplace(() => runLauncherAction(s.cmd.action));
+      else await runLauncherAction(s.cmd.action);
       return;
     }
     if (s.kind === 'url') {
@@ -439,7 +337,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
           autoComplete="off"
         />
         {suggestions.length > 0 && (
-          <div className="palette-results pathinput-suggestions">
+          <div className="palette-results pathinput-suggestions" ref={resultsRef}>
             {suggestions.map((s, i) => (
               <SuggestionRow
                 key={s.key}
@@ -500,7 +398,11 @@ function SuggestionRow({
   let tag: string | null = null;
 
   if (s.kind === 'command') {
-    glyph = '⌘';
+    glyph = (
+      <span className={`pathinput-tabicon pathinput-tabicon--${s.cmd.iconKind}`}>
+        <TabKindGlyph kind={s.cmd.iconKind} />
+      </span>
+    );
     title = s.cmd.keywords[0];
     subtitle = s.cmd.label;
     tag = s.cmd.category;

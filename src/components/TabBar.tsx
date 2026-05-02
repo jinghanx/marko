@@ -210,10 +210,21 @@ function KindIcon({ tab }: { tab: Tab }) {
       return <SettingsGlyph />;
     case 'sqlite':
       return <SqliteGlyph />;
+    case 'shortcuts':
+      return <ShortcutsTabGlyph />;
     case 'code':
     default:
       return <CodeGlyph />;
   }
+}
+
+function ShortcutsTabGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <rect x="2" y="4" width="12" height="8" rx="1.6" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M4.5 6.6 L4.5 6.7 M7 6.6 L7 6.7 M9.5 6.6 L9.5 6.7 M12 6.6 L12 6.7 M5 9.4 H11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 /** Renders a site favicon for web tabs. Pulls `<host>/favicon.ico` directly

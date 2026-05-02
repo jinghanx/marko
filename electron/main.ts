@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, protocol, net, safeStorage, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, protocol, net, safeStorage, clipboard, globalShortcut, screen } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -15,6 +15,10 @@ const require = createRequire(import.meta.url);
 // `app.name` everywhere. Without this we'd fall through to the bundled
 // Electron's "Electron" name in dev.
 app.setName('Marko');
+
+// Force the regular macOS activation policy at boot. Marko keeps this
+// for the lifetime of the process — dock icon never disappears.
+applyRegularActivationPolicy();
 
 // Custom scheme used by the media viewer / image viewer to stream files from
 // disk directly into <video>/<audio>/<img>. Bypasses the renderer's IPC and
@@ -38,6 +42,129 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow: BrowserWindow | null = null;
+let launcherWindow: BrowserWindow | null = null;
+/** Set when the user actually wants to quit Marko (Cmd+Q, app menu →
+ *  Quit). Lets the main-window close handler distinguish "user X'd the
+ *  window" (which we intercept to hide instead) from "user is quitting"
+ *  (which we let through). */
+let appIsQuitting = false;
+app.on('before-quit', () => { appIsQuitting = true; });
+
+/** Marko's dock icon stays visible at all times — we never flip the
+ *  activation policy after boot. Closing the main window hides it but
+ *  doesn't put us in accessory mode. */
+function applyRegularActivationPolicy() {
+  if (process.platform === 'darwin' && app.setActivationPolicy) {
+    app.setActivationPolicy('regular');
+  }
+}
+const LAUNCHER_W = 600;
+const LAUNCHER_H = 420;
+const LAUNCHER_HOTKEY = 'CommandOrControl+Alt+Space';
+
+function createLauncherWindow() {
+  if (launcherWindow) return;
+  launcherWindow = new BrowserWindow({
+    width: LAUNCHER_W,
+    height: LAUNCHER_H,
+    // Note: alwaysOnTop and visibleOnAllWorkspaces are applied only when
+    // the launcher is first shown, not at construction. Setting them at
+    // boot has been observed to interfere with the main window's drag
+    // region and dock presentation on macOS.
+    //
+    // skipTaskbar is intentionally NOT set: combining it with frameless
+    // + alwaysOnTop demotes the whole app to "accessory" activation
+    // policy on macOS (no dock icon, no ⌘Tab). Letting the launcher
+    // count as a normal window keeps Marko a regular app; the launcher's
+    // brief presence in the dock while visible is an acceptable trade.
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Hide on blur so the launcher feels ephemeral. Skipping in dev because
+  // opening DevTools blurs the window and nukes the launcher mid-debug.
+  // Skipping while dispatching so the user-action flow (which hides the
+  // launcher then shows the main window) isn't intercepted.
+  launcherWindow.on('blur', () => {
+    if (suppressLauncherBlur) return;
+    if (isDev && launcherWindow?.webContents.isDevToolsOpened()) return;
+    hideLauncher();
+  });
+  launcherWindow.on('closed', () => {
+    launcherWindow = null;
+  });
+
+  if (isDev) {
+    const devUrl = process.env.VITE_DEV_SERVER_URL!;
+    launcherWindow.loadURL(new URL('launcher.html', devUrl).toString());
+  } else {
+    launcherWindow.loadFile(path.join(__dirname, '../dist/launcher.html'));
+  }
+}
+
+function showLauncher() {
+  if (!launcherWindow) createLauncherWindow();
+  if (!launcherWindow) return;
+  // Apply the floating-overlay properties only on first show, not at
+  // construction (see createLauncherWindow comment).
+  launcherWindow.setAlwaysOnTop(true, 'floating');
+  launcherWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Recenter relative to whichever display has the cursor — multi-monitor
+  // friendly so the launcher always shows up where the user is looking.
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursor);
+  const { x, y, width, height } = display.workArea;
+  const wx = Math.round(x + (width - LAUNCHER_W) / 2);
+  // Position slightly above center for a Spotlight-like feel.
+  const wy = Math.round(y + (height - LAUNCHER_H) / 3);
+  launcherWindow.setBounds({ x: wx, y: wy, width: LAUNCHER_W, height: LAUNCHER_H });
+  launcherWindow.show();
+  launcherWindow.focus();
+  launcherWindow.webContents.send('launcher:show');
+}
+
+function toggleLauncher() {
+  if (!launcherWindow) createLauncherWindow();
+  if (!launcherWindow) return;
+  if (launcherWindow.isVisible() && launcherWindow.isFocused()) {
+    hideLauncher();
+  } else {
+    showLauncher();
+  }
+}
+
+/** Set during launcher:dispatch so the launcher's own blur listener
+ *  (fired when we hide it) doesn't run hideLauncher() → app.hide() and
+ *  block the subsequent mainWindow.show() from coming forward. */
+let suppressLauncherBlur = false;
+
+
+/** Dismiss the launcher. On macOS, app.hide() runs FIRST so Marko
+ *  deactivates and all windows vanish in a single frame — preventing
+ *  the visible "main flashes between launcher hide and app deactivate"
+ *  race. The launcher.hide() that follows marks the launcher as
+ *  explicitly orderOut'd so re-activating Marko (dock click, Cmd+Tab)
+ *  brings only the main window back, not the launcher. */
+function hideLauncher() {
+  if (!launcherWindow) return;
+  if (process.platform === 'darwin') {
+    app.hide();
+  }
+  launcherWindow.hide();
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -64,6 +191,20 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
   });
+
+  // Raycast-style lifecycle: the main window's red X / Cmd+Shift+W hides
+  // it instead of closing. Marko stays running in the background (the
+  // launcher hotkey + tray are still live) but its dock icon disappears.
+  // Cmd+Q sets appIsQuitting and bypasses this so quit still works.
+  mainWindow.on('close', (e) => {
+    if (appIsQuitting) return;
+    e.preventDefault();
+    mainWindow?.hide();
+  });
+
+  // Dock icon stays put across show/hide — no activation-policy
+  // switching. The user wants Marko's dock entry to always be there.
+
 
   if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL!);
@@ -287,7 +428,9 @@ function buildMenu() {
         },
         {
           label: 'Keyboard Shortcuts',
-          accelerator: 'CmdOrCtrl+?',
+          // Use the canonical Shift+/ form rather than '?' — Electron
+          // doesn't reliably resolve the shifted-key shorthand on macOS.
+          accelerator: 'CmdOrCtrl+Shift+/',
           click: () => sendToRenderer('menu:show-shortcuts'),
         },
         { type: 'separator' },
@@ -396,17 +539,29 @@ app.whenReady().then(() => {
 
   buildMenu();
   createWindow();
+  // Note: launcher window is created lazily on first hotkey press (see
+  // showLauncher) to avoid interfering with the main window at app boot.
 
   // Boot clipboard history watcher after window creation so the renderer is
   // available to receive 'clipboard:changed' broadcasts.
   void loadClipboardLog().then(() => startClipboardWatcher());
 
+  const ok = globalShortcut.register(LAUNCHER_HOTKEY, toggleLauncher);
+  if (!ok) console.warn('[marko] failed to register launcher hotkey', LAUNCHER_HOTKEY);
+
   app.on('activate', () => {
+    // We deliberately don't auto-show the main window here — macOS fires
+    // 'activate' for many reasons (launcher hide, focus shuffle, dock
+    // click) and we'd flash main on every launcher dismissal. Showing
+    // main is the launcher dispatch's / tray's / Cmd+Tab's job.
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('will-quit', () => {
+  // Always release the global shortcut before quitting; otherwise the next
+  // launch can fail to bind it.
+  globalShortcut.unregisterAll();
   for (const db of sqliteConnections.values()) {
     try { db.close(); } catch { /* ignore */ }
   }
@@ -2544,3 +2699,138 @@ function quoteIdent(name: string): string {
   // SQLite identifier quoting — wrap in double quotes, double up any inner ones.
   return `"${name.replace(/"/g, '""')}"`;
 }
+
+// =====================================================================
+// macOS application discovery — scan the standard `.app` folders so the
+// launcher can autocomplete + launch installed applications. Cached for
+// 30 s; refreshed on demand.
+// =====================================================================
+
+interface AppEntry {
+  name: string;
+  path: string;
+}
+
+const APP_SCAN_DIRS = [
+  '/Applications',
+  '/Applications/Utilities',
+  '/System/Applications',
+  '/System/Applications/Utilities',
+  path.join(os.homedir(), 'Applications'),
+];
+const APP_CACHE_TTL_MS = 30_000;
+let appCache: { ts: number; apps: AppEntry[] } | null = null;
+
+async function scanApps(): Promise<AppEntry[]> {
+  if (appCache && Date.now() - appCache.ts < APP_CACHE_TTL_MS) return appCache.apps;
+  const seen = new Set<string>();
+  const apps: AppEntry[] = [];
+  for (const dir of APP_SCAN_DIRS) {
+    let entries: string[] = [];
+    try {
+      entries = await fs.readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.endsWith('.app')) continue;
+      const name = entry.slice(0, -4);
+      const full = path.join(dir, entry);
+      // Dedup across dirs (e.g., a user copy at ~/Applications shadowing
+      // /Applications); first occurrence wins.
+      if (seen.has(name)) continue;
+      seen.add(name);
+      apps.push({ name, path: full });
+    }
+  }
+  apps.sort((a, b) => a.name.localeCompare(b.name));
+  appCache = { ts: Date.now(), apps };
+  return apps;
+}
+
+ipcMain.handle('apps:list', async (): Promise<AppEntry[]> => scanApps());
+
+/** Per-app icon cache, keyed by absolute path. PNG data URLs at ~64px.
+ *  Null entries are also cached so a bundle that fails once doesn't keep
+ *  retrying every keystroke. */
+const appIconCache = new Map<string, string | null>();
+
+ipcMain.handle('apps:icon', async (_e, appPath: string): Promise<string | null> => {
+  if (!appPath) return null;
+  if (appIconCache.has(appPath)) return appIconCache.get(appPath) ?? null;
+  // Each step is wrapped in its own try so a failure in resize/toDataURL
+  // (which has been observed to crash on certain .icns variants) gets
+  // caught instead of taking down the main process.
+  try {
+    const icon = await app.getFileIcon(appPath, { size: 'large' });
+    if (icon.isEmpty()) {
+      appIconCache.set(appPath, null);
+      return null;
+    }
+    let dataUrl: string;
+    try {
+      const sized = icon.resize({ width: 64, height: 64, quality: 'best' });
+      dataUrl = sized.toDataURL();
+    } catch {
+      // Fall back to the original size if resize fails.
+      try {
+        dataUrl = icon.toDataURL();
+      } catch {
+        appIconCache.set(appPath, null);
+        return null;
+      }
+    }
+    appIconCache.set(appPath, dataUrl);
+    return dataUrl;
+  } catch (err) {
+    console.warn('[marko] apps:icon failed for', appPath, (err as Error).message);
+    appIconCache.set(appPath, null);
+    return null;
+  }
+});
+
+// =====================================================================
+// Launcher window — small frameless palette woken by the global hotkey.
+// Dispatches the chosen action over to the main window and hides itself.
+// =====================================================================
+
+ipcMain.handle('launcher:hide', async () => {
+  hideLauncher();
+  return { ok: true };
+});
+
+ipcMain.handle('launcher:dispatch', async (_e, action: unknown): Promise<{ ok: boolean }> => {
+  const a = action as { type?: string; appPath?: string } | null;
+
+  // External-app launches: app.hide() first to vanish Marko in one
+  // frame, then orderOut the launcher (so it doesn't reappear on
+  // re-activation), then shell.openPath brings the target app forward.
+  if (a?.type === 'open-app' && typeof a.appPath === 'string') {
+    suppressLauncherBlur = true;
+    if (process.platform === 'darwin') app.hide();
+    launcherWindow?.hide();
+    try {
+      await shell.openPath(a.appPath);
+    } catch (err) {
+      console.warn('[marko] open-app failed:', (err as Error).message);
+    }
+    setTimeout(() => { suppressLauncherBlur = false; }, 50);
+    return { ok: true };
+  }
+
+  // Marko-internal actions need the main window. Hide the launcher
+  // (suppressing the blur-hide path so this isn't treated as a user
+  // dismiss) and bring main forward.
+  suppressLauncherBlur = true;
+  launcherWindow?.hide();
+  try {
+    if (!mainWindow) return { ok: false };
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send('launcher:run', action);
+    return { ok: true };
+  } finally {
+    setTimeout(() => { suppressLauncherBlur = false; }, 50);
+  }
+});

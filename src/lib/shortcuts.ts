@@ -15,16 +15,16 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
   {
     title: 'Files',
     items: [
-      { keys: '⌘N', label: 'new file…' },
-      { keys: '⌘O', label: 'open file…' },
-      { keys: '⌘⇧O', label: 'open folder…' },
+      { keys: '⌘N', label: 'new file' },
+      { keys: '⌘O', label: 'open file' },
+      { keys: '⌘⇧O', label: 'open folder' },
       { keys: '⌘P', label: 'quick open' },
       { keys: '⌘⇧P', label: 'quick open (replace tab)' },
       { keys: '⌘⇧F', label: 'find in files' },
       { keys: '⌘T', label: 'go to path / command' },
       { keys: '⌘⇧T', label: 'go to path (replace tab)' },
       { keys: '⌘S', label: 'save' },
-      { keys: '⌘⇧S', label: 'save as…' },
+      { keys: '⌘⇧S', label: 'save as' },
     ],
   },
   {
@@ -36,12 +36,12 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
     ],
   },
   {
-    title: 'Sessions',
+    title: 'Workspaces',
     items: [
-      { keys: '⌘⌥N', label: 'new session' },
-      { keys: '⌘⇧W', label: 'close session' },
-      { keys: '⌘⇧9', label: 'previous session' },
-      { keys: '⌘⇧0', label: 'next session' },
+      { keys: '⌘⌥N', label: 'new workspace' },
+      { keys: '⌘⇧W', label: 'close workspace' },
+      { keys: '⌘⇧9', label: 'previous workspace' },
+      { keys: '⌘⇧0', label: 'next workspace' },
     ],
   },
   {

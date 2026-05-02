@@ -146,6 +146,21 @@ export function openClipboardTab(opts: { focus?: boolean } = {}) {
   return tab;
 }
 
+/** Reveal the existing shortcuts tab if one is open, otherwise open a
+ *  fresh one. Single-instance like settings/clipboard. */
+export function openShortcutsTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const existing = workspace.getState().tabs.find((t) => t.kind === 'shortcuts');
+  if (existing) {
+    workspace.revealTab(existing.id);
+    if (focus) workspace.requestEditorFocus();
+    return existing;
+  }
+  const tab = workspace.openNewTab({ kind: 'shortcuts', title: 'Shortcuts' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
 /** Reveal the existing settings tab if one is open, otherwise open a fresh
  *  one. Settings are global, so a single instance is the right model. */
 export function openSettingsTab(opts: { focus?: boolean } = {}) {

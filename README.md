@@ -19,6 +19,18 @@ The tools above usually live in fifteen separate apps. Switching between them �
 
 Splits and sessions live alongside everything: `⌘\` splits right, `⌘=` splits down, `⌘⌥N` opens a new tmux-style session with its own workspace root. The whole layout — sessions, panes, open tabs, scratch buffers — survives restart.
 
+## Global launcher (⌘⌥Space)
+
+A Spotlight/Raycast-style mini-window you can wake from anywhere — even when Marko isn't focused, even when its window is closed.
+
+- **All ⌘T commands** — every Marko command (open terminal, git, chat, search, http, settings, clipboard, downloads, documents, …) with proper per-kind icons.
+- **macOS app launcher** — type `chrome` / `slack` / `figma` and press ↵ to launch. Apps in `/Applications`, `~/Applications`, and the system app folders are all indexed.
+- **Web search** — anything that doesn't match a command or app falls back to "Search the web for X" using your configured engine (Google · DuckDuckGo · Kagi · Bing · Brave · Custom URL).
+- **Inline calculator** — type `1234 * 5678` or `(15 + 5) * 4 / 2`; press ↵ to copy the result to the clipboard. No round-trip to the main app.
+- **Keyboard-first** — ↑↓ to navigate, ↵ to run, Tab to extend the input to the highlighted command, Esc to dismiss.
+
+Internal commands wake Marko's main window when needed; external apps and the calculator finish without touching it. Esc dismisses the launcher and returns focus to whatever app you were using before.
+
 ## What you get
 
 ### 18 tab kinds
@@ -73,12 +85,15 @@ A full cheatsheet is shown on the welcome screen and via `⌘⇧/`. Highlights:
 
 | Action | Shortcut |
 |---|---|
+| **Global launcher** (works anywhere on macOS) | `⌘⌥Space` |
 | Quick open file | `⌘P` |
 | Go to path / command | `⌘T` |
+| Clipboard history | `⌘⇧V` |
 | Find in files | `⌘⇧F` |
 | New file (with type picker) | `⌘N` |
 | Save / Save As | `⌘S` / `⌘⇧S` |
 | Close tab / pane / session | `⌘W` / `⌘⌥W` / `⌘⇧W` |
+| Jump to tab N · last tab | `⌘1` – `⌘8` · `⌘9` |
 | Previous / next tab | `⌘⇧[` / `⌘⇧]` |
 | Previous / next session | `⌘⇧9` / `⌘⇧0` |
 | New session | `⌘⌥N` |
@@ -89,7 +104,7 @@ A full cheatsheet is shown on the welcome screen and via `⌘⇧/`. Highlights:
 | Toggle markdown view mode | `⌘⇧M` |
 | Process viewer | `⌘Y` |
 | Show all shortcuts | `⌘⇧/` |
-| Preferences | `⌘,` |
+| Settings | `⌘,` |
 | Quick Look (folder) | `Space` |
 | Move to Trash | `⌘⌫` |
 | Terminal: find / clear / AI command | `⌘F` / `⌘K` / `⌘I` |

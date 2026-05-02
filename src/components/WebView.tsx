@@ -52,8 +52,17 @@ export function WebView({ tabId, url }: Props) {
       try {
         setCanBack(wv.canGoBack());
         setCanForward(wv.canGoForward());
-        setCurrentUrl(wv.getURL());
-        setAddressBar(wv.getURL());
+        const u = wv.getURL();
+        setCurrentUrl(u);
+        setAddressBar(u);
+        // Persist the navigated URL back to the tab so a restart picks
+        // up where the user left off, not where they started.
+        const cur = workspace.getState().tabs.find((t) => t.id === tabId);
+        if (cur && u && cur.filePath !== u) {
+          workspace.setState((prev) => ({
+            tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, filePath: u } : t)),
+          }));
+        }
       } catch {
         // webview not yet attached
       }
@@ -66,6 +75,13 @@ export function WebView({ tabId, url }: Props) {
     const onTitle = (e: any) => setPageTitle(e.title);
     const onMediaPlay = () => workspace.setTabPlaying(tabId, true);
     const onMediaPause = () => workspace.setTabPlaying(tabId, false);
+    // The <webview> tag runs in its own process, so click events inside
+    // it never bubble to the parent React tree — meaning Pane's
+    // onMouseDown can't focus this leaf when the user clicks INTO the
+    // webpage. Webview's 'focus' event fires whenever the embedded page
+    // takes focus (clicks, tabs, programmatic focus), and that's the
+    // hook we use to flip the focused leaf.
+    const onFocus = () => workspace.setActiveTab(tabId);
 
     wv.addEventListener('did-start-loading', onStart);
     wv.addEventListener('did-stop-loading', onStop);
@@ -74,6 +90,7 @@ export function WebView({ tabId, url }: Props) {
     wv.addEventListener('page-title-updated', onTitle);
     wv.addEventListener('media-started-playing', onMediaPlay);
     wv.addEventListener('media-paused', onMediaPause);
+    wv.addEventListener('focus', onFocus);
     return () => {
       wv.removeEventListener('did-start-loading', onStart);
       wv.removeEventListener('did-stop-loading', onStop);
@@ -82,6 +99,7 @@ export function WebView({ tabId, url }: Props) {
       wv.removeEventListener('page-title-updated', onTitle);
       wv.removeEventListener('media-started-playing', onMediaPlay);
       wv.removeEventListener('media-paused', onMediaPause);
+      wv.removeEventListener('focus', onFocus);
       workspace.setTabPlaying(tabId, false);
     };
   }, [tabId]);

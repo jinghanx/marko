@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { workspace, type PaneTree } from '../state/workspace';
 import { Pane } from './Pane';
 
@@ -39,38 +39,56 @@ function SplitContainer({
   second: React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const draggingRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  // Latest mouse position the rAF loop hasn't applied yet. We coalesce
+  // many mousemove events into one ratio update per frame — without this
+  // the editor + terminal panes burn CPU re-rendering on every event.
+  const pendingRef = useRef<{ x: number; y: number } | null>(null);
+  const rafRef = useRef<number | null>(null);
 
+  // Drag lifecycle: while `dragging` is true we render a full-window
+  // overlay that captures all pointer events (webviews and iframes
+  // otherwise swallow them in their own processes, which is what made
+  // the splitter feel stuck mid-drag). Mouse events fire on the overlay,
+  // ratio updates flow through a rAF queue.
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!draggingRef.current) return;
+    if (!dragging) return;
+    const flush = () => {
+      rafRef.current = null;
+      const p = pendingRef.current;
       const c = containerRef.current;
-      if (!c) return;
+      if (!p || !c) return;
       const r = c.getBoundingClientRect();
       const next =
         direction === 'horizontal'
-          ? (e.clientX - r.left) / r.width
-          : (e.clientY - r.top) / r.height;
+          ? (p.x - r.left) / r.width
+          : (p.y - r.top) / r.height;
       workspace.setSplitRatio(id, next);
     };
-    const onUp = () => {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+    const queue = (x: number, y: number) => {
+      pendingRef.current = { x, y };
+      if (rafRef.current == null) {
+        rafRef.current = requestAnimationFrame(flush);
+      }
     };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    const onMove = (e: MouseEvent) => queue(e.clientX, e.clientY);
+    const onUp = () => setDragging(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
     return () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      pendingRef.current = null;
     };
-  }, [id, direction]);
+  }, [dragging, direction, id]);
 
-  const onSplitterDown = () => {
-    draggingRef.current = true;
-    document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
-    document.body.style.userSelect = 'none';
+  const onSplitterDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setDragging(true);
   };
 
   return (
@@ -91,6 +109,12 @@ function SplitContainer({
       <div className="split-child" style={{ flex: 1 - ratio, minWidth: 0, minHeight: 0 }}>
         {second}
       </div>
+      {dragging && (
+        <div
+          className={`splitter-drag-overlay splitter-drag-overlay--${direction}`}
+          aria-hidden
+        />
+      )}
     </div>
   );
 }

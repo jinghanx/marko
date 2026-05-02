@@ -188,6 +188,15 @@ export function SettingsView() {
             )}
           </Section>
 
+          <Section label="Launcher">
+            <Row label="Global hotkey">
+              <HotkeyCapture
+                value={s.launcherHotkey}
+                onChange={(launcherHotkey) => settings.update({ launcherHotkey })}
+              />
+            </Row>
+          </Section>
+
           <AiProvidersSection />
       </div>
     </div>
@@ -541,4 +550,101 @@ function AiProvidersSection() {
       </div>
     </Section>
   );
+}
+
+/** Hotkey capture button. Click to start recording, press the desired
+ *  combination, the press settles into Electron's accelerator format
+ *  (e.g. "Cmd+Alt+Space"). Esc cancels recording. */
+function HotkeyCapture({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (accel: string) => void;
+}) {
+  const [recording, setRecording] = useState(false);
+
+  useEffect(() => {
+    if (!recording) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        setRecording(false);
+        return;
+      }
+      const accel = eventToAccelerator(e);
+      if (!accel) return;
+      onChange(accel);
+      setRecording(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [recording, onChange]);
+
+  return (
+    <div className="hotkey-capture">
+      <button
+        type="button"
+        className={`hotkey-capture-btn${recording ? ' hotkey-capture-btn--recording' : ''}`}
+        onClick={() => setRecording((v) => !v)}
+      >
+        {recording ? 'Press a key combo…' : prettifyAccelerator(value)}
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        onClick={() => onChange('Alt+Space')}
+        title="Reset to Option+Space"
+      >
+        Reset
+      </button>
+      <span className="settings-hint">Esc to cancel recording.</span>
+    </div>
+  );
+}
+
+/** Convert a browser KeyboardEvent into an Electron accelerator string. */
+function eventToAccelerator(e: KeyboardEvent): string {
+  // Ignore solo modifier presses — wait for an actual key.
+  if (e.key === 'Meta' || e.key === 'Alt' || e.key === 'Control' || e.key === 'Shift') {
+    return '';
+  }
+  const parts: string[] = [];
+  if (e.metaKey) parts.push('Cmd');
+  if (e.altKey) parts.push('Alt');
+  if (e.ctrlKey) parts.push('Ctrl');
+  if (e.shiftKey) parts.push('Shift');
+  let key: string;
+  if (e.key === ' ' || e.code === 'Space') key = 'Space';
+  else if (e.key === 'Enter') key = 'Return';
+  else if (e.key === 'Tab') key = 'Tab';
+  else if (e.key === 'Backspace') key = 'Backspace';
+  else if (e.key.length === 1) key = e.key.toUpperCase();
+  else if (/^F\d{1,2}$/.test(e.key)) key = e.key;
+  else key = e.key;
+  parts.push(key);
+  return parts.join('+');
+}
+
+/** Render an accelerator like "Alt+Space" as "⌥ Space" with macOS glyphs. */
+function prettifyAccelerator(accel: string): string {
+  return accel
+    .split('+')
+    .map((part) => {
+      switch (part) {
+        case 'Cmd':
+        case 'Command':
+        case 'CommandOrControl':
+        case 'CmdOrCtrl': return '⌘';
+        case 'Alt':
+        case 'Option': return '⌥';
+        case 'Ctrl':
+        case 'Control': return '⌃';
+        case 'Shift': return '⇧';
+        case 'Return': return '↵';
+        default: return part;
+      }
+    })
+    .join(' ');
 }

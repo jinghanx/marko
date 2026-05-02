@@ -59,24 +59,127 @@ html, body, #launcher-root {
   border-radius: 14px;
   overflow: hidden;
   box-shadow: var(--shadow);
+  /* System cursor is hidden everywhere in the launcher — including the
+   *  input — so the custom dot is the only pointer indicator. The text
+   *  insertion caret in the input is a separate native thing and still
+   *  shows when the input is focused. !important is needed because UA
+   *  styles (input → text, button → pointer, kbd → default) and Electron
+   *  defaults override `cursor: none` on specific elements otherwise. */
+  cursor: none !important;
+}
+.launcher,
+.launcher *,
+.launcher *::before,
+.launcher *::after {
+  cursor: none !important;
 }
 
-/* Input — large, frameless, prominent. Subtle separator below. */
-.launcher-input {
+/* Custom cursor — small accent dot that lerps to mouse position each
+ *  frame and grows over interactive elements. Sits above all content
+ *  via a high z-index. mix-blend-mode keeps it visible on any bg. */
+.custom-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.85;
+  mix-blend-mode: difference;
+  /* Width/height/opacity transitions give the size change a soft feel
+   *  even though the position itself is rAF-driven for smoothness. */
+  transition:
+    width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    margin 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease-out,
+    border-radius 200ms;
+}
+.custom-cursor--hidden {
+  opacity: 0;
+}
+.custom-cursor--hover {
+  width: 28px;
+  height: 28px;
+  margin-left: -14px;
+  margin-top: -14px;
+  opacity: 0.45;
+}
+
+/* Input — large, frameless, prominent. Subtle separator below.
+ *  Wrapped in a positioned container so the custom-rendered caret div
+ *  and the hidden text-measurement mirror can sit absolutely inside it.
+ *  caret-color: transparent hides the native caret; the visible caret
+ *  is .launcher-caret, lerped each frame toward the measured target X. */
+.launcher-input-wrap {
+  position: relative;
   flex: 0 0 auto;
-  padding: 18px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.launcher-input,
+.launcher-input-mirror {
   font-size: 18px;
   font-weight: 400;
+  font-family: var(--font-ui);
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+}
+.launcher-input {
+  display: block;
+  width: 100%;
+  padding: 18px 22px 16px;
   background: transparent;
   border: 0;
   outline: none;
   color: var(--text);
-  font-family: var(--font-ui);
-  letter-spacing: -0.005em;
-  border-bottom: 1px solid var(--border);
+  caret-color: transparent;
 }
 .launcher-input::placeholder {
   color: var(--text-subtle);
+}
+/* Hidden mirror — same typography + left padding as the input so its
+ *  measured width equals the input's text x-offset. visibility:hidden
+ *  (not display:none) preserves layout-time width measurement, but
+ *  position:absolute keeps it from affecting the visible layout. */
+.launcher-input-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+}
+/* Custom caret. Sits at the input's left padding and translates X
+ *  via JS-driven transform. Idle blink is opt-in: the .--idle modifier
+ *  is added only when the user hasn't typed for 600ms, so the glide
+ *  animation looks crisp during input. */
+.launcher-caret {
+  position: absolute;
+  /* Match the input's vertical text box: padding-top 18px, line-height
+   *  1.2 of 18px ≈ 21.6px tall. Inset 2px top/bottom to look like a
+   *  caret rather than a column. */
+  top: 20px;
+  bottom: 18px;
+  left: 22px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: none;
+  will-change: transform;
+  transform: translateX(0);
+}
+.launcher-caret--idle {
+  animation: launcher-caret-blink 1.05s steps(2, jump-none) infinite;
+}
+@keyframes launcher-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
 }
 
 /* Results scroll area. Padding gives the rows breathing room from the
@@ -85,14 +188,12 @@ html, body, #launcher-root {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 6px 8px 8px;
-  scrollbar-width: thin;
+  /* Hide the scrollbar — trackpad/wheel scroll still works, but the
+   *  visible bar was ugly against the rounded launcher chrome. */
+  scrollbar-width: none;
 }
 .launcher-results::-webkit-scrollbar {
-  width: 6px;
-}
-.launcher-results::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 3px;
+  display: none;
 }
 
 .launcher-empty {

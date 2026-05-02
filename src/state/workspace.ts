@@ -54,6 +54,11 @@ export interface LeafNode {
   id: string;
   tabIds: string[];
   activeTabId: string | null;
+  /** Stack of tab ids in this leaf ordered by most-recent activation
+   *  (most-recent first). Used by close to fall back to "the tab I was
+   *  just on" instead of "the next one in the strip". Optional for
+   *  back-compat with old snapshots; treated as empty when missing. */
+  recentlyActiveTabIds?: string[];
 }
 
 export interface SplitNode {
@@ -192,6 +197,23 @@ function mapLeaf(node: PaneTree, id: string, fn: (leaf: LeafNode) => LeafNode): 
   const c1 = mapLeaf(node.children[1], id, fn);
   if (c0 === node.children[0] && c1 === node.children[1]) return node;
   return { ...node, children: [c0, c1] };
+}
+
+const RECENT_STACK_CAP = 20;
+
+/** Set the active tab in `leaf` and push the previous active onto the
+ *  recently-active stack (most-recent first, deduped, capped). Used by
+ *  every codepath that activates a tab so the close fallback always has
+ *  a sensible "what tab was I just looking at" answer. */
+function activateTabInLeaf(leaf: LeafNode, tabId: string | null): LeafNode {
+  if (tabId === null) return { ...leaf, activeTabId: null };
+  const recent = (leaf.recentlyActiveTabIds ?? []).filter((t) => t !== tabId);
+  recent.unshift(tabId);
+  return {
+    ...leaf,
+    activeTabId: tabId,
+    recentlyActiveTabIds: recent.slice(0, RECENT_STACK_CAP),
+  };
 }
 
 // Map every leaf.
@@ -424,11 +446,9 @@ export const workspace = {
       return {
         tabs: [...prev.tabs, tab],
         sessions: patchActiveSession(prev, {
-          root: mapLeaf(active.root, active.focusedLeafId, (l) => ({
-            ...l,
-            tabIds: [...l.tabIds, tab.id],
-            activeTabId: tab.id,
-          })),
+          root: mapLeaf(active.root, active.focusedLeafId, (l) =>
+            activateTabInLeaf({ ...l, tabIds: [...l.tabIds, tab.id] }, tab.id),
+          ),
         }),
       };
     });
@@ -442,11 +462,15 @@ export const workspace = {
         const active = getActiveSession(prev);
         return {
           sessions: patchActiveSession(prev, {
-            root: mapLeaf(active.root, active.focusedLeafId, (l) => ({
-              ...l,
-              tabIds: l.tabIds.includes(existing.id) ? l.tabIds : [...l.tabIds, existing.id],
-              activeTabId: existing.id,
-            })),
+            root: mapLeaf(active.root, active.focusedLeafId, (l) =>
+              activateTabInLeaf(
+                {
+                  ...l,
+                  tabIds: l.tabIds.includes(existing.id) ? l.tabIds : [...l.tabIds, existing.id],
+                },
+                existing.id,
+              ),
+            ),
           }),
         };
       });
@@ -466,11 +490,9 @@ export const workspace = {
       return {
         tabs: [...prev.tabs, tab],
         sessions: patchActiveSession(prev, {
-          root: mapLeaf(active.root, active.focusedLeafId, (l) => ({
-            ...l,
-            tabIds: [...l.tabIds, tab.id],
-            activeTabId: tab.id,
-          })),
+          root: mapLeaf(active.root, active.focusedLeafId, (l) =>
+            activateTabInLeaf({ ...l, tabIds: [...l.tabIds, tab.id] }, tab.id),
+          ),
         }),
       };
     });
@@ -484,7 +506,7 @@ export const workspace = {
       if (!leaf) return prev;
       return {
         sessions: patchActiveSession(prev, {
-          root: mapLeaf(active.root, leaf.id, (l) => ({ ...l, activeTabId: id })),
+          root: mapLeaf(active.root, leaf.id, (l) => activateTabInLeaf(l, id)),
           focusedLeafId: leaf.id,
         }),
         focusToken: prev.focusToken + 1,
@@ -540,9 +562,10 @@ export const workspace = {
       const idx = leaf.tabIds.indexOf(leaf.activeTabId ?? '');
       const len = leaf.tabIds.length;
       const next = idx < 0 ? 0 : (idx + delta + len) % len;
+      const nextId = leaf.tabIds[next];
       return {
         sessions: patchActiveSession(prev, {
-          root: mapLeaf(active.root, leaf.id, (l) => ({ ...l, activeTabId: l.tabIds[next] })),
+          root: mapLeaf(active.root, leaf.id, (l) => activateTabInLeaf(l, nextId)),
         }),
         focusToken: prev.focusToken + 1,
       };
@@ -558,10 +581,23 @@ export const workspace = {
       if (!leaf || !leaf.tabIds.includes(id)) return prev;
       const idx = leaf.tabIds.indexOf(id);
       const tabIds = leaf.tabIds.filter((t) => t !== id);
+      // Drop the closed tab from the recent stack regardless of whether
+      // it was active.
+      const recent = (leaf.recentlyActiveTabIds ?? []).filter((t) => t !== id);
       let activeTabId = leaf.activeTabId;
-      if (activeTabId === id) activeTabId = tabIds[idx] ?? tabIds[idx - 1] ?? null;
+      if (activeTabId === id) {
+        // Fall back to the most-recently-used tab still in this leaf
+        // ("the tab I was just on") rather than positionally.
+        activeTabId =
+          recent.find((t) => tabIds.includes(t)) ?? tabIds[idx] ?? tabIds[idx - 1] ?? null;
+      }
 
-      let root = mapLeaf(active.root, leaf.id, (l) => ({ ...l, tabIds, activeTabId }));
+      let root = mapLeaf(active.root, leaf.id, (l) => ({
+        ...l,
+        tabIds,
+        activeTabId,
+        recentlyActiveTabIds: recent,
+      }));
       let focusedLeafId = active.focusedLeafId;
 
       if (tabIds.length === 0) {
@@ -593,10 +629,18 @@ export const workspace = {
       const leaf = findLeaf(active.root, leafId);
       if (!leaf) return prev;
       const tabIds = leaf.tabIds.filter((t) => !closeSet.has(t));
+      const recent = (leaf.recentlyActiveTabIds ?? []).filter((t) => !closeSet.has(t));
       let activeTabId = leaf.activeTabId;
-      if (activeTabId && closeSet.has(activeTabId)) activeTabId = tabIds[0] ?? null;
+      if (activeTabId && closeSet.has(activeTabId)) {
+        activeTabId = recent.find((t) => tabIds.includes(t)) ?? tabIds[0] ?? null;
+      }
 
-      let root = mapLeaf(active.root, leaf.id, (l) => ({ ...l, tabIds, activeTabId }));
+      let root = mapLeaf(active.root, leaf.id, (l) => ({
+        ...l,
+        tabIds,
+        activeTabId,
+        recentlyActiveTabIds: recent,
+      }));
       let focusedLeafId = active.focusedLeafId;
 
       if (tabIds.length === 0) {
@@ -854,6 +898,67 @@ export const workspace = {
       return {
         sessions: patchActiveSession(prev, {
           root: mapLeaf(active.root, leaf.id, (l) => ({ ...l, tabIds: ids })),
+        }),
+      };
+    });
+  },
+
+  /** Move a tab from one leaf to another (cross-pane drag). When the
+   *  source and target are the same leaf, this delegates to the in-leaf
+   *  reorder. The tab becomes active in its destination leaf, and the
+   *  source's active tab falls back to a neighbor when needed. */
+  moveTab(fromLeafId: string, fromIdx: number, toLeafId: string, toIdx: number) {
+    if (fromLeafId === toLeafId) {
+      workspace.reorderTabInLeaf(fromLeafId, fromIdx, toIdx);
+      return;
+    }
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      const fromLeaf = findLeaf(active.root, fromLeafId);
+      const toLeaf = findLeaf(active.root, toLeafId);
+      if (!fromLeaf || !toLeaf) return prev;
+      if (fromIdx < 0 || fromIdx >= fromLeaf.tabIds.length) return prev;
+      const tabId = fromLeaf.tabIds[fromIdx];
+      if (!tabId) return prev;
+      // If the same tab is already in toLeaf (e.g., file open in both
+      // panes), don't duplicate — just remove from source and activate
+      // the existing one in target.
+      const alreadyInTarget = toLeaf.tabIds.includes(tabId);
+      // Build new tab lists.
+      const newFromTabIds = fromLeaf.tabIds.filter((_, i) => i !== fromIdx);
+      const fromRecent = (fromLeaf.recentlyActiveTabIds ?? []).filter((t) => t !== tabId);
+      let newFromActive = fromLeaf.activeTabId;
+      if (newFromActive === tabId) {
+        newFromActive =
+          fromRecent.find((t) => newFromTabIds.includes(t)) ??
+          newFromTabIds[Math.max(0, fromIdx - 1)] ??
+          null;
+      }
+      let newToTabIds: string[];
+      let clampedToIdx = toIdx;
+      if (alreadyInTarget) {
+        newToTabIds = toLeaf.tabIds;
+      } else {
+        newToTabIds = toLeaf.tabIds.slice();
+        clampedToIdx = Math.max(0, Math.min(toIdx, newToTabIds.length));
+        newToTabIds.splice(clampedToIdx, 0, tabId);
+      }
+      // Apply both leaf updates in a single tree walk.
+      const newRoot = mapLeaf(
+        mapLeaf(active.root, fromLeafId, (l) => ({
+          ...l,
+          tabIds: newFromTabIds,
+          activeTabId: newFromActive,
+          recentlyActiveTabIds: fromRecent,
+        })),
+        toLeafId,
+        (l) =>
+          activateTabInLeaf({ ...l, tabIds: newToTabIds }, tabId),
+      );
+      return {
+        sessions: patchActiveSession(prev, {
+          root: newRoot,
+          focusedLeafId: toLeafId,
         }),
       };
     });

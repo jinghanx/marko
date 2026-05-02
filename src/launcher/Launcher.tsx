@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LAUNCHER_COMMANDS, type LauncherCommand, type LauncherAction } from '../shared/launcherActions';
-import { TabKindGlyph } from '../components/TabKindGlyph';
+import { TabKindGlyph, GlobeGlyph } from '../components/TabKindGlyph';
+import { CustomCursor } from './CustomCursor';
+import { LauncherInput } from './LauncherInput';
 
 interface AppEntry {
   name: string;
@@ -95,7 +97,11 @@ function ResultRow({
     subtitle = result.app.path;
     tag = 'App';
   } else if (result.kind === 'web-search') {
-    glyph = '🔍';
+    glyph = (
+      <span className="launcher-row-tabicon launcher-row-tabicon--web">
+        <GlobeGlyph />
+      </span>
+    );
     title = `Search the web for "${result.query}"`;
     subtitle = 'opens in a Marko web tab';
     tag = 'Search';
@@ -261,16 +267,13 @@ export function Launcher() {
 
   return (
     <div className="launcher">
-      <input
+      <CustomCursor />
+      <LauncherInput
         ref={inputRef}
-        className="launcher-input"
         value={query}
         placeholder="Run a command or open an app…"
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={setQuery}
         onKeyDown={onKeyDown}
-        spellCheck={false}
-        autoCapitalize="off"
-        autoComplete="off"
       />
       <div className="launcher-results" ref={resultsRef}>
         {results.length === 0 ? (

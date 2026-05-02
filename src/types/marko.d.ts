@@ -288,6 +288,7 @@ export interface MarkoApi {
   onLauncherRun(handler: (action: unknown) => void): () => void;
   listApps(): Promise<{ name: string; path: string }[]>;
   appIcon(appPath: string): Promise<string | null>;
+  launcherSetHotkey(accelerator: string): Promise<{ ok: boolean }>;
 
   ptySpawn(id: string, opts: { cwd?: string; cols?: number; rows?: number }): Promise<{ ok: boolean; error?: string }>;
   ptyWrite(id: string, data: string): Promise<boolean>;

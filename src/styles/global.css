@@ -793,24 +793,35 @@ button {
    *  (split-child / session-stack are flex columns) and any non-flex
    *  ancestor. Without `flex: 1`, an empty leaf with no tabs collapsed to
    *  zero height because `.welcome` has no intrinsic height when nothing
-   *  forces stretch in the flex column. */
+   *  forces stretch in the flex column.
+   *  Both min-width and min-height are zero so the pane can shrink in
+   *  either direction past its content's intrinsic size — without this,
+   *  splits could be enlarged but not shrunk (the editor's content forced
+   *  a minimum width). */
   flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   position: relative;
 }
-.pane:not(.pane--focused) {
-  opacity: 0.92;
+/* Multi-pane sessions: tint the focused pane's tab bar with a hint of
+ *  accent so the user can tell which pane is active without an outline
+ *  drawn around the whole pane. Unfocused tab bars stay at their
+ *  default neutral. Single-pane sessions keep the neutral on both
+ *  states (no need to differentiate). */
+.session-stack--multi .pane--focused .tabbar {
+  background: color-mix(in srgb, var(--accent) 14%, var(--tab-bg));
 }
 .pane:not(.pane--focused) .tab--active {
-  /* Unfocused panes dim the active-tab accent stripe + fill so attention
-   *  stays on the focused pane's active tab. */
+  /* Unfocused panes dim the active-tab accent stripe so attention stays
+   *  on the focused pane's active tab. No opacity/saturation tricks on
+   *  the rest of the pane — just the tab indicator. */
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--accent) 50%, var(--text-muted)) 0,
-    color-mix(in srgb, var(--accent) 50%, var(--text-muted)) 2px,
+    color-mix(in srgb, var(--accent) 35%, var(--text-muted)) 0,
+    color-mix(in srgb, var(--accent) 35%, var(--text-muted)) 2px,
     color-mix(in srgb, var(--tab-active-bg) 85%, var(--text-muted)) 2px
   );
   font-weight: 500;
@@ -833,6 +844,29 @@ button {
 .splitter:hover,
 .splitter:active {
   background: var(--accent);
+}
+
+/* Drag overlay — covers the whole split container while resizing so
+ *  webviews / iframes / xterm canvases (which run in separate processes
+ *  or eat events) can't swallow the mousemove/mouseup that the splitter
+ *  needs. Transparent + correct cursor + above all pane content. */
+.splitter-drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 999;
+  background: transparent;
+  user-select: none;
+}
+.splitter-drag-overlay--horizontal {
+  cursor: col-resize;
+}
+.splitter-drag-overlay--vertical {
+  cursor: row-resize;
+}
+/* The split container needs to be a positioning context so the absolute
+ *  overlay sits flush over its children. */
+.split {
+  position: relative;
 }
 
 .tabbar {
@@ -6026,6 +6060,37 @@ button {
 .settings-hint {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Hotkey capture (used in Settings → Launcher). Click-to-record button
+ *  plus a reset button. */
+.hotkey-capture {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hotkey-capture-btn {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  min-width: 120px;
+  letter-spacing: 0.04em;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 80ms ease-out, background 80ms ease-out;
+}
+.hotkey-capture-btn:hover {
+  border-color: var(--accent);
+}
+.hotkey-capture-btn--recording {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-muted));
+  color: var(--accent);
 }
 
 /* Theme swatch grid */

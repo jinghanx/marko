@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useWorkspace, workspace, findLeaf, type Tab } from '../state/workspace';
-import { useDragReorder } from '../lib/dragReorder';
+import { useTabDrag } from '../lib/tabDrag';
 
 interface TabBarProps {
   paneId: string;
@@ -38,18 +38,28 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
   }, [menu]);
 
   // All hooks must be called unconditionally — the empty-tabs early return
-  // below would skip useDragReorder otherwise and React throws "rendered
+  // below would skip useTabDrag otherwise and React throws "rendered
   // fewer hooks than expected" when the last tab in a leaf is closed.
-  const { state: drag, handlers: dragHandlers } = useDragReorder((from, to) =>
-    workspace.reorderTabInLeaf(paneId, from, to),
+  const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
+  const { state: drag, handlers: dragHandlers } = useTabDrag(
+    paneId,
+    tabIds,
+    (fromLeafId, fromIdx, toLeafId, toIdx) =>
+      workspace.moveTab(fromLeafId, fromIdx, toLeafId, toIdx),
   );
 
   // Render an empty bar with just the `+` button when the leaf has no tabs,
   // so the pane stays visually anchored and the user always has a way to
   // add a new tab (the WelcomeScreen below also has shortcuts).
   if (tabs.length === 0) {
+    // Empty tabbars are still valid drop targets so the user can drag a
+    // tab from another pane into this empty pane.
     return (
-      <div className="tabbar tabbar--empty">
+      <div
+        className="tabbar tabbar--empty"
+        onDragOver={dragHandlers.onStripDragOver}
+        onDrop={dragHandlers.onStripDrop}
+      >
         <button
           className="tab-new"
           onClick={() => workspace.openNewTab()}
@@ -74,7 +84,11 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
   };
 
   return (
-    <div className="tabbar">
+    <div
+      className="tabbar"
+      onDragOver={dragHandlers.onStripDragOver}
+      onDrop={dragHandlers.onStripDrop}
+    >
       {tabs.map((tab, i) => {
         const active = tab.id === activeTabId;
         const isDragging = drag.dragIdx === i;

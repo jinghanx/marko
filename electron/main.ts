@@ -60,7 +60,36 @@ function applyRegularActivationPolicy() {
 }
 const LAUNCHER_W = 600;
 const LAUNCHER_H = 420;
-const LAUNCHER_HOTKEY = 'CommandOrControl+Alt+Space';
+/** Default launcher hotkey before the renderer pushes the user's
+ *  configured value. The renderer's settings module pings us on boot
+ *  and on every change, so this matters for ~the first second of the
+ *  process lifetime. */
+const DEFAULT_LAUNCHER_HOTKEY = 'Alt+Space';
+let currentLauncherHotkey: string | null = null;
+
+function registerLauncherHotkey(accel: string): boolean {
+  if (currentLauncherHotkey) {
+    globalShortcut.unregister(currentLauncherHotkey);
+  }
+  if (!accel) {
+    currentLauncherHotkey = null;
+    return false;
+  }
+  try {
+    const ok = globalShortcut.register(accel, toggleLauncher);
+    if (ok) {
+      currentLauncherHotkey = accel;
+      return true;
+    }
+    console.warn('[marko] failed to register launcher hotkey', accel);
+    currentLauncherHotkey = null;
+    return false;
+  } catch (err) {
+    console.warn('[marko] launcher hotkey error', (err as Error).message);
+    currentLauncherHotkey = null;
+    return false;
+  }
+}
 
 function createLauncherWindow() {
   if (launcherWindow) return;
@@ -162,6 +191,10 @@ function hideLauncher() {
   if (!launcherWindow) return;
   if (process.platform === 'darwin') {
     app.hide();
+    // Some Electron + macOS combos quietly demote the activation policy
+    // when the launcher's frameless+alwaysOnTop window cycles. Re-apply
+    // 'regular' after the hide settles so the dock icon stays put.
+    setTimeout(applyRegularActivationPolicy, 0);
   }
   launcherWindow.hide();
 }
@@ -546,14 +579,14 @@ app.whenReady().then(() => {
   // available to receive 'clipboard:changed' broadcasts.
   void loadClipboardLog().then(() => startClipboardWatcher());
 
-  const ok = globalShortcut.register(LAUNCHER_HOTKEY, toggleLauncher);
-  if (!ok) console.warn('[marko] failed to register launcher hotkey', LAUNCHER_HOTKEY);
+  registerLauncherHotkey(DEFAULT_LAUNCHER_HOTKEY);
 
   app.on('activate', () => {
-    // We deliberately don't auto-show the main window here — macOS fires
-    // 'activate' for many reasons (launcher hide, focus shuffle, dock
-    // click) and we'd flash main on every launcher dismissal. Showing
-    // main is the launcher dispatch's / tray's / Cmd+Tab's job.
+    // Re-assert the regular activation policy on every reactivation. We
+    // don't auto-show the main window here — macOS fires 'activate' for
+    // many reasons (launcher hide, focus shuffle, dock click) and we'd
+    // flash main on every launcher dismissal.
+    applyRegularActivationPolicy();
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
@@ -2793,6 +2826,12 @@ ipcMain.handle('apps:icon', async (_e, appPath: string): Promise<string | null> 
 // Launcher window — small frameless palette woken by the global hotkey.
 // Dispatches the chosen action over to the main window and hides itself.
 // =====================================================================
+
+ipcMain.handle('launcher:set-hotkey', async (_e, accelerator: string): Promise<{ ok: boolean }> => {
+  if (typeof accelerator !== 'string' || !accelerator) return { ok: false };
+  if (accelerator === currentLauncherHotkey) return { ok: true };
+  return { ok: registerLauncherHotkey(accelerator) };
+});
 
 ipcMain.handle('launcher:hide', async () => {
   hideLauncher();

@@ -77,6 +77,9 @@ export interface Settings {
   searchEngine: SearchEngineId;
   /** When `searchEngine === 'custom'`, the URL template (must contain `{q}`). */
   customSearchUrl: string;
+  /** Global hotkey that wakes the launcher window. Electron accelerator
+   *  syntax (Cmd+Alt+Space, Alt+Space, F12, …). */
+  launcherHotkey: string;
 }
 
 export const MAX_RECENT_FILES = 30;
@@ -100,6 +103,7 @@ export const DEFAULT_SETTINGS: Settings = {
   recentUrls: [],
   searchEngine: 'google',
   customSearchUrl: 'https://example.com/?q={q}',
+  launcherHotkey: 'Alt+Space',
 };
 
 const STORAGE_KEY = 'marko:settings';
@@ -159,6 +163,19 @@ function applyToDom(s: Settings) {
 applyToDom(state);
 watchSystemTheme(() => ({ appTheme: state.theme, editorTheme: state.editorTheme }));
 
+/** Push the user's launcher hotkey to the main process. We re-send on
+ *  every settings update — main re-registers the global shortcut if the
+ *  value changed. The boot send happens here (right after initial load)
+ *  so main can override its own default with the persisted value. */
+function pushLauncherHotkey() {
+  try {
+    void window.marko.launcherSetHotkey?.(state.launcherHotkey);
+  } catch {
+    // window.marko may not be ready in some early-render edge cases.
+  }
+}
+pushLauncherHotkey();
+
 // Re-apply when system color scheme flips (so the right light/dark theme kicks in).
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (state.theme === 'system') applyToDom(state);
@@ -170,9 +187,13 @@ export const settings = {
   },
 
   update(patch: Partial<Settings>) {
+    const prev = state;
     state = { ...state, ...patch };
     persist(state);
     applyToDom(state);
+    if (state.launcherHotkey !== prev.launcherHotkey) {
+      pushLauncherHotkey();
+    }
     listeners.forEach((fn) => fn());
   },
 

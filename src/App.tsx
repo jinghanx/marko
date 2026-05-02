@@ -175,16 +175,19 @@ export function App() {
           <Sidebar />
         </aside>
         <div className="panes">
-          {sessions.map((session) => (
-            <div
-              key={session.id}
-              className="session-stack"
-              data-session-id={session.id}
-              style={{ display: session.id === activeSessionId ? 'flex' : 'none' }}
-            >
-              <PaneNode node={session.root} sessionId={session.id} />
-            </div>
-          ))}
+          {sessions.map((session) => {
+            const multi = getAllLeaves(session.root).length > 1;
+            return (
+              <div
+                key={session.id}
+                className={`session-stack${multi ? ' session-stack--multi' : ''}`}
+                data-session-id={session.id}
+                style={{ display: session.id === activeSessionId ? 'flex' : 'none' }}
+              >
+                <PaneNode node={session.root} sessionId={session.id} />
+              </div>
+            );
+          })}
         </div>
         {outlineVisible && (
           <aside className="outline">

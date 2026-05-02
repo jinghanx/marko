@@ -264,6 +264,10 @@ const api = {
     ipcRenderer.invoke('apps:list'),
   appIcon: (appPath: string): Promise<string | null> =>
     ipcRenderer.invoke('apps:icon', appPath),
+
+  // ---------- Launcher hotkey configuration ----------
+  launcherSetHotkey: (accelerator: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('launcher:set-hotkey', accelerator),
 };
 
 contextBridge.exposeInMainWorld('marko', api);

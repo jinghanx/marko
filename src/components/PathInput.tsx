@@ -161,17 +161,18 @@ export function PathInput({ open, replace = false, onClose }: Props) {
     for (const s of pathChildren) push(s);
 
     // Empty query: rank by usage recency so frequent commands bubble
-    // up. Show Marko stays first regardless — it's the launcher's
-    // home action and not a "command" in the same sense as the others.
-    const cmdMatches: Command[] = trimmed
-      ? COMMANDS.filter((c) => c.keywords.some((k) => k.startsWith(q)))
-      : [...COMMANDS].sort((a, b) => {
-          if (a.action.type === 'show-marko') return -1;
-          if (b.action.type === 'show-marko') return 1;
-          const ua = settingsState.commandUsage[a.keywords[0]] ?? 0;
-          const ub = settingsState.commandUsage[b.keywords[0]] ?? 0;
-          return ub - ua;
-        });
+    // up. `show-marko` is dropped entirely — it's the global
+    // launcher's home action; once you're already inside Marko (which
+    // is the only way to open this palette) it's a no-op.
+    const cmdMatches: Command[] = (
+      trimmed
+        ? COMMANDS.filter((c) => c.keywords.some((k) => k.startsWith(q)))
+        : [...COMMANDS].sort((a, b) => {
+            const ua = settingsState.commandUsage[a.keywords[0]] ?? 0;
+            const ub = settingsState.commandUsage[b.keywords[0]] ?? 0;
+            return ub - ua;
+          })
+    ).filter((c) => c.action.type !== 'show-marko');
     for (const cmd of cmdMatches) {
       push({ kind: 'command', cmd, key: `cmd:${cmd.keywords[0]}` });
     }

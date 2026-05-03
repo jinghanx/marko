@@ -47,7 +47,10 @@ html, body, #launcher-root {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: transparent;
+  /* Body wears the launcher's solid bg so an empty / not-yet-mounted
+   * React tree still shows a colored panel — easier to diagnose
+   * "invisible launcher" failures than a fully transparent window. */
+  background: var(--bg);
   font-family: var(--font-ui);
   color: var(--text);
   -webkit-font-smoothing: antialiased;

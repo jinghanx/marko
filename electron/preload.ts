@@ -1,24 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import * as nodeFs from 'node:fs';
-import * as nodeOs from 'node:os';
-import * as nodePath from 'node:path';
 
-/** Synchronously read ~/.marko/settings.json at preload boot so the
- *  renderer's settings module — which loads synchronously — has the
- *  persisted blob available immediately. Async IPC would force the
- *  whole settings store async, which would cascade through every
- *  consumer. Sync fs in preload is fine: preload is a Node process
- *  that runs before the renderer's first paint. */
-function readInitialSettings(): string | null {
-  try {
-    const file = nodePath.join(nodeOs.homedir(), '.marko', 'settings.json');
-    if (!nodeFs.existsSync(file)) return null;
-    return nodeFs.readFileSync(file, 'utf8');
-  } catch {
-    return null;
-  }
-}
-const initialSettings = readInitialSettings();
+/** The initial settings blob is shipped from main as a CLI argument
+ *  on the BrowserWindow's `additionalArguments`. Reading via
+ *  process.argv keeps the preload free of Node module imports
+ *  (those throw under the launcher's sandboxed preload context,
+ *  which would block contextBridge entirely → window.marko
+ *  undefined → renderer crash). */
+const SETTINGS_ARG_PREFIX = '--marko-initial-settings=';
+const settingsArg = process.argv.find((a) => a.startsWith(SETTINGS_ARG_PREFIX));
+const initialSettings = settingsArg
+  ? settingsArg.slice(SETTINGS_ARG_PREFIX.length) || null
+  : null;
 
 export interface DirEntry {
   name: string;

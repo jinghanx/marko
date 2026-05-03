@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
@@ -56,6 +56,24 @@ protocol.registerSchemesAsPrivileged([
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
+/** Cached snapshot of ~/.marko/settings.json read once at app boot.
+ *  Shipped to every BrowserWindow via webPreferences.additionalArguments
+ *  so the preload can hand it to the renderer synchronously without
+ *  having to do its own fs read (Node imports inside the preload
+ *  throw under the launcher's sandboxed context). */
+let initialSettingsBlob = '';
+function loadInitialSettingsSync(): void {
+  try {
+    const file = path.join(os.homedir(), '.marko', 'settings.json');
+    if (existsSync(file)) initialSettingsBlob = readFileSync(file, 'utf8');
+  } catch {
+    initialSettingsBlob = '';
+  }
+}
+function settingsArg(): string {
+  return `--marko-initial-settings=${initialSettingsBlob}`;
+}
 
 /** Production renderer URL — populated by `startRendererServer()`
  *  during app boot. We serve `dist/` over a random localhost port
@@ -468,6 +486,7 @@ function createLauncherWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      additionalArguments: [settingsArg()],
     },
   });
 
@@ -570,6 +589,7 @@ function createWindow() {
       // Enable Chromium's built-in PDF viewer so the PdfViewer component can
       // render PDFs in an <embed type="application/pdf">.
       plugins: true,
+      additionalArguments: [settingsArg()],
     },
   });
 
@@ -1009,6 +1029,38 @@ function buildMenu() {
 }
 
 app.whenReady().then(async () => {
+  // Read settings.json once and stash it for preload/window creation.
+  // Both the main and launcher windows inherit it via additionalArguments.
+  loadInitialSettingsSync();
+
+  // First-launch: enrol Marko in macOS Login Items so the global
+  // Cmd+Space launcher is available whenever the user logs in. We
+  // mark a flag the first time we do this so subsequent launches
+  // don't override the user's choice if they later remove Marko
+  // from System Settings → General → Login Items themselves.
+  if (process.platform === 'darwin') {
+    void (async () => {
+      try {
+        const dir = path.join(os.homedir(), '.marko');
+        await fs.mkdir(dir, { recursive: true });
+        const flagPath = path.join(dir, '.login-item-set');
+        try {
+          await fs.access(flagPath);
+          // Flag exists — user already had Marko enrolled (or
+          // explicitly opted out by removing it). Don't touch it.
+          return;
+        } catch {
+          /* fall through — first run */
+        }
+        app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
+        await fs.writeFile(flagPath, new Date().toISOString(), 'utf8');
+        console.log('[marko] enrolled in macOS login items (first launch)');
+      } catch (err) {
+        console.warn('[marko] login item enrol failed:', err);
+      }
+    })();
+  }
+
   // Stream local files into the renderer through net.fetch — supports HTTP
   // range requests so <video> seeking works without buffering the whole clip.
   protocol.handle('marko-file', (req) => {
@@ -1072,7 +1124,23 @@ app.whenReady().then(async () => {
   // available to receive 'clipboard:changed' broadcasts.
   void loadClipboardLog().then(() => startClipboardWatcher());
 
-  registerLauncherHotkey(DEFAULT_LAUNCHER_HOTKEY);
+  // Boot the launcher hotkey directly from the persisted settings
+  // file (~/.marko/settings.json) instead of waiting for the renderer
+  // to push it via IPC. The renderer push still runs once
+  // settings.ts loads, but it might not — slow load, hot-reload, blank
+  // renderer, etc. Doing it here means Cmd+Space (or whatever the
+  // user picked) is bound immediately on app start, regardless.
+  let bootHotkey = DEFAULT_LAUNCHER_HOTKEY;
+  try {
+    const raw = await fs.readFile(await settingsFilePath(), 'utf8');
+    const parsed = JSON.parse(raw) as { launcherHotkey?: unknown };
+    if (typeof parsed.launcherHotkey === 'string' && parsed.launcherHotkey) {
+      bootHotkey = parsed.launcherHotkey;
+    }
+  } catch {
+    /* file missing / unreadable — stick with the default */
+  }
+  registerLauncherHotkey(bootHotkey);
 
   app.on('activate', () => {
     // Re-assert the regular activation policy on every reactivation. We

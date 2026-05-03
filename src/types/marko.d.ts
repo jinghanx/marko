@@ -195,6 +195,13 @@ export interface MarkoApi {
   listDir(dirPath: string): Promise<DirEntry[]>;
   basename(p: string): Promise<string>;
   homeDir(): Promise<string>;
+  /** Fetch title / channel / description / isLive for a YouTube
+   *  video id by scraping its watch page. Used by the music tab's
+   *  Add Link flow to pre-fill metadata + suggest a genre. */
+  youtubeMetadata(videoId: string): Promise<
+    | { ok: true; title: string; channel: string; description: string; isLive: boolean }
+    | { ok: false; error: string }
+  >;
   configDir(): Promise<string>;
   notesPath(): Promise<string>;
   createFile(filePath: string): Promise<{ ok: boolean; error?: string }>;

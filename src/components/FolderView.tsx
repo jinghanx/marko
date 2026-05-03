@@ -547,9 +547,14 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
   };
 
   // Keyboard shortcuts: ⌘[/⌘] back/forward, ⌘↑ up.
+  // Shift must be excluded — on macOS, holding Cmd suppresses Shift's
+  // effect on KeyboardEvent.key, so Cmd+Shift+[ reports `e.key === '['`
+  // and would otherwise match. Cmd+Shift+[/] is the tab-cycle shortcut
+  // and must never trigger folder back/forward.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
+      if (e.shiftKey || e.altKey) return;
       if (e.key === '[') {
         if (canBack) {
           e.preventDefault();

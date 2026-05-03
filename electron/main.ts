@@ -1106,6 +1106,56 @@ ipcMain.handle('dir:list', async (_e, dirPath: string): Promise<DirEntry[]> => {
 
 ipcMain.handle('path:basename', async (_e, p: string) => path.basename(p));
 
+/** Fetch the YouTube watch page for a video and pull out title,
+ *  channel, description, and live-status flag. The renderer can't do
+ *  this directly because the watch page doesn't ship CORS headers;
+ *  the main process has no such restriction. Used by the music tab's
+ *  Add Link flow to pre-fill metadata + suggest a genre. */
+ipcMain.handle(
+  'youtube:metadata',
+  async (
+    _e,
+    videoId: string,
+  ): Promise<
+    | { ok: true; title: string; channel: string; description: string; isLive: boolean }
+    | { ok: false; error: string }
+  > => {
+    try {
+      const res = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
+        headers: {
+          // Default headers from Electron's main fetch are spartan and
+          // some YouTube responses redirect to a consent gate. A full
+          // browser UA short-circuits that path.
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+      const html = await res.text();
+      const decode = (raw: string): string => {
+        try {
+          return JSON.parse(`"${raw}"`);
+        } catch {
+          return raw;
+        }
+      };
+      const titleMatch = html.match(/"title":"((?:\\.|[^"\\])*)"/);
+      const channelMatch = html.match(/"author":"((?:\\.|[^"\\])*)"/);
+      const descMatch = html.match(/"shortDescription":"((?:\\.|[^"\\])*)"/);
+      return {
+        ok: true,
+        title: titleMatch ? decode(titleMatch[1]) : '',
+        channel: channelMatch ? decode(channelMatch[1]) : '',
+        description: descMatch ? decode(descMatch[1]) : '',
+        isLive: /"isLiveContent":true/.test(html) || /"isLive":true/.test(html),
+      };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  },
+);
+
 ipcMain.handle('path:home', async () => os.homedir());
 
 /** ~/.marko is Marko's per-user config/data directory. We use it for the

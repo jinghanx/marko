@@ -42,6 +42,12 @@ const api = {
   listDir: (dirPath: string): Promise<DirEntry[]> => ipcRenderer.invoke('dir:list', dirPath),
   basename: (p: string): Promise<string> => ipcRenderer.invoke('path:basename', p),
   homeDir: (): Promise<string> => ipcRenderer.invoke('path:home'),
+  youtubeMetadata: (
+    videoId: string,
+  ): Promise<
+    | { ok: true; title: string; channel: string; description: string; isLive: boolean }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('youtube:metadata', videoId),
   configDir: (): Promise<string> => ipcRenderer.invoke('marko:config-dir'),
   notesPath: (): Promise<string> => ipcRenderer.invoke('marko:notes-path'),
   createFile: (filePath: string): Promise<{ ok: boolean; error?: string }> =>

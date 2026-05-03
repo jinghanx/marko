@@ -331,11 +331,18 @@ export function WebView({ tabId, url }: Props) {
         (function () {
           if (window.__markoNavBound) return;
           window.__markoNavBound = true;
+          // Only fire on bare back/forward mouse-button presses. If
+          // any modifier is held, bail — Logitech Options+ profiles
+          // can synthesize both a keystroke (Cmd+Shift+[) and the
+          // underlying button event for the same press, and we don't
+          // want both "cycle tab" and "go back" firing at once.
           window.addEventListener('mousedown', function (e) {
+            if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
             if (e.button === 3) { e.preventDefault(); window.history.back(); }
             else if (e.button === 4) { e.preventDefault(); window.history.forward(); }
           }, true);
           window.addEventListener('auxclick', function (e) {
+            if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
             if (e.button === 3 || e.button === 4) e.preventDefault();
           }, true);
         })();

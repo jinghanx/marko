@@ -1,4 +1,24 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import * as nodeFs from 'node:fs';
+import * as nodeOs from 'node:os';
+import * as nodePath from 'node:path';
+
+/** Synchronously read ~/.marko/settings.json at preload boot so the
+ *  renderer's settings module — which loads synchronously — has the
+ *  persisted blob available immediately. Async IPC would force the
+ *  whole settings store async, which would cascade through every
+ *  consumer. Sync fs in preload is fine: preload is a Node process
+ *  that runs before the renderer's first paint. */
+function readInitialSettings(): string | null {
+  try {
+    const file = nodePath.join(nodeOs.homedir(), '.marko', 'settings.json');
+    if (!nodeFs.existsSync(file)) return null;
+    return nodeFs.readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+}
+const initialSettings = readInitialSettings();
 
 export interface DirEntry {
   name: string;
@@ -52,6 +72,12 @@ const api = {
     ipcRenderer.invoke('music-library:read'),
   musicLibraryWrite: (json: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('music-library:write', json),
+  /** Initial settings blob — read synchronously by preload from
+   *  ~/.marko/settings.json so settings.ts can hydrate without
+   *  becoming async. `null` on first run / unreadable file. */
+  initialSettings,
+  settingsWrite: (json: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('settings:write', json),
   configDir: (): Promise<string> => ipcRenderer.invoke('marko:config-dir'),
   notesPath: (): Promise<string> => ipcRenderer.invoke('marko:notes-path'),
   createFile: (filePath: string): Promise<{ ok: boolean; error?: string }> =>

@@ -3,7 +3,9 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import os from 'node:os';
+import http from 'node:http';
 import { spawn } from 'node:child_process';
 import * as pty from 'node-pty';
 import type { IPty } from 'node-pty';
@@ -54,6 +56,78 @@ protocol.registerSchemesAsPrivileged([
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
+/** Production renderer URL — populated by `startRendererServer()`
+ *  during app boot. We serve `dist/` over a random localhost port
+ *  so the renderer's origin is `http://127.0.0.1:<port>` rather
+ *  than `file://` or `marko-app://`. YouTube's embed policy only
+ *  honours http(s) origins, so without this every embedded YouTube
+ *  iframe in a packaged build refuses with Error 153. */
+let prodRendererUrl: string | null = null;
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.map': 'application/json; charset=utf-8',
+};
+
+async function startRendererServer(): Promise<string> {
+  const distDir = path.join(__dirname, '..', 'dist');
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      try {
+        const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+        let pathname = decodeURIComponent(url.pathname);
+        if (pathname === '/' || pathname === '') pathname = '/index.html';
+        const filePath = path.join(distDir, pathname);
+        // Path-traversal guard — refuse any request that escapes
+        // dist/. The local server is bound to 127.0.0.1 only, but
+        // belt-and-braces.
+        if (!filePath.startsWith(distDir)) {
+          res.statusCode = 403;
+          res.end('forbidden');
+          return;
+        }
+        const ext = path.extname(filePath).toLowerCase();
+        res.setHeader('Content-Type', MIME[ext] ?? 'application/octet-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        const stream = createReadStream(filePath);
+        stream.on('error', () => {
+          res.statusCode = 404;
+          res.end('not found');
+        });
+        stream.pipe(res);
+      } catch {
+        res.statusCode = 500;
+        res.end('error');
+      }
+    });
+    server.on('error', reject);
+    // Port 0 = let the OS pick a free port.
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address();
+      if (addr && typeof addr === 'object') {
+        resolve(`http://127.0.0.1:${addr.port}`);
+      } else {
+        reject(new Error('renderer server: no address'));
+      }
+    });
+  });
+}
 
 let mainWindow: BrowserWindow | null = null;
 let launcherWindow: BrowserWindow | null = null;
@@ -413,8 +487,10 @@ function createLauncherWindow() {
   if (isDev) {
     const devUrl = process.env.VITE_DEV_SERVER_URL!;
     launcherWindow.loadURL(new URL('launcher.html', devUrl).toString());
+  } else if (prodRendererUrl) {
+    launcherWindow.loadURL(`${prodRendererUrl}/launcher.html`);
   } else {
-    launcherWindow.loadURL('marko-app://app/launcher.html');
+    launcherWindow.loadFile(path.join(__dirname, '../dist/launcher.html'));
   }
 }
 
@@ -548,11 +624,12 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL!);
+  } else if (prodRendererUrl) {
+    // Real http://127.0.0.1 origin so YouTube embeds work — see
+    // startRendererServer() above for why this matters.
+    mainWindow.loadURL(`${prodRendererUrl}/index.html`);
   } else {
-    // Loaded via the marko-app:// protocol so the renderer's origin
-    // is a real one — YouTube embeds refuse file:// origin in
-    // production (Error 153).
-    mainWindow.loadURL('marko-app://app/index.html');
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -931,7 +1008,7 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Stream local files into the renderer through net.fetch — supports HTTP
   // range requests so <video> seeking works without buffering the whole clip.
   protocol.handle('marko-file', (req) => {
@@ -940,22 +1017,20 @@ app.whenReady().then(() => {
     return net.fetch(`file://${filePath}`);
   });
 
-  // Production renderer protocol. Maps `marko-app://app/<path>` to
-  // the matching file inside the bundled `dist/` directory. Gives the
-  // renderer a real origin (`marko-app://app`) so embed-restricted
-  // sites like YouTube don't refuse to load inside iframes.
-  const distDir = path.join(__dirname, '..', 'dist');
-  protocol.handle('marko-app', (req) => {
-    const u = new URL(req.url);
-    let pathname = decodeURIComponent(u.pathname || '/');
-    if (pathname === '/' || pathname === '') pathname = '/index.html';
-    const filePath = path.join(distDir, pathname);
-    // Path-traversal guard — refuse anything that escapes distDir.
-    if (!filePath.startsWith(distDir)) {
-      return new Response('forbidden', { status: 403 });
+  // Boot the localhost renderer server in production. We need a real
+  // http origin (not file://, not a custom scheme) because YouTube's
+  // embed policy refuses to render inside any iframe whose parent's
+  // protocol isn't http(s).
+  if (!isDev) {
+    try {
+      prodRendererUrl = await startRendererServer();
+      console.log('[marko] renderer server:', prodRendererUrl);
+    } catch (err) {
+      console.error('[marko] renderer server failed:', err);
+      // Fall back to file:// — app still works, just no YouTube
+      // embeds. Better than refusing to launch.
     }
-    return net.fetch(`file://${filePath}`);
-  });
+  }
 
   // Set the dock icon in dev (production builds get the icon from .icns).
   // Try a few candidate paths since __dirname differs between dev and prod.
@@ -1234,6 +1309,26 @@ ipcMain.handle('state:write', async (_e, json: string): Promise<{ ok: boolean }>
     const file = await statePath();
     // Atomic-ish write: write tmp then rename, so a crash mid-write doesn't
     // leave a half-written file that breaks the next launch.
+    const tmp = file + '.tmp';
+    await fs.writeFile(tmp, json, 'utf8');
+    await fs.rename(tmp, file);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+});
+
+/** App settings at ~/.marko/settings.json. Lives in the shared
+ *  dotfile dir so dev and packaged builds see the same prefs.
+ *  Initial read happens synchronously in preload (settings.ts loads
+ *  synchronously); writes go through the async IPC below. */
+async function settingsFilePath(): Promise<string> {
+  const dir = await ensureMarkoDir();
+  return path.join(dir, 'settings.json');
+}
+ipcMain.handle('settings:write', async (_e, json: string): Promise<{ ok: boolean }> => {
+  try {
+    const file = await settingsFilePath();
     const tmp = file + '.tmp';
     await fs.writeFile(tmp, json, 'utf8');
     await fs.rename(tmp, file);

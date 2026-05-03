@@ -431,10 +431,31 @@ function KindIcon({ tab }: { tab: Tab }) {
       return <SqliteGlyph />;
     case 'shortcuts':
       return <ShortcutsTabGlyph />;
+    case 'music':
+      return <MusicGlyph />;
     case 'code':
     default:
       return <CodeGlyph />;
   }
+}
+
+function MusicGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      {/* Eighth-note: stem with a beam, two filled note heads. Reads as
+        * "music" at every size and is visually distinct from the code
+        * file glyph (which has a file outline + chevrons inside). */}
+      <path
+        d="M6 11 V3 L13 2 V10"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="4.6" cy="11.2" rx="2" ry="1.4" fill="currentColor" />
+      <ellipse cx="11.6" cy="10.2" rx="2" ry="1.4" fill="currentColor" />
+    </svg>
+  );
 }
 
 function ShortcutsTabGlyph() {

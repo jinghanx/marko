@@ -117,11 +117,28 @@ export const DEFAULT_SETTINGS: Settings = {
   launcherHotkey: 'Alt+Space',
 };
 
-const STORAGE_KEY = 'marko:settings';
+const LEGACY_STORAGE_KEY = 'marko:settings';
 
 function load(): Settings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // Primary: file-backed blob from ~/.marko/settings.json (synchronously
+    // read by preload at boot). Shared across dev and packaged builds.
+    let raw =
+      typeof window !== 'undefined' ? window.marko?.initialSettings ?? null : null;
+    // Fallback: one-time migration from the old localStorage key. After
+    // the next save, the file becomes the source of truth and the old
+    // key gets cleared.
+    if (!raw && typeof localStorage !== 'undefined') {
+      raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (raw && typeof window !== 'undefined' && window.marko?.settingsWrite) {
+        void window.marko.settingsWrite(raw);
+        try {
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<Settings> & { vimMode?: boolean };
     // Migrate legacy `vimMode: boolean` → `editorKeymap`. Users who had
@@ -138,10 +155,14 @@ function load(): Settings {
 }
 
 function persist(settings: Settings) {
+  // Write to ~/.marko/settings.json via main. Fire-and-forget — the
+  // tmp+rename in main makes it safe against partial writes.
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    if (typeof window !== 'undefined' && window.marko?.settingsWrite) {
+      void window.marko.settingsWrite(JSON.stringify(settings));
+    }
   } catch {
-    // ignore quota / unavailable
+    /* main might not be ready, or non-Electron context */
   }
   // Push tray-relevant state to main so the menubar tray's submenus
   // stay current. Main can't read localStorage, so we send a minimal

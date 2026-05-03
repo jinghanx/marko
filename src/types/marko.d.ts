@@ -207,6 +207,12 @@ export interface MarkoApi {
    *  the same library. */
   musicLibraryRead(): Promise<string | null>;
   musicLibraryWrite(json: string): Promise<{ ok: boolean }>;
+  /** Settings JSON blob from ~/.marko/settings.json, read
+   *  synchronously by preload at boot so settings.ts can hydrate
+   *  without becoming async. `null` if the file doesn't exist or
+   *  couldn't be read. */
+  initialSettings: string | null;
+  settingsWrite(json: string): Promise<{ ok: boolean }>;
   configDir(): Promise<string>;
   notesPath(): Promise<string>;
   createFile(filePath: string): Promise<{ ok: boolean; error?: string }>;

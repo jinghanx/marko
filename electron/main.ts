@@ -51,11 +51,9 @@ let tray: Tray | null = null;
  *  this), so without re-applying, dev builds revert to Electron's
  *  generic icon mid-session. */
 let cachedDockIcon: Electron.NativeImage | null = null;
-/** Brand icon used in the menu-bar tray. Loaded once from the same
- *  PNG that drives the dock icon, downscaled to menu-bar size. State
- *  (visible / hidden main window) is now communicated via the tooltip
- *  only — the icon itself stays the brand mark in both states. */
-let trayIcon: Electron.NativeImage | null = null;
+/** Pre-rendered tray icons for the two main-window states. */
+let trayIconActive: Electron.NativeImage | null = null;
+let trayIconDormant: Electron.NativeImage | null = null;
 /** Renderer-pushed snapshot of tray-relevant state. The tray menu
  *  reads this directly instead of trying to access localStorage from
  *  the main process. Renderer pushes via 'tray:push-state' IPC on
@@ -198,42 +196,21 @@ function buildTrayMenu(): Menu {
   ]);
 }
 
-/** Reflect main-window visibility via tooltip only. The tray icon is
- *  the brand mark in both states (matches the dock); state is
- *  communicated through the tooltip. */
+/** Reflect main-window visibility in the tray icon. Called from the
+ *  show/hide event handlers and once at boot. */
 function updateTrayState() {
   if (!tray) return;
   const visible = !!mainWindow?.isVisible();
+  tray.setImage((visible ? trayIconActive : trayIconDormant) ?? nativeImage.createEmpty());
   tray.setToolTip(visible ? 'Marko' : 'Marko (hidden — click to open launcher)');
 }
 
-/** Load the brand icon and downscale for the menu bar. macOS uses
- *  ~22pt menu-bar icons; we render a 44px image and tag it as 2× so
- *  retina displays show it crisply at 22pt logical. NOT a template
- *  image — colors come through, same as Spotify/Slack/Notion. */
-function loadTrayIcon(): Electron.NativeImage {
-  const candidates = [
-    path.join(__dirname, '..', 'build', 'icon.png'),
-    path.join(process.cwd(), 'build', 'icon.png'),
-    path.resolve(__dirname, '..', '..', 'build', 'icon.png'),
-  ];
-  for (const candidate of candidates) {
-    try {
-      const full = nativeImage.createFromPath(candidate);
-      if (full.isEmpty()) continue;
-      const sized = full.resize({ width: 44, height: 44, quality: 'best' });
-      return nativeImage.createFromBuffer(sized.toPNG(), { scaleFactor: 2.0 });
-    } catch {
-      // try next candidate
-    }
-  }
-  return nativeImage.createEmpty();
-}
-
-function createTray() {
+async function createTray() {
   if (tray) return;
-  trayIcon = loadTrayIcon();
-  tray = new Tray(trayIcon);
+  const icons = await generateTrayIcons();
+  trayIconActive = icons.active;     // filled M — confident
+  trayIconDormant = icons.dormant;   // outlined M — quieter
+  tray = new Tray(trayIconActive);
   tray.setToolTip('Marko');
   // Single click → open the launcher. Right-click shows the context
   // menu. We don't attach the menu via setContextMenu directly,
@@ -245,6 +222,104 @@ function createTray() {
   tray.on('right-click', () => {
     tray?.popUpContextMenu(buildTrayMenu());
   });
+}
+
+/** Render the tray icons by drawing a folder silhouette with an "M"
+ *  composited onto an offscreen canvas. Two states:
+ *    - active:  filled folder with the M cut out (destination-out)
+ *    - dormant: outlined folder with a solid M inside
+ *  Marked as template images so macOS tints them for the menu bar's
+ *  light/dark mode automatically. */
+async function generateTrayIcons(): Promise<{ active: Electron.NativeImage; dormant: Electron.NativeImage }> {
+  // Hidden helper window — runs the canvas rendering in a real
+  // Chromium context so we get system font access and proper text
+  // hinting, then closes immediately.
+  const helper = new BrowserWindow({
+    width: 1,
+    height: 1,
+    show: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  // Target 20pt menu-bar height. At retina 2× that's 40 actual pixels.
+  const PT = 20;
+  const PX = PT * 2;
+  const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;background:transparent">
+<canvas id="a" width="${PX}" height="${PX}"></canvas>
+<canvas id="d" width="${PX}" height="${PX}"></canvas>
+<script>
+  // Folder geometry — tab at top-left, body below. Both rounded; the
+  // tab's bottom corners are square because the body overlaps and
+  // hides them. Sized for the 40px canvas.
+  const TAB_X = 4, TAB_Y = 6, TAB_W = 14, TAB_H = 6;
+  const BODY_X = 4, BODY_Y = 11, BODY_W = 32, BODY_H = 23;
+  const R = 3;
+
+  function drawFolder(ctx, mode) {
+    ctx.lineWidth = 1.8;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.roundRect(TAB_X, TAB_Y, TAB_W, TAB_H, [R, R, 0, 0]);
+    if (mode === 'fill') ctx.fill(); else ctx.stroke();
+    ctx.beginPath();
+    ctx.roundRect(BODY_X, BODY_Y, BODY_W, BODY_H, R);
+    if (mode === 'fill') ctx.fill(); else ctx.stroke();
+  }
+
+  function drawM(ctx, op) {
+    ctx.globalCompositeOperation = op;
+    ctx.fillStyle = '#000';
+    ctx.font = '900 ' + Math.round(${PX} * 0.42) + 'px "Futura", "Avenir Next", "SF Pro Rounded", system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('M', ${PX / 2}, BODY_Y + BODY_H / 2 + 1);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function draw(id, mode) {
+    const c = document.getElementById(id);
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, ${PX}, ${PX});
+    ctx.fillStyle = '#000';
+    ctx.strokeStyle = '#000';
+    if (mode === 'active') {
+      // Solid folder, then carve M out of it.
+      drawFolder(ctx, 'fill');
+      drawM(ctx, 'destination-out');
+    } else {
+      // Outlined folder with a solid M inside.
+      drawFolder(ctx, 'stroke');
+      drawM(ctx, 'source-over');
+    }
+    return c.toDataURL('image/png');
+  }
+  window.__icons = {
+    active:  draw('a', 'active'),
+    dormant: draw('d', 'dormant'),
+  };
+</script></body>`;
+  await helper.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  const result = (await helper.webContents.executeJavaScript('window.__icons')) as {
+    active: string;
+    dormant: string;
+  };
+  helper.destroy();
+  // dataURL → buffer → nativeImage with scaleFactor=2 so macOS treats
+  // the 40px image as 20pt logical, not 40pt.
+  const decode = (dataURL: string) => {
+    const base64 = dataURL.replace(/^data:image\/png;base64,/, '');
+    return Buffer.from(base64, 'base64');
+  };
+  const active = nativeImage.createFromBuffer(decode(result.active), { scaleFactor: 2.0 });
+  const dormant = nativeImage.createFromBuffer(decode(result.dormant), { scaleFactor: 2.0 });
+  // Template images: macOS tints them based on menu-bar appearance
+  // (white on dark, black on light, with proper hover/click highlights).
+  active.setTemplateImage(true);
+  dormant.setTemplateImage(true);
+  return { active, dormant };
 }
 
 const LAUNCHER_W = 600;
@@ -876,10 +951,10 @@ app.whenReady().then(() => {
   console.log('[marko] dock icon:', setIconResult);
 
   buildMenu();
-  // Tray now loads the brand icon directly from build/icon.png and
-  // creates the Tray instance synchronously — fast enough that no
-  // async-then-attach sequencing is needed.
-  createTray();
+  // Tray creation is async (renders the procedural M icons via a
+  // hidden BrowserWindow). Don't await — the main window can come up
+  // first; the tray icon will appear once the canvases finish.
+  void createTray();
   createWindow();
   // Note: launcher window is created lazily on first hotkey press (see
   // showLauncher) to avoid interfering with the main window at app boot.

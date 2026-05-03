@@ -46,6 +46,12 @@ export interface Tab {
   /** Pinned tabs sort to the front of every leaf they're in (Chrome-style)
    *  and survive "Close Other Tabs" / "Close Tabs to the Right". */
   pinned?: boolean;
+  /** Web tabs only — URL of the page's favicon, captured from the
+   *  webview's `page-favicon-updated` event. The TabBar uses this in
+   *  preference to the host's `/favicon.ico` since it picks up the
+   *  page-declared icon (high-res, color-correct) rather than the
+   *  blunt "/favicon.ico" probe. */
+  favicon?: string;
 }
 
 // ---------- Pane tree ----------
@@ -556,12 +562,19 @@ export const workspace = {
   },
 
   cycleTab(delta: number) {
+    // Single setState — the tab change and focus token bump happen in
+    // one notification round so subscribers re-render once, not twice.
+    // The file-tree reveal that setActiveTab does is intentionally
+    // skipped here: cycling is a fast browse action, and scrolling the
+    // sidebar on every keypress costs a synchronous layout that the
+    // user feels as lag. setActiveTab (clicking) still reveals.
     setState((prev) => {
       const active = getActiveSession(prev);
       const leaf = findLeaf(active.root, active.focusedLeafId);
       if (!leaf || leaf.tabIds.length === 0) return prev;
       const idx = leaf.tabIds.indexOf(leaf.activeTabId ?? '');
       const len = leaf.tabIds.length;
+      if (len < 2) return prev;
       const next = idx < 0 ? 0 : (idx + delta + len) % len;
       const nextId = leaf.tabIds[next];
       return {
@@ -571,7 +584,6 @@ export const workspace = {
         focusToken: prev.focusToken + 1,
       };
     });
-    revealActiveTabInTree();
   },
 
   /** Close a tab from a specific pane (leaf) within the active session. */

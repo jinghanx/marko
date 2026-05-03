@@ -1,18 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useWorkspace, workspace, findLeaf, type Tab } from '../state/workspace';
+import { useWorkspace, workspace, findLeaf, getActiveSession, type Tab } from '../state/workspace';
 import { useTabDrag } from '../lib/tabDrag';
 
 interface TabBarProps {
   paneId: string;
   sessionId: string;
+  /** Whether this tabbar's pane sits at the leftmost / rightmost edge
+   *  of the pane tree. The leftmost tabbar gets the "show sidebar"
+   *  reveal button (when sidebar is hidden); the rightmost gets the
+   *  "show outline" button (when outline is hidden). */
+  edges?: { left: boolean; right: boolean };
 }
 
-export function TabBar({ paneId, sessionId }: TabBarProps) {
+export function TabBar({ paneId, sessionId, edges = { left: true, right: true } }: TabBarProps) {
   const allTabs = useWorkspace((s) => s.tabs);
   const leaf = useWorkspace((s) => {
     const session = s.sessions.find((x) => x.id === sessionId);
     return session ? findLeaf(session.root, paneId) : null;
   });
+  // Sidebar / outline visibility — drives the toggle buttons' tooltips
+  // (the icon stays the same; only the title flips between Show/Hide).
+  // Buttons are always rendered on the outer-edge tab bars regardless
+  // of state so they sit at exactly the same pixel position whether
+  // the panel is open or closed — no visual shift on toggle.
+  const sidebarVisible = useWorkspace((s) => getActiveSession(s).sidebarVisible);
+  const outlineVisible = useWorkspace((s) => getActiveSession(s).outlineVisible);
   const tabs = useMemo(() => {
     if (!leaf) return [];
     const map = new Map(allTabs.map((t) => [t.id, t]));
@@ -60,6 +72,7 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
         onDragOver={dragHandlers.onStripDragOver}
         onDrop={dragHandlers.onStripDrop}
       >
+        {edges.left && <SidebarToggle visible={sidebarVisible} />}
         <button
           className="tab-new"
           onClick={() => workspace.openNewTab()}
@@ -67,6 +80,7 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
         >
           +
         </button>
+        {edges.right && <OutlineToggle visible={outlineVisible} />}
       </div>
     );
   }
@@ -89,6 +103,7 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
       onDragOver={dragHandlers.onStripDragOver}
       onDrop={dragHandlers.onStripDrop}
     >
+      {edges.left && <SidebarToggle visible={sidebarVisible} />}
       {tabs.map((tab, i) => {
         const active = tab.id === activeTabId;
         const isDragging = drag.dragIdx === i;
@@ -156,6 +171,7 @@ export function TabBar({ paneId, sessionId }: TabBarProps) {
       <button className="tab-new" onClick={() => workspace.openNewTab()} aria-label="New tab">
         +
       </button>
+      {edges.right && <OutlineToggle visible={outlineVisible} />}
 
       {menu && (
         <TabContextMenu
@@ -187,7 +203,7 @@ function KindIcon({ tab }: { tab: Tab }) {
     case 'folder':
       return <FolderGlyph />;
     case 'web':
-      return <WebFavicon url={tab.filePath} />;
+      return <WebFavicon url={tab.filePath} stored={tab.favicon} />;
     case 'markdown':
       return <MarkdownGlyph />;
     case 'image':
@@ -241,11 +257,15 @@ function ShortcutsTabGlyph() {
   );
 }
 
-/** Renders a site favicon for web tabs. Pulls `<host>/favicon.ico` directly
- *  (no third-party lookup service — privacy-local). On any load failure
- *  falls back to the globe glyph; same for non-http(s) URLs. */
-function WebFavicon({ url }: { url: string | null }) {
-  const [errored, setErrored] = useState(false);
+/** Renders a site favicon for web tabs. Prefers the page-declared
+ *  icon URL (captured by WebView from `page-favicon-updated`) since
+ *  that picks up real <link rel="icon"> entries with proper sizing.
+ *  Falls back to the host's `/favicon.ico` for tabs that haven't
+ *  loaded yet, and finally to the globe glyph if both fail or the
+ *  filePath isn't an http(s) URL. */
+function WebFavicon({ url, stored }: { url: string | null; stored: string | undefined }) {
+  const [erroredStored, setErroredStored] = useState(false);
+  const [erroredFallback, setErroredFallback] = useState(false);
   let host: string | null = null;
   let origin: string | null = null;
   if (url) {
@@ -259,23 +279,48 @@ function WebFavicon({ url }: { url: string | null }) {
       // ignore — non-URL filePath, fall through to globe
     }
   }
-  // Reset the error state when the URL changes (different host = retry).
+  // Reset error state when the source changes — a different host or a
+  // newly-captured stored icon should get a retry.
   useEffect(() => {
-    setErrored(false);
+    setErroredStored(false);
+  }, [stored]);
+  useEffect(() => {
+    setErroredFallback(false);
   }, [origin]);
-  if (!origin || !host || errored) return <GlobeGlyph />;
-  return (
-    <img
-      className="tab-favicon"
-      src={`${origin}/favicon.ico`}
-      alt=""
-      width={14}
-      height={14}
-      loading="lazy"
-      decoding="async"
-      onError={() => setErrored(true)}
-    />
-  );
+
+  // 1) Page-declared icon: best quality, takes priority while loadable.
+  if (stored && !erroredStored) {
+    return (
+      <img
+        className="tab-favicon"
+        src={stored}
+        alt=""
+        width={14}
+        height={14}
+        loading="lazy"
+        decoding="async"
+        onError={() => setErroredStored(true)}
+      />
+    );
+  }
+  // 2) Bare /favicon.ico probe — works for the brief window before
+  //    page-favicon-updated fires, and for sites that don't declare one.
+  if (origin && host && !erroredFallback) {
+    return (
+      <img
+        className="tab-favicon"
+        src={`${origin}/favicon.ico`}
+        alt=""
+        width={14}
+        height={14}
+        loading="lazy"
+        decoding="async"
+        onError={() => setErroredFallback(true)}
+      />
+    );
+  }
+  // 3) Globe glyph fallback.
+  return <GlobeGlyph />;
 }
 
 function SqliteGlyph() {
@@ -643,5 +688,64 @@ function TabContextMenu({
         </>
       )}
     </div>
+  );
+}
+
+/** Sidebar toggle — sits at the leftmost edge of the leftmost pane's
+ *  tab bar. Always rendered (regardless of whether the sidebar is
+ *  open or closed) so the button stays at exactly the same pixel
+ *  position across toggles. Only the icon's "filled" tint changes so
+ *  the user can tell at a glance whether the panel is currently open. */
+function SidebarToggle({ visible }: { visible: boolean }) {
+  return (
+    <button
+      className="tabbar-edge-btn"
+      onClick={() => workspace.toggleSidebar()}
+      title={`${visible ? 'Hide' : 'Show'} sidebar · ⌘E`}
+      aria-label={visible ? 'Hide sidebar' : 'Show sidebar'}
+    >
+      <PanelIcon side="left" filled={visible} />
+    </button>
+  );
+}
+
+/** Outline toggle — rightmost edge of the rightmost pane's tab bar.
+ *  Same always-rendered pattern as the sidebar toggle. The
+ *  margin-left:auto push ensures it anchors to the right edge of the
+ *  bar past the tabs and the `+` button. */
+function OutlineToggle({ visible }: { visible: boolean }) {
+  return (
+    <button
+      className="tabbar-edge-btn tabbar-edge-btn--push-right"
+      onClick={() => workspace.toggleOutline()}
+      title={`${visible ? 'Hide' : 'Show'} outline · ⌘⇧\\`}
+      aria-label={visible ? 'Hide outline' : 'Show outline'}
+    >
+      <PanelIcon side="right" filled={visible} />
+    </button>
+  );
+}
+
+/** Same pictogram as IconSidebarPanel in Sidebar.tsx: a rounded
+ *  rectangle with a thin column on the indicated side. `filled`
+ *  fills that column so users can read the toggle's current state at
+ *  a glance — filled = panel currently visible. */
+function PanelIcon({ side, filled }: { side: 'left' | 'right'; filled?: boolean }) {
+  const barX = side === 'left' ? 2.6 : 10;
+  return (
+    <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden fill="none">
+      <rect x="2" y="3.5" width="12" height="9" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      <rect
+        x={barX}
+        y="4.1"
+        width="3.4"
+        height="7.8"
+        rx="1.4"
+        fill={filled ? 'currentColor' : 'none'}
+        opacity={filled ? 0.35 : 1}
+        stroke={filled ? undefined : 'currentColor'}
+        strokeWidth={filled ? undefined : 1}
+      />
+    </svg>
   );
 }

@@ -8,19 +8,37 @@ interface Props {
    *  even when this session isn't currently the active one (we keep inactive
    *  sessions mounted to preserve <webview> playback, terminal output, etc.). */
   sessionId: string;
+  /** Whether this subtree sits at the leftmost / rightmost edge of the
+   *  whole pane tree. Threaded down so the leaf's TabBar can decide
+   *  whether to render the sidebar-reveal / outline-reveal buttons —
+   *  only the outer-edge tab bars get them. Defaults to true at the
+   *  root (a single leaf is at both edges). */
+  edges?: { left: boolean; right: boolean };
 }
 
-export function PaneNode({ node, sessionId }: Props) {
+export function PaneNode({ node, sessionId, edges = { left: true, right: true } }: Props) {
   if (node.kind === 'leaf') {
-    return <Pane leaf={node} sessionId={sessionId} />;
+    return <Pane leaf={node} sessionId={sessionId} edges={edges} />;
   }
+  // Horizontal split (children laid out left/right): the left child
+  // keeps the parent's left-edge flag and loses its right-edge flag;
+  // the right child does the inverse. Vertical splits (top/bottom)
+  // don't change horizontal-edge membership — both children inherit
+  // the parent's edge flags as-is.
+  const childEdges =
+    node.direction === 'horizontal'
+      ? [
+          { left: edges.left, right: false },
+          { left: false, right: edges.right },
+        ]
+      : [edges, edges];
   return (
     <SplitContainer
       id={node.id}
       direction={node.direction}
       ratio={node.ratio}
-      first={<PaneNode node={node.children[0]} sessionId={sessionId} />}
-      second={<PaneNode node={node.children[1]} sessionId={sessionId} />}
+      first={<PaneNode node={node.children[0]} sessionId={sessionId} edges={childEdges[0]} />}
+      second={<PaneNode node={node.children[1]} sessionId={sessionId} edges={childEdges[1]} />}
     />
   );
 }

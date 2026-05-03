@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LAUNCHER_COMMANDS, type LauncherCommand, type LauncherAction } from '../shared/launcherActions';
 import { TabKindGlyph, GlobeGlyph } from '../components/TabKindGlyph';
+import type { TabKind } from '../state/workspace';
 import { CustomCursor } from './CustomCursor';
 import { LauncherInput } from './LauncherInput';
 
@@ -69,11 +70,18 @@ function ResultRow({
   let subtitle: string;
   let tag: string;
   if (result.kind === 'command') {
-    glyph = (
-      <span className={`launcher-row-tabicon launcher-row-tabicon--${result.cmd.iconKind}`}>
-        <TabKindGlyph kind={result.cmd.iconKind} />
-      </span>
-    );
+    // The 'marko' icon kind is launcher-only (no matching TabKind), so
+    // it gets a custom branded "M" tile instead of going through
+    // TabKindGlyph. Everything else delegates to the shared glyph.
+    if (result.cmd.iconKind === 'marko') {
+      glyph = <span className="launcher-row-marko">M</span>;
+    } else {
+      glyph = (
+        <span className={`launcher-row-tabicon launcher-row-tabicon--${result.cmd.iconKind}`}>
+          <TabKindGlyph kind={result.cmd.iconKind as TabKind} />
+        </span>
+      );
+    }
     title = result.cmd.keywords[0];
     subtitle = result.cmd.label;
     tag = result.cmd.category;
@@ -127,10 +135,26 @@ function ResultRow({
   );
 }
 
+/** Read launcher-command usage timestamps from the shared localStorage
+ *  blob. The main renderer writes these; the launcher reads them to
+ *  sort empty-query results by recency. We pull on every show so
+ *  newly-recorded usage shows up without restart. */
+function readCommandUsage(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem('marko:settings');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return (parsed?.commandUsage as Record<string, number> | undefined) ?? {};
+  } catch {
+    return {};
+  }
+}
+
 export function Launcher() {
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
   const [apps, setApps] = useState<AppEntry[]>([]);
+  const [commandUsage, setCommandUsage] = useState<Record<string, number>>(readCommandUsage);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
@@ -139,6 +163,7 @@ export function Launcher() {
   useEffect(() => {
     const refresh = () => {
       window.marko.listApps().then(setApps).catch(() => {});
+      setCommandUsage(readCommandUsage());
     };
     refresh();
     const off = window.markoLauncher.onShow(() => {
@@ -163,13 +188,23 @@ export function Launcher() {
     }
 
     // Commands: prefer keyword startsWith, then label substring.
+    // Empty query: bubble recently-used commands to the top so the
+    // user's frequent picks (chat / git / terminal) sit where they're
+    // muscle-memory'd. Show Marko stays first regardless — it's the
+    // launcher's home action.
     const cmdMatches = q
       ? LAUNCHER_COMMANDS.filter(
           (c) =>
             c.keywords.some((k) => k.startsWith(q)) ||
             c.label.toLowerCase().includes(q),
         )
-      : LAUNCHER_COMMANDS;
+      : [...LAUNCHER_COMMANDS].sort((a, b) => {
+          if (a.action.type === 'show-marko') return -1;
+          if (b.action.type === 'show-marko') return 1;
+          const ua = commandUsage[a.keywords[0]] ?? 0;
+          const ub = commandUsage[b.keywords[0]] ?? 0;
+          return ub - ua;
+        });
     for (const cmd of cmdMatches) out.push({ kind: 'command', cmd });
 
     // Apps: name startsWith first, then substring. Only show on non-empty
@@ -195,7 +230,7 @@ export function Launcher() {
     }
 
     return out.slice(0, MAX_RESULTS);
-  }, [query, apps]);
+  }, [query, apps, commandUsage]);
 
   // Clamp activeIdx if the list shrinks under the cursor.
   useEffect(() => {

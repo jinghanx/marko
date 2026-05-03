@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, protocol, net, safeStorage, clipboard, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, Tray, shell, nativeImage, protocol, net, safeStorage, clipboard, globalShortcut, screen } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -43,6 +43,30 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow: BrowserWindow | null = null;
 let launcherWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+/** Cached dock-icon image, set once at boot and re-applied every time
+ *  we flip the activation policy back to 'regular' from 'accessory'.
+ *  macOS resets the dock icon to the bundle's default whenever it
+ *  re-creates the dock entry (the accessory→regular transition does
+ *  this), so without re-applying, dev builds revert to Electron's
+ *  generic icon mid-session. */
+let cachedDockIcon: Electron.NativeImage | null = null;
+/** Brand icon used in the menu-bar tray. Loaded once from the same
+ *  PNG that drives the dock icon, downscaled to menu-bar size. State
+ *  (visible / hidden main window) is now communicated via the tooltip
+ *  only — the icon itself stays the brand mark in both states. */
+let trayIcon: Electron.NativeImage | null = null;
+/** Renderer-pushed snapshot of tray-relevant state. The tray menu
+ *  reads this directly instead of trying to access localStorage from
+ *  the main process. Renderer pushes via 'tray:push-state' IPC on
+ *  every settings update. */
+let trayState: {
+  recentFiles: string[];
+  bookmarks: { name: string; path: string }[];
+} = { recentFiles: [], bookmarks: [] };
+ipcMain.on('tray:push-state', (_e, state: typeof trayState) => {
+  trayState = state ?? { recentFiles: [], bookmarks: [] };
+});
 /** Set when the user actually wants to quit Marko (Cmd+Q, app menu →
  *  Quit). Lets the main-window close handler distinguish "user X'd the
  *  window" (which we intercept to hide instead) from "user is quitting"
@@ -50,14 +74,179 @@ let launcherWindow: BrowserWindow | null = null;
 let appIsQuitting = false;
 app.on('before-quit', () => { appIsQuitting = true; });
 
+/** Timestamp (Date.now) of the most recent `did-resign-active`.
+ *  app.hide() / ⌘H / clicking another app all fire this. We use it to
+ *  distinguish "main window hidden because the whole app was hidden"
+ *  (don't switch to accessory — keep dock + ⌘Tab presence) from "main
+ *  window hidden because user clicked X" (switch to accessory). */
+let lastResignAt = 0;
+app.on('did-resign-active', () => {
+  lastResignAt = Date.now();
+});
+
 /** Marko's dock icon stays visible at all times — we never flip the
  *  activation policy after boot. Closing the main window hides it but
- *  doesn't put us in accessory mode. */
+ *  doesn't put us in accessory mode.
+ *  Note: do NOT call app.dock.show() here. On macOS that internally
+ *  invokes NSApplication.unhide:, which can re-activate Marko and
+ *  steal focus from other apps the user is trying to use. */
 function applyRegularActivationPolicy() {
   if (process.platform === 'darwin' && app.setActivationPolicy) {
     app.setActivationPolicy('regular');
   }
 }
+
+/** Bring the main window forward — used as the universal "before X"
+ *  step for tray menu items that need a visible main window. */
+function bringMainForward() {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+/** Send a path to the renderer for the standard "open file/folder"
+ *  flow, after bringing main forward. */
+function trayOpenPath(p: string) {
+  if (!p) return;
+  bringMainForward();
+  mainWindow?.webContents.send('tray:open-path', p);
+}
+
+/** Build the tray icon's right-click menu. Rebuilt every time the
+ *  state changes so labels stay accurate ("Show Marko" vs "Hide Marko")
+ *  and the recent-files / bookmarks submenus reflect the latest state. */
+function buildTrayMenu(): Menu {
+  const mainVisible = !!mainWindow?.isVisible();
+  // Recent files: shorten long paths for menu display ("…/parent/leaf").
+  const fmtPath = (p: string) => {
+    const parts = p.split('/').filter(Boolean);
+    if (parts.length <= 2) return p;
+    return '…/' + parts.slice(-2).join('/');
+  };
+  const recentItems: Electron.MenuItemConstructorOptions[] =
+    trayState.recentFiles.slice(0, 10).map((p) => ({
+      label: fmtPath(p),
+      toolTip: p,
+      click: () => trayOpenPath(p),
+    }));
+  const bookmarkItems: Electron.MenuItemConstructorOptions[] =
+    trayState.bookmarks.slice(0, 12).map((b) => ({
+      label: b.name,
+      toolTip: b.path,
+      click: () => trayOpenPath(b.path),
+    }));
+
+  return Menu.buildFromTemplate([
+    {
+      label: 'Open Launcher',
+      accelerator: currentLauncherHotkey ?? undefined,
+      click: () => toggleLauncher(),
+    },
+    { type: 'separator' },
+    {
+      label: mainVisible ? 'Hide Main Window' : 'Show Marko',
+      click: () => {
+        if (!mainWindow) return;
+        if (mainWindow.isVisible()) mainWindow.hide();
+        else bringMainForward();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Recent Files',
+      enabled: recentItems.length > 0,
+      submenu: recentItems.length > 0
+        ? recentItems
+        : [{ label: '(none yet)', enabled: false }],
+    },
+    {
+      label: 'Workspace Bookmarks',
+      enabled: bookmarkItems.length > 0,
+      submenu: bookmarkItems.length > 0
+        ? bookmarkItems
+        : [{ label: '(none yet — bookmark a folder in Settings)', enabled: false }],
+    },
+    { type: 'separator' },
+    {
+      label: 'Preferences…',
+      click: () => {
+        bringMainForward();
+        mainWindow?.webContents.send('menu:preferences');
+      },
+    },
+    {
+      label: 'Activity (Process Viewer)',
+      click: () => {
+        bringMainForward();
+        mainWindow?.webContents.send('menu:process-viewer');
+      },
+    },
+    {
+      label: 'Keyboard Shortcuts',
+      click: () => {
+        bringMainForward();
+        mainWindow?.webContents.send('menu:show-shortcuts');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit Marko',
+      accelerator: 'Cmd+Q',
+      click: () => app.quit(),
+    },
+  ]);
+}
+
+/** Reflect main-window visibility via tooltip only. The tray icon is
+ *  the brand mark in both states (matches the dock); state is
+ *  communicated through the tooltip. */
+function updateTrayState() {
+  if (!tray) return;
+  const visible = !!mainWindow?.isVisible();
+  tray.setToolTip(visible ? 'Marko' : 'Marko (hidden — click to open launcher)');
+}
+
+/** Load the brand icon and downscale for the menu bar. macOS uses
+ *  ~22pt menu-bar icons; we render a 44px image and tag it as 2× so
+ *  retina displays show it crisply at 22pt logical. NOT a template
+ *  image — colors come through, same as Spotify/Slack/Notion. */
+function loadTrayIcon(): Electron.NativeImage {
+  const candidates = [
+    path.join(__dirname, '..', 'build', 'icon.png'),
+    path.join(process.cwd(), 'build', 'icon.png'),
+    path.resolve(__dirname, '..', '..', 'build', 'icon.png'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      const full = nativeImage.createFromPath(candidate);
+      if (full.isEmpty()) continue;
+      const sized = full.resize({ width: 44, height: 44, quality: 'best' });
+      return nativeImage.createFromBuffer(sized.toPNG(), { scaleFactor: 2.0 });
+    } catch {
+      // try next candidate
+    }
+  }
+  return nativeImage.createEmpty();
+}
+
+function createTray() {
+  if (tray) return;
+  trayIcon = loadTrayIcon();
+  tray = new Tray(trayIcon);
+  tray.setToolTip('Marko');
+  // Single click → open the launcher. Right-click shows the context
+  // menu. We don't attach the menu via setContextMenu directly,
+  // because that overrides the click handler too — instead we open it
+  // explicitly on right-click.
+  tray.on('click', () => {
+    toggleLauncher();
+  });
+  tray.on('right-click', () => {
+    tray?.popUpContextMenu(buildTrayMenu());
+  });
+}
+
 const LAUNCHER_W = 600;
 const LAUNCHER_H = 420;
 /** Default launcher hotkey before the renderer pushes the user's
@@ -96,16 +285,12 @@ function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
     width: LAUNCHER_W,
     height: LAUNCHER_H,
-    // Note: alwaysOnTop and visibleOnAllWorkspaces are applied only when
-    // the launcher is first shown, not at construction. Setting them at
-    // boot has been observed to interfere with the main window's drag
-    // region and dock presentation on macOS.
-    //
-    // skipTaskbar is intentionally NOT set: combining it with frameless
-    // + alwaysOnTop demotes the whole app to "accessory" activation
-    // policy on macOS (no dock icon, no ⌘Tab). Letting the launcher
-    // count as a normal window keeps Marko a regular app; the launcher's
-    // brief presence in the dock while visible is an acceptable trade.
+    // Normal NSWindow type. Tried 'panel' to avoid activation-policy
+    // demotion on launcher show, but with the offscreen anchor window
+    // already keeping Marko classified as regular, the panel type was
+    // unnecessary and might have been triggering its own demotion path
+    // (when an NSPanel is the only "real" frontmost window, macOS can
+    // still classify the app as utility).
     show: false,
     frame: false,
     transparent: true,
@@ -163,6 +348,11 @@ function showLauncher() {
   launcherWindow.show();
   launcherWindow.focus();
   launcherWindow.webContents.send('launcher:show');
+  // No setActivationPolicy() here. The anchor window keeps Marko
+  // classified as regular continuously, and re-asserting at runtime
+  // calls activate() under the hood — which forces the main window
+  // forward (whether it was hidden or in the background). The whole
+  // point of this design is "launcher is independent of main window".
 }
 
 function toggleLauncher() {
@@ -189,14 +379,11 @@ let suppressLauncherBlur = false;
  *  brings only the main window back, not the launcher. */
 function hideLauncher() {
   if (!launcherWindow) return;
-  if (process.platform === 'darwin') {
-    app.hide();
-    // Some Electron + macOS combos quietly demote the activation policy
-    // when the launcher's frameless+alwaysOnTop window cycles. Re-apply
-    // 'regular' after the hide settles so the dock icon stays put.
-    setTimeout(applyRegularActivationPolicy, 0);
-  }
   launcherWindow.hide();
+  // No re-assertion — the anchor window is the source of truth for
+  // activation policy. setActivationPolicy('regular') here would
+  // re-activate the app and bring main forward, defeating the
+  // launcher-independent-of-main design.
 }
 
 function createWindow() {
@@ -226,8 +413,7 @@ function createWindow() {
   });
 
   // Raycast-style lifecycle: the main window's red X / Cmd+Shift+W hides
-  // it instead of closing. Marko stays running in the background (the
-  // launcher hotkey + tray are still live) but its dock icon disappears.
+  // it instead of closing. Marko stays running in the background.
   // Cmd+Q sets appIsQuitting and bypasses this so quit still works.
   mainWindow.on('close', (e) => {
     if (appIsQuitting) return;
@@ -235,8 +421,40 @@ function createWindow() {
     mainWindow?.hide();
   });
 
-  // Dock icon stays put across show/hide — no activation-policy
-  // switching. The user wants Marko's dock entry to always be there.
+  // Tie activation policy to main-window visibility:
+  //   visible main window → 'regular' → dock icon, in ⌘Tab
+  //   hidden main window → 'accessory' → no dock, no ⌘Tab, but Marko
+  //                                       still runs and the launcher
+  //                                       hotkey still works.
+  // The launcher's "Show Marko" command (or any other path that calls
+  // mainWindow.show()) flips us back to regular automatically. This
+  // matches every other macOS app's mental model — dock icon presence
+  // tracks "the app has a window open" — so we stop fighting the OS.
+  if (process.platform === 'darwin') {
+    mainWindow.on('show', () => {
+      app.setActivationPolicy('regular');
+      // accessory→regular re-creates the dock entry from the bundle's
+      // default icon (Electron's diamond in dev). Re-apply our cached
+      // PNG so the dock always shows Marko's brand mark.
+      if (cachedDockIcon && app.dock) {
+        app.dock.setIcon(cachedDockIcon);
+      }
+      updateTrayState();
+    });
+    mainWindow.on('hide', () => {
+      // If the app just became inactive (within 200ms), this hide is
+      // a side-effect of app.hide() — i.e., ⌘H or another app stole
+      // focus. Keep regular policy so the user can ⌘Tab back. Only
+      // window-only hides (X-button click, programmatic .hide()) flip
+      // us to accessory mode.
+      if (Date.now() - lastResignAt < 200) {
+        updateTrayState();
+        return;
+      }
+      app.setActivationPolicy('accessory');
+      updateTrayState();
+    });
+  }
 
 
   if (isDev) {
@@ -262,20 +480,80 @@ function createWindow() {
  *  during the popup auth flow are visible to the originating webview. */
 app.on('web-contents-created', (_e, contents) => {
   if (contents.getType() !== 'webview') return;
-  contents.setWindowOpenHandler(({ url }) => ({
-    action: 'allow',
-    overrideBrowserWindowOptions: {
-      width: 520,
-      height: 640,
-      parent: mainWindow ?? undefined,
-      modal: false,
-      autoHideMenuBar: true,
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    },
-  }));
+  contents.setWindowOpenHandler(({ url, features }) => {
+    // OAuth and share-sheet flows call window.open(url, '_blank',
+    // 'width=520,height=640,...') — any explicit width/height in
+    // `features` means the source wanted a sized popup, not a tab.
+    // Keep those as separate floating windows so sign-in flows still
+    // work end-to-end.
+    const isSizedPopup = /\b(width|height|top|left)\s*=/.test(features || '');
+    if (isSizedPopup) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 520,
+          height: 640,
+          parent: mainWindow ?? undefined,
+          modal: false,
+          autoHideMenuBar: true,
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+          },
+        },
+      };
+    }
+    // Anything else — middle-click, ⌘-click, target="_blank", plain
+    // window.open — forward to the main renderer to open as a Marko
+    // web tab. We don't filter on `disposition` because Chromium
+    // sometimes reports edge cases as 'other' or 'default' for
+    // perfectly normal links.
+    if (url) {
+      console.log('[marko] webview:open-url forwarding:', url);
+      mainWindow?.webContents.send('webview:open-url', url);
+    }
+    return { action: 'deny' };
+  });
+
+  // Tab-navigation shortcuts: a focused <webview> normally swallows
+  // these keys before they reach Marko's app menu, so once a user
+  // clicks into a web tab they can't ⌘⇧[ / ⌘⇧] back out. Intercept
+  // them at the guest's before-input-event and forward to the main
+  // renderer so the menu IPC handler runs as if the keystroke had
+  // hit the host window.
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const cmd = input.meta || input.control;
+    if (!cmd || input.alt) return;
+    const send = (channel: string) => {
+      event.preventDefault();
+      mainWindow?.webContents.send(channel);
+    };
+    if (input.shift) {
+      if (input.key === ']' || input.key === '}') return send('menu:next-tab');
+      if (input.key === '[' || input.key === '{') return send('menu:prev-tab');
+      // ⌘⇧9 / ⌘⇧0 → prev/next session. Shifted forms ('(' / ')') are
+      // what input.key reports on US layouts; the bare digits cover
+      // layouts/keyboards that don't shift to the parens.
+      if (input.key === '9' || input.key === '(') return send('menu:prev-session');
+      if (input.key === '0' || input.key === ')') return send('menu:next-session');
+    } else {
+      // ⌘1-8 and ⌘9 — tab jump shortcuts also get eaten by the guest.
+      if (/^[1-8]$/.test(input.key)) return send(`menu:goto-tab-${input.key}`);
+      if (input.key === '9') return send('menu:goto-tab-last');
+      // ⌘W — close current Marko tab. The webview otherwise has no
+      // close-tab semantics, so it's safe to forward.
+      if (input.key === 'w' || input.key === 'W') return send('menu:close-tab');
+      // ⌘H — hide the app. macOS's standard hide shortcut also gets
+      // eaten by the guest, so we need to call app.hide() directly
+      // here rather than rely on the menu role accelerator.
+      if (input.key === 'h' || input.key === 'H') {
+        event.preventDefault();
+        app.hide();
+        return;
+      }
+    }
+  });
 });
 
 function buildMenu() {
@@ -301,8 +579,26 @@ function buildMenu() {
               { type: 'separator' },
               { role: 'services' },
               { type: 'separator' },
-              { role: 'hide' },
-              { role: 'hideOthers' },
+              // Explicit click handler instead of `role: 'hide'`. The
+              // role's auto-bound accelerator wasn't always firing
+              // (suspect: focus state or menu rebuild timing). Calling
+              // app.hide() directly via the click handler is the
+              // canonical macOS hide behavior.
+              {
+                label: `Hide ${app.name}`,
+                accelerator: 'Command+H',
+                click: () => {
+                  console.log('[marko] menu Hide clicked');
+                  app.hide();
+                },
+              },
+              {
+                label: 'Hide Others',
+                accelerator: 'Command+Alt+H',
+                click: () => {
+                  Menu.sendActionToFirstResponder?.('hideOtherApplications:');
+                },
+              },
               { role: 'unhide' },
               { type: 'separator' },
               { role: 'quit' },
@@ -569,6 +865,7 @@ app.whenReady().then(() => {
       }
       if (process.platform === 'darwin' && app.dock) {
         app.dock.setIcon(icon);
+        cachedDockIcon = icon;
       }
       setIconResult = `ok (${candidate})`;
       break;
@@ -579,6 +876,10 @@ app.whenReady().then(() => {
   console.log('[marko] dock icon:', setIconResult);
 
   buildMenu();
+  // Tray now loads the brand icon directly from build/icon.png and
+  // creates the Tray instance synchronously — fast enough that no
+  // async-then-attach sequencing is needed.
+  createTray();
   createWindow();
   // Note: launcher window is created lazily on first hotkey press (see
   // showLauncher) to avoid interfering with the main window at app boot.
@@ -2849,12 +3150,13 @@ ipcMain.handle('launcher:hide', async () => {
 ipcMain.handle('launcher:dispatch', async (_e, action: unknown): Promise<{ ok: boolean }> => {
   const a = action as { type?: string; appPath?: string } | null;
 
-  // External-app launches: app.hide() first to vanish Marko in one
-  // frame, then orderOut the launcher (so it doesn't reappear on
-  // re-activation), then shell.openPath brings the target app forward.
+  // External-app launches: hide the launcher (it's a macOS panel, so
+  // hiding returns focus naturally — no app.hide() needed) and let
+  // shell.openPath bring the target app forward. Removed the prior
+  // app.hide() here because it was occasionally demoting Marko's
+  // activation policy and stealing focus on re-show.
   if (a?.type === 'open-app' && typeof a.appPath === 'string') {
     suppressLauncherBlur = true;
-    if (process.platform === 'darwin') app.hide();
     launcherWindow?.hide();
     try {
       await shell.openPath(a.appPath);

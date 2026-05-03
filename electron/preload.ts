@@ -230,6 +230,29 @@ const api = {
     return () => ipcRenderer.removeListener(channel, listener);
   },
 
+  // Plain new-tab links inside a <webview> are forwarded here from
+  // main so the renderer can open them as Marko web tabs.
+  onWebviewOpenUrl: (handler: (url: string) => void) => {
+    const listener = (_e: unknown, url: string) => handler(url);
+    ipcRenderer.on('webview:open-url', listener);
+    return () => ipcRenderer.removeListener('webview:open-url', listener);
+  },
+
+  /** Push a snapshot of tray-relevant state to the main process so
+   *  the tray menu can show recent files / bookmarks without reading
+   *  localStorage from main (which it can't). Called from the
+   *  renderer's settings module on every persisted change. */
+  trayPushState: (state: { recentFiles: string[]; bookmarks: { name: string; path: string }[] }) =>
+    ipcRenderer.send('tray:push-state', state),
+
+  /** Tray click → open a file/folder. Main sends these when the user
+   *  picks an item from the tray's recent-files / bookmarks submenu. */
+  onTrayOpenPath: (handler: (path: string) => void) => {
+    const listener = (_e: unknown, path: string) => handler(path);
+    ipcRenderer.on('tray:open-path', listener);
+    return () => ipcRenderer.removeListener('tray:open-path', listener);
+  },
+
   // ---------- Terminal ----------
   ptySpawn: (id: string, opts: { cwd?: string; cols?: number; rows?: number }) =>
     ipcRenderer.invoke('pty:spawn', id, opts),

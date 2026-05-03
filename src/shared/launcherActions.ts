@@ -4,6 +4,7 @@
  *  window's renderer, so no functions or DOM references. */
 
 export type LauncherAction =
+  | { type: 'show-marko' }
   | { type: 'open-terminal' }
   | { type: 'open-chat' }
   | { type: 'open-search' }
@@ -25,6 +26,7 @@ export type LauncherAction =
  *  command. Defined as a string union here (not imported from
  *  state/workspace) so this module stays decoupled from the renderer. */
 export type LauncherIconKind =
+  | 'marko'
   | 'terminal'
   | 'chat'
   | 'search'
@@ -52,6 +54,17 @@ export interface LauncherCommand {
 }
 
 export const LAUNCHER_COMMANDS: LauncherCommand[] = [
+  // Show Marko itself first — the empty-query default. Pressing Enter
+  // immediately brings the main window forward without doing anything
+  // else; the dispatch already calls mainWindow.show() for internal
+  // actions, so this only needs a no-op renderer handler.
+  {
+    keywords: ['marko', 'show', 'window', 'main', 'home', 'app'],
+    label: 'Show Marko',
+    category: 'Marko',
+    iconKind: 'marko',
+    action: { type: 'show-marko' },
+  },
   {
     keywords: ['terminal', 'term', 'shell', 'tty'],
     label: 'Open Terminal',

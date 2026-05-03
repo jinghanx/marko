@@ -76,6 +76,11 @@ export interface Settings {
   workspaceBookmarks: WorkspaceBookmark[];
   /** Most-recently-opened file paths, newest first. Capped at MAX_RECENT_FILES. */
   recentFiles: string[];
+  /** Last-used timestamp per launcher-command keyword (e.g., "chat",
+   *  "git"). Drives the ⌘T / launcher empty-query order so commands
+   *  the user actually uses bubble to the top. The keyword is the
+   *  command's canonical name (keywords[0]). */
+  commandUsage: Record<string, number>;
   /** Most-recently-opened URLs (web tabs), newest first. Same cap. */
   recentUrls: string[];
   /** Search engine used by ⌘T's web-search fallback. */
@@ -105,6 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showHiddenFiles: false,
   workspaceBookmarks: [],
   recentFiles: [],
+  commandUsage: {},
   recentUrls: [],
   searchEngine: 'google',
   customSearchUrl: 'https://example.com/?q={q}',
@@ -137,10 +143,38 @@ function persist(settings: Settings) {
   } catch {
     // ignore quota / unavailable
   }
+  // Push tray-relevant state to main so the menubar tray's submenus
+  // stay current. Main can't read localStorage, so we send a minimal
+  // snapshot. Guarded by typeof since the launcher window also imports
+  // this module but doesn't need to push (main is fed by main window).
+  try {
+    if (typeof window !== 'undefined' && window.marko?.trayPushState) {
+      window.marko.trayPushState({
+        recentFiles: settings.recentFiles,
+        bookmarks: settings.workspaceBookmarks.map((b) => ({ name: b.name, path: b.path })),
+      });
+    }
+  } catch {
+    // ignore — main might not be ready, or we're in a non-Electron context
+  }
 }
 
 let state: Settings = load();
 const listeners = new Set<() => void>();
+// Push initial tray state once at boot so the tray menu shows recent
+// files / bookmarks even if the user hasn't changed any settings yet.
+// Wrapped in try because the launcher window also imports this module
+// and may not have the marko bridge.
+try {
+  if (typeof window !== 'undefined' && window.marko?.trayPushState) {
+    window.marko.trayPushState({
+      recentFiles: state.recentFiles,
+      bookmarks: state.workspaceBookmarks.map((b) => ({ name: b.name, path: b.path })),
+    });
+  }
+} catch {
+  // ignore
+}
 
 function effectiveDark(theme: ThemeMode): boolean {
   if (theme === 'dark') return true;
@@ -224,6 +258,16 @@ export const settings = {
       MAX_RECENT_FILES,
     );
     state = { ...state, recentFiles: next };
+    persist(state);
+    listeners.forEach((fn) => fn());
+  },
+
+  /** Record that the user just ran a launcher command. The launcher
+   *  reads commandUsage to bubble recently-used commands to the top
+   *  on empty query (Spotlight/Raycast-style). */
+  bumpCommandUsage(keyword: string) {
+    if (!keyword) return;
+    state = { ...state, commandUsage: { ...state.commandUsage, [keyword]: Date.now() } };
     persist(state);
     listeners.forEach((fn) => fn());
   },

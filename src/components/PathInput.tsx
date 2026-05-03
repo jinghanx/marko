@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useWorkspace, getActiveSession } from '../state/workspace';
+import { useWorkspace, getActiveSession, type TabKind } from '../state/workspace';
 import { useSettings, buildSearchUrl } from '../state/settings';
 import {
   openFileFromPath,
@@ -12,6 +12,7 @@ import {
 import { LAUNCHER_COMMANDS, type LauncherCommand } from '../shared/launcherActions';
 import { runLauncherAction } from '../lib/runLauncherAction';
 import { TabKindGlyph } from './TabKindGlyph';
+import { useGlideCaret } from '../lib/useGlideCaret';
 
 type Command = LauncherCommand;
 
@@ -53,6 +54,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const homeDirRef = useRef<string | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null);
+  const { mirrorRef, caretRef, bumpInput, recompute } = useGlideCaret(inputRef, value);
 
   useEffect(() => {
     if (!open) return;
@@ -158,11 +160,29 @@ export function PathInput({ open, replace = false, onClose }: Props) {
 
     for (const s of pathChildren) push(s);
 
+    // Empty query: rank by usage recency so frequent commands bubble
+    // up. Show Marko stays first regardless — it's the launcher's
+    // home action and not a "command" in the same sense as the others.
     const cmdMatches: Command[] = trimmed
       ? COMMANDS.filter((c) => c.keywords.some((k) => k.startsWith(q)))
-      : COMMANDS;
+      : [...COMMANDS].sort((a, b) => {
+          if (a.action.type === 'show-marko') return -1;
+          if (b.action.type === 'show-marko') return 1;
+          const ua = settingsState.commandUsage[a.keywords[0]] ?? 0;
+          const ub = settingsState.commandUsage[b.keywords[0]] ?? 0;
+          return ub - ua;
+        });
     for (const cmd of cmdMatches) {
       push({ kind: 'command', cmd, key: `cmd:${cmd.keywords[0]}` });
+    }
+
+    // If the typed value parses as a URL, surface it as the first
+    // selectable suggestion. Without this it lived only in the meta
+    // hint line below the list, which arrow-keys couldn't reach — so
+    // the bottom row in the popup looked picked-able but wasn't.
+    if (trimmed && looksLikeUrl(trimmed)) {
+      const direct = normalizeUrl(trimmed);
+      push({ kind: 'url', url: direct, key: `url:${direct}` });
     }
 
     const urlMatches = trimmed
@@ -185,7 +205,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
     }
 
     return out.slice(0, MAX_LIST);
-  }, [value, pathChildren, recentUrls]);
+  }, [value, pathChildren, recentUrls, settingsState.commandUsage]);
 
   // Keep activeIndex in range as suggestions change.
   useEffect(() => {
@@ -320,22 +340,32 @@ export function PathInput({ open, replace = false, onClose }: Props) {
   return (
     <div className="modal-backdrop palette-backdrop" onClick={onClose}>
       <div className="palette pathinput" onClick={(e) => e.stopPropagation()}>
-        <input
-          ref={inputRef}
-          className="palette-input"
-          value={value}
-          placeholder={replace
-            ? 'Path, URL, or command — replaces current tab…'
-            : 'Path, URL, or command (try chat, git, find, http…)'}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setError(null);
-          }}
-          onKeyDown={onKeyDown}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoComplete="off"
-        />
+        <div className="palette-input-wrap">
+          <input
+            ref={inputRef}
+            className="palette-input"
+            value={value}
+            placeholder={replace
+              ? 'Path, URL, or command — replaces current tab…'
+              : 'Path, URL, or command (try chat, git, find, http…)'}
+            onChange={(e) => {
+              bumpInput();
+              setValue(e.target.value);
+              setError(null);
+            }}
+            onKeyDown={(e) => {
+              bumpInput();
+              onKeyDown(e);
+            }}
+            onKeyUp={recompute}
+            onClick={recompute}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoComplete="off"
+          />
+          <span ref={mirrorRef} className="palette-input-mirror" aria-hidden />
+          <div ref={caretRef} className="palette-caret" aria-hidden />
+        </div>
         {suggestions.length > 0 && (
           <div className="palette-results pathinput-suggestions" ref={resultsRef}>
             {suggestions.map((s, i) => (
@@ -353,10 +383,6 @@ export function PathInput({ open, replace = false, onClose }: Props) {
         <div className="pathinput-meta">
           {error ? (
             <span className="pathinput-error">{error}</span>
-          ) : value && looksLikeUrl(value.trim()) ? (
-            <span className="pathinput-resolved" title={normalizeUrl(value)}>
-              🌐 {normalizeUrl(value)}
-            </span>
           ) : value && !suggestions.find((s) => s.kind === 'path') ? (
             <span className="pathinput-resolved" title={resolvePath(value)}>
               → {resolvePath(value)}
@@ -398,11 +424,15 @@ function SuggestionRow({
   let tag: string | null = null;
 
   if (s.kind === 'command') {
-    glyph = (
-      <span className={`pathinput-tabicon pathinput-tabicon--${s.cmd.iconKind}`}>
-        <TabKindGlyph kind={s.cmd.iconKind} />
-      </span>
-    );
+    if (s.cmd.iconKind === 'marko') {
+      glyph = <span className="pathinput-marko">M</span>;
+    } else {
+      glyph = (
+        <span className={`pathinput-tabicon pathinput-tabicon--${s.cmd.iconKind}`}>
+          <TabKindGlyph kind={s.cmd.iconKind as TabKind} />
+        </span>
+      );
+    }
     title = s.cmd.keywords[0];
     subtitle = s.cmd.label;
     tag = s.cmd.category;

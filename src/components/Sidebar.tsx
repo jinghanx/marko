@@ -366,9 +366,10 @@ export function Sidebar() {
           >
             {showHidden ? <IconEye /> : <IconEyeOff />}
           </IconBtn>
-          <IconBtn label="Hide sidebar" onClick={toggleSidebar} kbd="⌘E">
-            <IconSidebarPanel filled />
-          </IconBtn>
+          {/* Sidebar visibility is now toggled from the leftmost
+              pane's tab bar (TabBar.tsx → SidebarRevealButton). One
+              button stays in the same place whether the panel is open
+              or closed, so toggling doesn't visibly shift it. */}
         </div>
       </div>
       <div

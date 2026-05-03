@@ -8,7 +8,7 @@ import { NewFilePicker } from './components/NewFilePicker';
 import { PathInput } from './components/PathInput';
 import { SessionStrip } from './components/SessionStrip';
 import { NowPlaying } from './components/NowPlaying';
-import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab, openClipboardTab, openSettingsTab, openShortcutsTab } from './lib/actions';
+import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab, openClipboardTab, openSettingsTab, openShortcutsTab, openUrlInTab, openFileFromPath } from './lib/actions';
 import { uiBus } from './lib/uiBus';
 import { resetWorkspaceAndReload } from './lib/persistence';
 import { runLauncherAction } from './lib/runLauncherAction';
@@ -73,6 +73,18 @@ export function App() {
         console.log('[marko] onLauncherRun fired with action:', action);
         void runLauncherAction(action as Parameters<typeof runLauncherAction>[0]);
       }),
+      // New-tab links inside web tabs are forwarded from main — open
+      // them as a Marko web tab in the active session.
+      window.marko.onWebviewOpenUrl?.((url) => {
+        console.log('[marko] webview:open-url received:', url);
+        openUrlInTab(url);
+      }) ?? (() => {}),
+      // Tray menu → recent file / workspace bookmark click. Main
+      // dispatches the path; we route through the standard
+      // openFileFromPath which handles files OR folders correctly.
+      window.marko.onTrayOpenPath?.((path) => {
+        void openFileFromPath(path, { focus: true });
+      }) ?? (() => {}),
       uiBus.on('open-palette', () => setModal({ kind: 'palette', replace: false })),
       uiBus.on('open-settings', () => openSettingsTab()),
       uiBus.on('open-process-viewer', () => openProcessTab()),
@@ -212,3 +224,4 @@ export function App() {
     </div>
   );
 }
+

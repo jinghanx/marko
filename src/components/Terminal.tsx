@@ -70,6 +70,12 @@ export function Terminal({ tabId }: Props) {
   const xtermRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
+  // Smooth-glide custom cursor (mirrors the launcher input's lerping
+  // caret). xterm's built-in cursor is hidden via CSS; this DOM
+  // overlay tracks the buffer cursor and slides between positions.
+  const cursorRef = useRef<HTMLDivElement | null>(null);
+  const cursorTargetRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  const cursorCurrentRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
   const rootDir = useWorkspace((s) => getActiveSession(s).rootDir);
   const codeFont = useSettings().codeFont;
@@ -237,6 +243,69 @@ export function Terminal({ tabId }: Props) {
     fitRef.current = fit;
     searchRef.current = search;
 
+    // ---- smooth-glide cursor ----------------------------------------
+    // Track xterm's logical cursor position and drive a DOM overlay
+    // that lerps toward it each animation frame. Same easing model as
+    // the launcher input (k=0.35: snappy on backspace, readable on
+    // glide). xterm's native cursor layer is hidden via CSS so the
+    // overlay is the only thing the user sees blink/move.
+    const computeCursorTarget = () => {
+      const cursor = cursorRef.current;
+      if (!cursor) return;
+      // The overlay sits in .terminal-wrap; xterm renders into
+      // .xterm-screen inside .terminal-host. Compute the screen's
+      // offset within the wrap and add it to the per-cell cursor
+      // coordinates so the overlay lands exactly on the grid.
+      const screen = host.querySelector('.xterm-screen') as HTMLElement | null;
+      const box = screen ?? host;
+      const cellW = box.clientWidth / term.cols;
+      const cellH = box.clientHeight / term.rows;
+      if (cellW <= 0 || cellH <= 0) return;
+      const wrap = cursor.parentElement;
+      let offsetX = 0;
+      let offsetY = 0;
+      if (wrap) {
+        const wrapRect = wrap.getBoundingClientRect();
+        const boxRect = box.getBoundingClientRect();
+        offsetX = boxRect.left - wrapRect.left;
+        offsetY = boxRect.top - wrapRect.top;
+      }
+      const buf = term.buffer.active;
+      cursorTargetRef.current = {
+        x: offsetX + buf.cursorX * cellW,
+        y: offsetY + buf.cursorY * cellH,
+        w: cellW,
+        h: cellH,
+      };
+    };
+    const cursorMoveDispose = term.onCursorMove(computeCursorTarget);
+    const cursorResizeDispose = term.onResize(computeCursorTarget);
+    // Initial position once xterm has measured its cells.
+    requestAnimationFrame(() => {
+      computeCursorTarget();
+      // Snap on first frame so the overlay doesn't fly in from (0,0).
+      cursorCurrentRef.current = { ...cursorTargetRef.current };
+    });
+    let cursorRaf = 0;
+    const cursorTick = () => {
+      const cursor = cursorRef.current;
+      const t = cursorTargetRef.current;
+      const c = cursorCurrentRef.current;
+      const k = 0.35;
+      c.x += (t.x - c.x) * k;
+      c.y += (t.y - c.y) * k;
+      c.w += (t.w - c.w) * k;
+      c.h += (t.h - c.h) * k;
+      if (cursor) {
+        cursor.style.transform = `translate3d(${c.x}px, ${c.y}px, 0)`;
+        cursor.style.width = `${c.w}px`;
+        cursor.style.height = `${c.h}px`;
+      }
+      cursorRaf = requestAnimationFrame(cursorTick);
+    };
+    cursorRaf = requestAnimationFrame(cursorTick);
+    // ---- end smooth-glide cursor ------------------------------------
+
     const cols = term.cols;
     const rows = term.rows;
 
@@ -305,6 +374,9 @@ export function Terminal({ tabId }: Props) {
     return () => {
       host.removeEventListener('keydown', onKeyDown);
       ro.disconnect();
+      cancelAnimationFrame(cursorRaf);
+      cursorMoveDispose.dispose();
+      cursorResizeDispose.dispose();
       onUserInput.dispose();
       linkDispose.dispose();
       urlLinkDispose.dispose();
@@ -432,6 +504,10 @@ export function Terminal({ tabId }: Props) {
   return (
     <div className="terminal-wrap">
       <div ref={hostRef} className="terminal-host" tabIndex={0} />
+      {/* Smooth-glide cursor overlay — sibling of terminal-host, not a
+          child, because xterm rearranges its host's DOM children
+          internally. Positioned absolutely over the host via CSS. */}
+      <div ref={cursorRef} className="terminal-glide-cursor" aria-hidden />
       {searchOpen && (
         <div className="terminal-search">
           <input

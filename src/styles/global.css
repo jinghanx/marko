@@ -287,9 +287,11 @@ button {
   gap: 6px;
   padding: 0 12px 0 14px;
   margin: 0;
-  /* Pill-shaped sessions vs rounded-rectangle file tabs — same bubble
-   *  language but visually distinct so the user can tell at a glance
-   *  which row they're acting on. */
+  /* Pill-shaped sessions vs rounded-rectangle file tabs — the shape
+   *  alone signals which row you're acting on, so we don't need
+   *  bubble fills on inactive ones to communicate "tab". Transparent
+   *  inactive + clear active accent matches the file-tab treatment
+   *  but the pill silhouette keeps the two rows distinct. */
   border-radius: 999px;
   /* The strip is a drag region; tabs opt out so clicks still register. */
   -webkit-app-region: no-drag;
@@ -301,13 +303,15 @@ button {
   user-select: none;
   min-width: 0;
   max-width: 200px;
-  background: color-mix(in srgb, var(--text) 12%, var(--tab-bg));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, var(--tab-bg));
+  background: transparent;
   transition: background 80ms ease-out, color 80ms ease-out;
 }
 .session-tab:hover {
   color: var(--text);
-  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
+  /* Sessions have no icon to anchor inactive ones the way file tabs
+   *  do, so the hover fill is a touch more present (8% vs 6%) to
+   *  make the pill silhouette readable on first click attempt. */
+  background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 /* Active session: solid accent fill on the pill — no top stripe (pill
  *  shape reads cleaner with a uniform colored fill). */
@@ -367,22 +371,22 @@ button {
   justify-content: center;
   width: 28px;
   margin: 0;
-  /* Match the pill shape of session tabs. */
+  /* Pill shape to match session tabs. */
   border-radius: 999px;
   font-size: 14px;
   line-height: 1;
-  color: var(--text-muted);
+  color: var(--text-subtle, var(--text-muted));
   border: 0;
   cursor: pointer;
   -webkit-app-region: no-drag;
-  /* Match the bubble treatment of the surrounding session tabs. */
-  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, var(--tab-bg));
-  transition: background 80ms ease-out;
+  /* Ghost button — transparent at rest, subtle fill on hover. Matches
+   *  the demoted bubble treatment of inactive session tabs. */
+  background: transparent;
+  transition: background 80ms ease-out, color 80ms ease-out;
 }
 .session-tab-new:hover {
   color: var(--text);
-  background: color-mix(in srgb, var(--text) 30%, var(--tab-bg));
+  background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 /* Drag-reorder feedback for session tabs. The dragged tab dims; the drop
@@ -412,6 +416,7 @@ button {
   width: 0;
   border-right-color: transparent;
 }
+
 .sidebar--hidden .sidebar-inner {
   /* keep content laid out at full width while clipping, so it doesn't reflow during animation */
   width: var(--sidebar-w);
@@ -896,19 +901,20 @@ button {
   padding: 0 12px 0 14px;
   margin: 0;
   border-radius: 10px;
-  /* Inactive bubble fill + edge: shift the tabbar bg ~22% toward the
-   *  foreground color and ring with a hairline so each bubble has a
-   *  definitive silhouette against the tabbar regardless of theme. The
-   *  ring uses box-shadow (not border) so it doesn't change layout. */
-  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, var(--tab-bg));
+  /* Inactive tabs are intentionally near-invisible — just icon + text
+   *  floating on the tabbar strip. The active tab does the heavy
+   *  lifting of "this is the current view"; making inactives chunky
+   *  bubbles competes with it and reads as cluttered (Chrome/Arc both
+   *  go this way). The gap between tabs and the active bubble's
+   *  obvious fill provide all the structure we need. */
+  background: transparent;
   font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;
   min-width: 0;
   max-width: 220px;
   user-select: none;
-  transition: background 80ms ease-out;
+  transition: background 80ms ease-out, color 80ms ease-out;
 }
 .tab-icon {
   flex: 0 0 auto;
@@ -964,6 +970,19 @@ button {
 .pathinput-tabicon--clipboard { color: #d97757; }
 .pathinput-tabicon--settings { color: var(--text-muted); }
 .pathinput-tabicon--music { color: #b56eff; }
+.pathinput-marko {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #f0883e 0%, #d97757 100%);
+  box-shadow: 0 1px 2px rgba(217, 119, 87, 0.35);
+}
 
 /* Drag-reorder feedback for file tabs. */
 .tab--dragging { opacity: 0.4; }
@@ -998,6 +1017,41 @@ button {
   text-decoration-style: dotted;
   text-decoration-color: var(--accent);
   cursor: pointer;
+}
+
+/* Hide xterm's built-in cursor canvas — the smooth-glide overlay below
+ *  is the only cursor the user sees. visibility:hidden (not display:
+ *  none) preserves layout, which keeps xterm's measurement correct. */
+.terminal-host .xterm-cursor-layer {
+  visibility: hidden;
+}
+
+/* Smooth-glide cursor overlay — block-style, lerps between cursor
+ *  positions each frame via JS-driven translate3d. Mirrors the
+ *  launcher input's caret feel: snappy on backspace, gliding on
+ *  cursor-jumps. Lives in .terminal-wrap as a sibling of the host
+ *  because xterm rearranges its host's children. */
+.terminal-glide-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  background: var(--accent);
+  opacity: 0.55;
+  border-radius: 1px;
+  pointer-events: none;
+  will-change: transform, width, height;
+  transform: translate3d(0, 0, 0);
+  z-index: 5;
+  /* mix-blend-mode keeps the cursor visible against any character
+   *  beneath it without obscuring the glyph. */
+  mix-blend-mode: difference;
+}
+/* Dim further when the terminal isn't focused (matches xterm's
+ *  "outline cursor" behavior for unfocused terminals). */
+.terminal-host:not(:focus-within) ~ .terminal-glide-cursor {
+  opacity: 0.25;
 }
 
 /* Search overlay — Cmd+F. Sits in the top-right corner. */
@@ -1136,18 +1190,63 @@ button {
   opacity: 0.5;
   cursor: default;
 }
-.webview-address {
+/* Address-bar wrap holds the input + glide caret overlay. The wrap
+ *  is the flex item so the input can fill it without disturbing
+ *  toolbar layout. */
+.webview-address-wrap {
+  position: relative;
   flex: 1;
+  display: flex;
+}
+.webview-address,
+.webview-address-mirror {
   font-family: var(--font-mono);
   font-size: 12px;
+  letter-spacing: normal;
+  line-height: 1.2;
+}
+.webview-address {
+  flex: 1;
+  width: 100%;
   padding: 4px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--bg);
   color: var(--text);
   outline: none;
+  caret-color: transparent;
 }
 .webview-address:focus { border-color: var(--accent); }
+.webview-address-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+}
+.webview-address-caret {
+  position: absolute;
+  /* The address bar has 1px border + 4px top padding; align caret to
+   *  the visible text baseline. */
+  top: 6px;
+  bottom: 6px;
+  left: 11px;
+  width: 1.5px;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: none;
+  will-change: transform;
+  transform: translateX(0);
+}
+.webview-address-caret.glide-caret--idle {
+  animation: webview-address-caret-blink 1.05s steps(2, jump-none) infinite;
+}
+@keyframes webview-address-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
 .webview-frame {
   flex: 1;
   width: 100%;
@@ -1169,9 +1268,10 @@ button {
 
 .tab:hover {
   color: var(--text);
-  /* Slightly tint the bubble fill on hover so the tab visibly responds
-   *  before clicking. */
-  background: color-mix(in srgb, var(--text) 8%, var(--tab-bg));
+  /* Subtle fill appears on hover so users get clear feedback that
+   *  the area is clickable, without the inactive tabs competing
+   *  visually with the active one. */
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 .tab--active,
@@ -1218,19 +1318,20 @@ button {
 }
 
 .tab-close {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   font-size: 14px;
   line-height: 1;
   color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
 }
 
 .tab-close:hover {
-  background: var(--border);
+  background: color-mix(in srgb, var(--text) 14%, transparent);
   color: var(--text);
 }
 
@@ -1278,16 +1379,47 @@ button {
   border-radius: 10px;
   font-size: 16px;
   line-height: 1;
-  color: var(--text-muted);
-  /* Match the bubble treatment of the surrounding file tabs. */
-  background: color-mix(in srgb, var(--text) 22%, var(--tab-bg));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, var(--tab-bg));
-  transition: background 80ms ease-out;
+  color: var(--text-subtle, var(--text-muted));
+  /* Ghost button — transparent at rest, subtle fill on hover. Matches
+   *  the demoted bubble treatment of inactive file tabs. */
+  background: transparent;
+  transition: background 80ms ease-out, color 80ms ease-out;
 }
 
 .tab-new:hover {
   color: var(--text);
-  background: color-mix(in srgb, var(--text) 30%, var(--tab-bg));
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+/* Sidebar / outline reveal buttons docked at the tab bar's outer
+ *  edges. Same look as the sidebar's own IconBtn (close button) —
+ *  square 22x22 ghost button with subtle hover fill — so the four
+ *  panel-toggle controls (close sidebar, reveal sidebar, close
+ *  outline, reveal outline) read as one consistent control set. */
+.tabbar-edge-btn {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  margin: 0 4px;
+}
+.tabbar-edge-btn:hover {
+  color: var(--text);
+  background: var(--bg-elev);
+}
+/* Anchors a tabbar-edge-btn to the right edge of the bar, regardless
+ *  of how many tabs precede it. Used by the outline reveal button. */
+.tabbar-edge-btn--push-right {
+  margin-left: auto;
 }
 
 .editor-pane {
@@ -1715,7 +1847,10 @@ button {
 }
 
 /* File palette (⌘P) */
-.palette-backdrop {
+/* Anchor the palette to the top, not the center, so the input box stays
+ *  put as the suggestion list grows or shrinks under it. The combined
+ *  selector beats the later .modal-backdrop rule's align-items:center. */
+.modal-backdrop.palette-backdrop {
   align-items: flex-start;
   padding-top: 96px;
 }
@@ -1730,18 +1865,62 @@ button {
   overflow: hidden;
   max-height: calc(100vh - 192px);
 }
-.palette-input {
+/* Palette input wrap holds the input + mirror + glide caret. The
+ *  mirror is hidden but matches the input's typography so it can
+ *  measure the caret-prefix width; the caret div is positioned
+ *  absolutely and translated by useGlideCaret each frame. */
+.palette-input-wrap {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+.palette-input,
+.palette-input-mirror {
   font-family: var(--font-ui);
   font-size: 14px;
+  letter-spacing: normal;
+  line-height: 1.2;
+}
+.palette-input {
+  display: block;
+  width: 100%;
   padding: 12px 16px;
   border: 0;
   background: transparent;
   color: var(--text);
   outline: none;
-  border-bottom: 1px solid var(--border);
+  /* Hide the native caret; the .palette-caret overlay is the visible one. */
+  caret-color: transparent;
 }
 .palette-input::placeholder {
   color: var(--text-muted);
+}
+.palette-input-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+}
+.palette-caret {
+  position: absolute;
+  top: 14px;
+  bottom: 12px;
+  left: 16px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: none;
+  will-change: transform;
+  transform: translateX(0);
+}
+.palette-caret.glide-caret--idle {
+  animation: palette-caret-blink 1.05s steps(2, jump-none) infinite;
+}
+@keyframes palette-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
 }
 .palette-results {
   flex: 1;
@@ -2297,8 +2476,36 @@ button {
   padding: 14px 0;
 }
 .codemirror-host .cm-content {
-  caret-color: var(--accent);
+  /* Native browser caret hidden — the glideCursorExtension renders
+   *  the visible one. We keep the value defined (transparent) so a
+   *  fallback environment without the extension still styles cleanly. */
+  caret-color: transparent;
   padding: 0 16px;
+}
+
+/* Smooth-glide cursor for CodeMirror — overlay div appended to
+ *  contentDOM by glideCursorExtension, positioned via translate3d
+ *  each frame. Lerps between editor selection-head positions. */
+.codemirror-host .cm-glide-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1.6px;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: none;
+  will-change: transform, height;
+  transform: translate3d(0, 0, 0);
+  /* z-index above selection but below text — matches default
+   *  .cm-cursor stacking. */
+  z-index: 1;
+}
+.codemirror-host .cm-glide-cursor.glide-caret--idle {
+  animation: cm-glide-caret-blink 1.05s steps(2, jump-none) infinite;
+}
+@keyframes cm-glide-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
 }
 /* Match the vim block cursor's overlaid character to the surrounding text. */
 .codemirror-host .cm-fat-cursor {
@@ -6097,7 +6304,9 @@ button {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 0 12px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;

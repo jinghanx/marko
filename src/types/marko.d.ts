@@ -285,6 +285,9 @@ export interface MarkoApi {
   gitCreateTag(repoDir: string, name: string, message: string): Promise<{ ok: boolean; error?: string }>;
   gitDeleteTag(repoDir: string, name: string): Promise<{ ok: boolean; error?: string }>;
   onMenu(channel: string, handler: () => void): () => void;
+  onWebviewOpenUrl(handler: (url: string) => void): () => void;
+  trayPushState(state: { recentFiles: string[]; bookmarks: { name: string; path: string }[] }): void;
+  onTrayOpenPath(handler: (path: string) => void): () => void;
   onLauncherRun(handler: (action: unknown) => void): () => void;
   listApps(): Promise<{ name: string; path: string }[]>;
   appIcon(appPath: string): Promise<string | null>;

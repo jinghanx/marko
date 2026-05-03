@@ -2,6 +2,7 @@ import { createElement, useEffect, useRef, useState } from 'react';
 import { useWorkspace, workspace, findLeaf, getActiveSession } from '../state/workspace';
 import { normalizeUrl } from '../lib/actions';
 import { uiBus } from '../lib/uiBus';
+import { useGlideCaret } from '../lib/useGlideCaret';
 
 interface Props {
   tabId: string;
@@ -28,6 +29,15 @@ export function WebView({ tabId, url }: Props) {
   const [loading, setLoading] = useState(true);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const addressRef = useRef<HTMLInputElement | null>(null);
+  const { mirrorRef: addrMirrorRef, caretRef: addrCaretRef, bumpInput: addrBump, recompute: addrRecompute } =
+    useGlideCaret(addressRef, addressBar);
+  // Snapshot the initial URL once at mount. The webview owns its
+  // current URL internally after that — we MUST NOT pass `url` (which
+  // updates as sync() writes navigation back to tab.filePath) into the
+  // src attribute, because writing to the webview's src on every
+  // re-render triggers another navigation, causing visible flashes
+  // when clicking links inside the page.
+  const initialUrlRef = useRef(url);
   const isActive = useWorkspace((s) => {
     const session = getActiveSession(s);
     const focused = findLeaf(session.root, session.focusedLeafId);
@@ -58,6 +68,64 @@ export function WebView({ tabId, url }: Props) {
     });
   }, [isActive]);
 
+  // History navigation triggers — fire from any of three sources:
+  //   1. MX-style mouse side buttons (button 3 / 4) outside the webview
+  //   2. Cmd+[ / Cmd+] (macOS browser-history shortcut)
+  //   3. The toolbar's chevron buttons (wired below in the JSX)
+  // Most users with Logitech mice on macOS have the side buttons
+  // mapped to Cmd+[ / Cmd+] by the Options+ driver, so the keyboard
+  // path is the one that usually fires. The mouse-button path covers
+  // people with raw button-3/4 mappings and clicks on the toolbar.
+  useEffect(() => {
+    if (!isActive) return;
+    const navigate = (delta: -1 | 1) => {
+      const wv = wvRef.current;
+      if (!wv) return;
+      try {
+        if (delta < 0 && wv.canGoBack()) wv.goBack();
+        else if (delta > 0 && wv.canGoForward()) wv.goForward();
+      } catch {
+        // webview detached
+      }
+    };
+    const onMouse = (e: MouseEvent) => {
+      if (e.button !== 3 && e.button !== 4) return;
+      // Don't navigate if the click was outside this webview's host —
+      // multiple web tabs in different panes shouldn't all react.
+      const wv = wvRef.current;
+      if (!wv) return;
+      const host = (wv as unknown as HTMLElement).closest('.webview-host') as HTMLElement | null;
+      const target = e.target as Node | null;
+      if (!host || !target || !host.contains(target)) return;
+      e.preventDefault();
+      navigate(e.button === 3 ? -1 : 1);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // Cmd+[ / Cmd+] only — must be the modifier-only shortcut, not
+      // Shift+Cmd+[ (used for tab cycling) or any other combo.
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.shiftKey || e.altKey) return;
+      // Don't hijack the address bar's own field shortcuts — leaving
+      // the keystroke alone there lets users navigate text selection
+      // with arrow keys etc. without competing.
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+      if (e.key === '[') {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === ']') {
+        e.preventDefault();
+        navigate(1);
+      }
+    };
+    window.addEventListener('mousedown', onMouse);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onMouse);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [isActive]);
+
   useEffect(() => {
     const wv = wvRef.current;
     if (!wv) return;
@@ -86,6 +154,18 @@ export function WebView({ tabId, url }: Props) {
       sync();
     };
     const onTitle = (e: any) => setPageTitle(e.title);
+    // Capture the page-declared favicon URL and stash it on the tab.
+    // Pages emit this event for any <link rel="icon"> they ship; we
+    // pick the first (most-relevant) entry. The TabBar reads tab.favicon
+    // and prefers it over the blunt /favicon.ico probe.
+    const onFavicon = (e: any) => {
+      const urls: string[] | undefined = e?.favicons;
+      const url = urls && urls.length > 0 ? urls[0] : null;
+      if (!url) return;
+      workspace.setState((prev) => ({
+        tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, favicon: url } : t)),
+      }));
+    };
     const onMediaPlay = () => workspace.setTabPlaying(tabId, true);
     const onMediaPause = () => workspace.setTabPlaying(tabId, false);
     // The <webview> tag runs in its own process, so click events inside
@@ -101,6 +181,7 @@ export function WebView({ tabId, url }: Props) {
     wv.addEventListener('did-navigate', sync);
     wv.addEventListener('did-navigate-in-page', sync);
     wv.addEventListener('page-title-updated', onTitle);
+    wv.addEventListener('page-favicon-updated', onFavicon);
     wv.addEventListener('media-started-playing', onMediaPlay);
     wv.addEventListener('media-paused', onMediaPause);
     wv.addEventListener('focus', onFocus);
@@ -110,6 +191,7 @@ export function WebView({ tabId, url }: Props) {
       wv.removeEventListener('did-navigate', sync);
       wv.removeEventListener('did-navigate-in-page', sync);
       wv.removeEventListener('page-title-updated', onTitle);
+      wv.removeEventListener('page-favicon-updated', onFavicon);
       wv.removeEventListener('media-started-playing', onMediaPlay);
       wv.removeEventListener('media-paused', onMediaPause);
       wv.removeEventListener('focus', onFocus);
@@ -161,19 +243,29 @@ export function WebView({ tabId, url }: Props) {
         >
           {loading ? '×' : '↻'}
         </button>
-        <input
-          ref={addressRef}
-          className="webview-address"
-          value={addressBar}
-          onChange={(e) => setAddressBar(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              loadAddress();
-            }
-          }}
-          spellCheck={false}
-        />
+        <div className="webview-address-wrap">
+          <input
+            ref={addressRef}
+            className="webview-address"
+            value={addressBar}
+            onChange={(e) => {
+              addrBump();
+              setAddressBar(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              addrBump();
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                loadAddress();
+              }
+            }}
+            onKeyUp={addrRecompute}
+            onClick={addrRecompute}
+            spellCheck={false}
+          />
+          <span ref={addrMirrorRef} className="webview-address-mirror" aria-hidden />
+          <div ref={addrCaretRef} className="webview-address-caret" aria-hidden />
+        </div>
       </div>
       {/* `webview` is an Electron-specific element; React's typings don't
           model its DOM attributes, so we cast props through React.createElement.
@@ -181,7 +273,10 @@ export function WebView({ tabId, url }: Props) {
           (Google, Twitter, GitHub, etc.). */}
       {createElement('webview', {
         ref: wvRef,
-        src: url,
+        // Use the snapshot — see initialUrlRef. Setting src to a value
+        // that matches React's view of the prop on every render
+        // re-navigates the guest WebContents, which flashes the page.
+        src: initialUrlRef.current,
         className: 'webview-frame',
         allowpopups: 'true',
         webpreferences: 'contextIsolation=yes',

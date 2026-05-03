@@ -5,9 +5,13 @@ import { EditorPane } from './EditorPane';
 interface Props {
   leaf: LeafNode;
   sessionId: string;
+  /** Set by PaneNode based on tree position; threaded into TabBar so
+   *  only the outer-left and outer-right pane tab bars show the
+   *  sidebar / outline reveal buttons. */
+  edges?: { left: boolean; right: boolean };
 }
 
-export function Pane({ leaf, sessionId }: Props) {
+export function Pane({ leaf, sessionId, edges = { left: true, right: true } }: Props) {
   const focused = useWorkspace(
     (s) =>
       s.activeSessionId === sessionId &&
@@ -35,7 +39,7 @@ export function Pane({ leaf, sessionId }: Props) {
         });
       }}
     >
-      <TabBar paneId={leaf.id} sessionId={sessionId} />
+      <TabBar paneId={leaf.id} sessionId={sessionId} edges={edges} />
       <EditorPane paneId={leaf.id} sessionId={sessionId} />
     </div>
   );

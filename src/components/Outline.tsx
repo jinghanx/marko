@@ -70,7 +70,7 @@ export function Outline() {
   if (activeTab?.kind === 'code') {
     return (
       <div className="outline-inner">
-        <div className="outline-header">Minimap</div>
+        <OutlineHeader title="Minimap" />
         <CodeMinimap content={activeTab.content} />
       </div>
     );
@@ -82,7 +82,7 @@ export function Outline() {
 
   return (
     <div className="outline-inner">
-      <div className="outline-header">Outline</div>
+      <OutlineHeader title="Outline" />
       <div className="outline-list">
         {headings.length === 0 ? (
           <div className="outline-empty">No headings.</div>
@@ -116,12 +116,23 @@ function FolderPreviewSection({ tabId }: { tabId: string }) {
       : 'Preview';
   return (
     <div className="outline-inner">
-      <div className="outline-header">{headerText}</div>
+      <OutlineHeader title={headerText} />
       {info && info.tabId === tabId ? (
         <FolderPreview info={info} />
       ) : (
         <div className="outline-empty">Loading…</div>
       )}
+    </div>
+  );
+}
+
+/** Outline section header. Toggle lives in the rightmost pane's
+ *  tab bar (TabBar.tsx → OutlineRevealButton) so it stays put across
+ *  open/close without shifting. */
+function OutlineHeader({ title }: { title: string }) {
+  return (
+    <div className="outline-header">
+      <span>{title}</span>
     </div>
   );
 }

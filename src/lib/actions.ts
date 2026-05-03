@@ -304,6 +304,16 @@ export async function saveActiveAs() {
 export function closeActiveTab() {
   const tab = workspace.getActiveTab();
   if (!tab) return;
+  // Pinned tabs survive "Close Other Tabs" / "Close Tabs to the Right",
+  // but ⌘W on the active pinned tab still drops it. Confirm first so a
+  // muscle-memory ⌘W doesn't quietly nuke a tab the user explicitly
+  // pinned to keep around.
+  if (tab.pinned) {
+    const confirmClose = window.confirm(
+      `"${tab.title}" is pinned. Close it anyway?`,
+    );
+    if (!confirmClose) return;
+  }
   if (tab.dirty) {
     const confirmClose = window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`);
     if (!confirmClose) return;

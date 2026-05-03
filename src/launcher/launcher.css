@@ -20,21 +20,25 @@
   --font-mono: 'SF Mono', Menlo, Monaco, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #ffffff;
-    --bg-elev: #f4f4f6;
-    --bg-row-hover: rgba(0, 0, 0, 0.04);
-    --bg-row-active: rgba(0, 0, 0, 0.08);
-    --border: rgba(0, 0, 0, 0.08);
-    --border-strong: rgba(0, 0, 0, 0.14);
-    --text: #1c1c1e;
-    --text-muted: #5a5d62;
-    --text-subtle: #a4a6ab;
-    --accent: #d97757;
-    --footer-bg: #f8f8fa;
-    --shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
-  }
+/* Light-mode palette — applied via the [data-theme="light"] attribute
+ *  set on <html> by main.tsx, which reads the app's `theme` setting
+ *  from localStorage and resolves 'system' against matchMedia. The
+ *  attribute is the single source of truth so users who pick "light"
+ *  while their OS is dark (or vice versa) get the launcher they asked
+ *  for, not what their OS reports. */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-elev: #f4f4f6;
+  --bg-row-hover: rgba(0, 0, 0, 0.04);
+  --bg-row-active: rgba(0, 0, 0, 0.08);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --text: #1c1c1e;
+  --text-muted: #5a5d62;
+  --text-subtle: #a4a6ab;
+  --accent: #d97757;
+  --footer-bg: #f8f8fa;
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 * { box-sizing: border-box; }
@@ -174,7 +178,7 @@ html, body, #launcher-root {
   will-change: transform;
   transform: translateX(0);
 }
-.launcher-caret--idle {
+.launcher-caret.glide-caret--idle {
   animation: launcher-caret-blink 1.05s steps(2, jump-none) infinite;
 }
 @keyframes launcher-caret-blink {
@@ -268,6 +272,22 @@ html, body, #launcher-root {
 .launcher-row-tabicon--clipboard { color: #d97757; }
 .launcher-row-tabicon--settings { color: var(--text-muted); }
 .launcher-row-tabicon--music { color: #b56eff; }
+/* Marko's own brand tile — orange "M" pill, distinct from the
+ *  letter avatars used for other apps so it reads as the home action. */
+.launcher-row-marko {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: #fff;
+  background: linear-gradient(135deg, #f0883e 0%, #d97757 100%);
+  box-shadow: 0 1px 2px rgba(217, 119, 87, 0.4);
+}
 .launcher-row-icon {
   width: 22px;
   height: 22px;

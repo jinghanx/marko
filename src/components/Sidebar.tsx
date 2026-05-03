@@ -660,6 +660,16 @@ function basename(p: string): string {
 }
 
 function WorkspaceDropdown({ rootDir }: { rootDir: string | null }) {
+  // Single-click toggles the dropdown; double-click opens the folder
+  // tab. We defer the single-click action by ~220ms so a fast second
+  // click can preempt it via the double-click handler — otherwise both
+  // the dropdown and the folder tab fire on a double-click.
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    };
+  }, []);
   const bookmarks = useSettings().workspaceBookmarks;
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -713,7 +723,25 @@ function WorkspaceDropdown({ rootDir }: { rootDir: string | null }) {
         ref={btnRef}
         className={`sidebar-root ${rootDir ? '' : 'sidebar-root--empty'}`}
         title={rootDir ?? 'No folder'}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+          clickTimerRef.current = setTimeout(() => {
+            clickTimerRef.current = null;
+            setOpen((v) => !v);
+          }, 220);
+        }}
+        onDoubleClick={(e) => {
+          // Cancel the pending single-click action and open the folder
+          // tab instead.
+          e.preventDefault();
+          if (clickTimerRef.current) {
+            clearTimeout(clickTimerRef.current);
+            clickTimerRef.current = null;
+          }
+          if (!rootDir) return;
+          setOpen(false);
+          void openFolderInEditor(rootDir, { focus: true });
+        }}
       >
         <span className="sidebar-root-name">{rootDir ? basename(rootDir) : 'No folder'}</span>
         <span className="sidebar-root-caret">▾</span>

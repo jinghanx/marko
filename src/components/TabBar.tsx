@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Reorder, type PanInfo } from 'framer-motion';
 import { useWorkspace, workspace, findLeaf, getActiveSession, type Tab } from '../state/workspace';
-import { useTabDrag } from '../lib/tabDrag';
+import { uiBus } from '../lib/uiBus';
 
 interface TabBarProps {
   paneId: string;
@@ -50,37 +52,147 @@ export function TabBar({ paneId, sessionId, edges = { left: true, right: true } 
     };
   }, [menu]);
 
-  // All hooks must be called unconditionally — the empty-tabs early return
-  // below would skip useTabDrag otherwise and React throws "rendered
-  // fewer hooks than expected" when the last tab in a leaf is closed.
-  const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
-  const { state: drag, handlers: dragHandlers } = useTabDrag(
-    paneId,
-    tabIds,
-    (fromLeafId, fromIdx, toLeafId, toIdx) =>
-      workspace.moveTab(fromLeafId, fromIdx, toLeafId, toIdx),
-  );
+  // Local copy of the tabs array that framer's <Reorder.Group> drives
+  // during a drag — sibling tabs slide aside as the cursor crosses each
+  // tab's midpoint. We only commit the reorder back to the workspace
+  // store on dragEnd, so framer's animation runs uninterrupted by
+  // store updates mid-drag. localTabs re-syncs from the store whenever
+  // the source-of-truth order actually changes (close, open, etc.).
+  const [localTabs, setLocalTabs] = useState(tabs);
+  const draggingRef = useRef(false);
+  // Free-floating cursor-attached ghost rendered via portal so it can
+  // visually leave the source `.tabbar` (which has overflow:hidden) and
+  // float over neighboring panes. Framer's Reorder.Item itself stays
+  // constrained to its group; this ghost is what the user actually
+  // sees following their cursor across panes.
+  const [ghost, setGhost] = useState<
+    | {
+        tab: Tab;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }
+    | null
+  >(null);
+  useEffect(() => {
+    if (draggingRef.current) return;
+    if (
+      tabs.length !== localTabs.length ||
+      tabs.some((t, i) => t.id !== localTabs[i]?.id)
+    ) {
+      setLocalTabs(tabs);
+    }
+  }, [tabs, localTabs]);
+
+  const handleReorder = (next: Tab[]) => {
+    // Pinned partition: pinned tabs always live to the left. As the
+    // user drags, framer proposes orders that may violate this; we
+    // re-partition locally so the visual state always satisfies it
+    // (a non-pinned drag dropped at index 0 lands right after the
+    // last pinned tab, etc.).
+    const pinned = next.filter((t) => t.pinned);
+    const rest = next.filter((t) => !t.pinned);
+    setLocalTabs([...pinned, ...rest]);
+  };
+
+  /** elementFromPoint(x,y) → the .tabbar element under the cursor at
+   *  drag end (could be this strip or another). Used for cross-strip
+   *  drop routing. */
+  const stripUnderPoint = (x: number, y: number): HTMLElement | null => {
+    const el = document.elementFromPoint(x, y);
+    return (el as HTMLElement | null)?.closest('[data-tabbar-pane-id]') as HTMLElement | null;
+  };
+
+  const handleDragStart = (tab: Tab) => (e: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+    draggingRef.current = true;
+    // Snapshot the source tab's rendered size so the ghost matches —
+    // tabs vary in width based on title length.
+    const target = e.target as HTMLElement | null;
+    const tabEl = target?.closest('.tab') as HTMLElement | null;
+    const r = tabEl?.getBoundingClientRect();
+    if (r) {
+      setGhost({
+        tab,
+        x: info.point.x,
+        y: info.point.y,
+        width: r.width,
+        height: r.height,
+      });
+    }
+  };
+
+  const handleDrag = (_e: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+    setGhost((g) => (g ? { ...g, x: info.point.x, y: info.point.y } : g));
+  };
+
+  const handleDragEnd = (tab: Tab) => (_e: PointerEvent, info: PanInfo) => {
+    draggingRef.current = false;
+    setGhost(null);
+    const targetStrip = stripUnderPoint(info.point.x, info.point.y);
+    const targetPaneId = targetStrip?.getAttribute('data-tabbar-pane-id') ?? null;
+    const fromIdx = tabs.findIndex((t) => t.id === tab.id);
+
+    // Cross-strip drop: dispatch moveTab to the other pane. The drop
+    // index is computed from the cursor's x position relative to the
+    // tabs in the target strip's reorder container.
+    if (targetPaneId && targetPaneId !== paneId) {
+      const reorderContainer = targetStrip?.querySelector('[data-tabbar-reorder]');
+      let toIdx = 0;
+      if (reorderContainer) {
+        const tabEls = Array.from(
+          reorderContainer.querySelectorAll<HTMLElement>('.tab'),
+        );
+        for (const el of tabEls) {
+          const r = el.getBoundingClientRect();
+          if (info.point.x < r.left + r.width / 2) break;
+          toIdx++;
+        }
+      }
+      // Don't reset localTabs — let the layout-animation flow handle
+      // the visual transit. moveTab triggers a workspace re-render
+      // that unmounts this tab from the source Reorder.Group; the
+      // shared layoutId tells framer to animate from the dragged
+      // position into the target Reorder.Group's new slot.
+      if (fromIdx >= 0) workspace.moveTab(paneId, fromIdx, targetPaneId, toIdx);
+      return;
+    }
+
+    // Intra-strip: commit localTabs's order back to the store. Find
+    // the first index where localTabs and tabs disagree — that's the
+    // drop position; the moved tab id tells us where it came from.
+    const newIds = localTabs.map((t) => t.id);
+    const oldIds = tabs.map((t) => t.id);
+    for (let i = 0; i < oldIds.length; i++) {
+      if (oldIds[i] !== newIds[i]) {
+        const movedId = newIds[i];
+        const sourceIdx = oldIds.indexOf(movedId);
+        if (sourceIdx >= 0 && sourceIdx !== i) {
+          workspace.reorderTabInLeaf(paneId, sourceIdx, i);
+        }
+        return;
+      }
+    }
+  };
 
   // Render an empty bar with just the `+` button when the leaf has no tabs,
   // so the pane stays visually anchored and the user always has a way to
   // add a new tab (the WelcomeScreen below also has shortcuts).
   if (tabs.length === 0) {
-    // Empty tabbars are still valid drop targets so the user can drag a
-    // tab from another pane into this empty pane.
+    // Empty tabbars are still valid drop targets — `data-tabbar-pane-id`
+    // lets the framer-driven cross-strip drop detect this strip via
+    // elementFromPoint when the user releases over it.
     return (
-      <div
-        className="tabbar tabbar--empty"
-        onDragOver={dragHandlers.onStripDragOver}
-        onDrop={dragHandlers.onStripDrop}
-      >
+      <div className="tabbar tabbar--empty" data-tabbar-pane-id={paneId}>
         {edges.left && <SidebarToggle visible={sidebarVisible} />}
         <button
           className="tab-new"
-          onClick={() => workspace.openNewTab()}
+          onClick={() => uiBus.emit('open-path')}
           aria-label="New tab"
         >
           +
         </button>
+        <SplitButtons paneId={paneId} />
         {edges.right && <OutlineToggle visible={outlineVisible} />}
       </div>
     );
@@ -99,98 +211,125 @@ export function TabBar({ paneId, sessionId, edges = { left: true, right: true } 
   };
 
   return (
-    <div
-      className="tabbar"
-      onDragOver={dragHandlers.onStripDragOver}
-      onDrop={dragHandlers.onStripDrop}
-    >
+    <div className="tabbar" data-tabbar-pane-id={paneId}>
       {edges.left && <SidebarToggle visible={sidebarVisible} />}
-      {tabs.map((tab, i) => {
-        const active = tab.id === activeTabId;
-        const isDragging = drag.dragIdx === i;
-        const insertSide =
-          drag.dragIdx !== null && drag.overIdx === i ? drag.overSide : null;
-        return (
-          <div
-            key={tab.id}
-            className={
-              `tab tab--${tab.kind} ${active ? 'tab--active' : ''}` +
-              (tab.pinned ? ' tab--pinned' : '') +
-              (isDragging ? ' tab--dragging' : '') +
-              (insertSide === 'before' ? ' tab--drop-before' : '') +
-              (insertSide === 'after' ? ' tab--drop-after' : '')
-            }
-            draggable={renamingId !== tab.id}
-            onDragStart={dragHandlers.onDragStart(i)}
-            onDragOver={dragHandlers.onDragOver(i)}
-            onDrop={dragHandlers.onDrop(i)}
-            onDragEnd={dragHandlers.onDragEnd}
-            onClick={() => {
-              if (renamingId === tab.id) return;
-              workspace.setActiveTab(tab.id);
-              workspace.requestEditorFocus();
-            }}
-            onDoubleClick={(e) => {
-              // Match the workspace strip's rename UX: double-click the
-              // tab to inline-edit its title. Stop propagation so the
-              // single-click activate logic above doesn't double-fire.
-              e.stopPropagation();
-              setRenamingId(tab.id);
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              workspace.setActiveTab(tab.id);
-              setMenu({ x: e.clientX, y: e.clientY, tabId: tab.id });
-            }}
-            onAuxClick={(e) => {
-              // Middle-click closes the tab (browser convention).
-              if (e.button === 1) {
-                e.preventDefault();
-                closeWithDirtyCheck([tab]);
+      <Reorder.Group
+        as="div"
+        axis="x"
+        values={localTabs}
+        onReorder={handleReorder}
+        data-tabbar-reorder=""
+        // The group is its own flex row that holds just the tabs, sitting
+        // inside the larger .tabbar flex strip alongside the toggles and
+        // the `+` button. flex:1 lets it consume available width so the
+        // OutlineToggle's margin-left:auto still pushes to the far right.
+        className="tabbar-reorder"
+      >
+        {localTabs.map((tab) => {
+          const active = tab.id === activeTabId;
+          // Renaming uses an inline <input> — disable drag while the
+          // user is typing so cursor moves don't initiate a drag.
+          const dragDisabled = renamingId === tab.id;
+          return (
+            <Reorder.Item
+              as="div"
+              key={tab.id}
+              value={tab}
+              // Shared layoutId pairs this tab with itself across all
+              // panes so a cross-pane drop animates the tab from its
+              // source slot to its destination slot via the LayoutGroup
+              // wrapper in App.tsx — instead of unmount-then-pop.
+              layoutId={`tab-${tab.id}`}
+              drag={dragDisabled ? false : 'x'}
+              onDragStart={handleDragStart(tab)}
+              onDrag={handleDrag}
+              onDragEnd={handleDragEnd(tab)}
+              // While this tab is the one being dragged, fade its
+              // in-strip rendering so the user perceives it as "lifted
+              // out" — the portaled ghost is the real visual now.
+              animate={{ opacity: ghost?.tab.id === tab.id ? 0.25 : 1 }}
+              // The flat layout in our existing CSS is built around
+              // tabs being plain divs; framer's default <li> wrapping
+              // would change that, so we render as a div and rely on
+              // the parent flex.
+              className={
+                `tab tab--${tab.kind} ${active ? 'tab--active' : ''}` +
+                (tab.pinned ? ' tab--pinned' : '')
               }
-            }}
-            title={tab.filePath ?? tab.title}
-          >
-            <span className={`tab-icon tab-icon--${tab.kind}`} aria-hidden>
-              <KindIcon tab={tab} />
-            </span>
-            {renamingId === tab.id ? (
-              <TabRenameInput
-                initial={tab.title}
-                onCommit={(name) => {
-                  workspace.renameTab(tab.id, name);
-                  setRenamingId(null);
-                }}
-                onCancel={() => setRenamingId(null)}
-              />
-            ) : (
-              <span className="tab-title">{tab.title}</span>
-            )}
-            {tab.kind === 'markdown' && tab.viewMode === 'raw' && (
-              <span className="tab-mode-badge" title="Raw markdown (⌘⇧M cycles)">RAW</span>
-            )}
-            {tab.kind === 'markdown' && tab.viewMode === 'split' && (
-              <span className="tab-mode-badge" title="Split markdown (⌘⇧M cycles)">SPLIT</span>
-            )}
-            {tab.dirty && <span className="tab-dirty" aria-label="unsaved" />}
-            <button
-              className="tab-close"
-              draggable={false}
-              onClick={(e) => {
-                e.stopPropagation();
-                closeWithDirtyCheck([tab]);
+              onClick={() => {
+                if (renamingId === tab.id) return;
+                workspace.setActiveTab(tab.id);
+                workspace.requestEditorFocus();
               }}
-              aria-label="Close tab"
+              onDoubleClick={(e) => {
+                // Match the workspace strip's rename UX: double-click
+                // the tab to inline-edit its title.
+                e.stopPropagation();
+                setRenamingId(tab.id);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                workspace.setActiveTab(tab.id);
+                setMenu({ x: e.clientX, y: e.clientY, tabId: tab.id });
+              }}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault();
+                  closeWithDirtyCheck([tab]);
+                }
+              }}
+              title={tab.filePath ?? tab.title}
+              // Spring tuned for snappy reorder — feels faster than
+              // framer's default which is too soft for tab strips.
+              transition={{ type: 'spring', stiffness: 600, damping: 38, mass: 0.6 }}
+              whileDrag={{ cursor: 'grabbing' }}
             >
-              ×
-            </button>
-          </div>
-        );
-      })}
-      <button className="tab-new" onClick={() => workspace.openNewTab()} aria-label="New tab">
+              <span className={`tab-icon tab-icon--${tab.kind}`} aria-hidden>
+                <KindIcon tab={tab} />
+              </span>
+              {renamingId === tab.id ? (
+                <TabRenameInput
+                  initial={tab.title}
+                  onCommit={(name) => {
+                    workspace.renameTab(tab.id, name);
+                    setRenamingId(null);
+                  }}
+                  onCancel={() => setRenamingId(null)}
+                />
+              ) : (
+                <span className="tab-title">{tab.title}</span>
+              )}
+              {tab.kind === 'markdown' && tab.viewMode === 'raw' && (
+                <span className="tab-mode-badge" title="Raw markdown (⌘⇧M cycles)">RAW</span>
+              )}
+              {tab.kind === 'markdown' && tab.viewMode === 'split' && (
+                <span className="tab-mode-badge" title="Split markdown (⌘⇧M cycles)">SPLIT</span>
+              )}
+              {tab.dirty && <span className="tab-dirty" aria-label="unsaved" />}
+              <button
+                className="tab-close"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeWithDirtyCheck([tab]);
+                }}
+                onPointerDown={(e) => {
+                  // Stop the close button from initiating framer's
+                  // drag — clicks on × should close, not pick up.
+                  e.stopPropagation();
+                }}
+                aria-label="Close tab"
+              >
+                ×
+              </button>
+            </Reorder.Item>
+          );
+        })}
+      </Reorder.Group>
+      <button className="tab-new" onClick={() => uiBus.emit('open-path')} aria-label="New tab">
         +
       </button>
+      <SplitButtons paneId={paneId} />
       {edges.right && <OutlineToggle visible={outlineVisible} />}
 
       {menu && (
@@ -214,6 +353,36 @@ export function TabBar({ paneId, sessionId, edges = { left: true, right: true } 
           onTogglePin={(t) => workspace.togglePinTab(t.id)}
         />
       )}
+
+      {/* Portaled drag ghost — renders at body level so it can fly
+        * across panes without being clipped by the source `.tabbar`'s
+        * overflow. Only the source TabBar of the active drag renders
+        * its own ghost. */}
+      {ghost &&
+        createPortal(
+          <div
+            className={`tab tab--${ghost.tab.kind} tab-drag-ghost`}
+            style={{
+              position: 'fixed',
+              left: ghost.x,
+              top: ghost.y,
+              width: ghost.width,
+              height: ghost.height,
+              transform: 'translate(-50%, -50%) scale(1.04)',
+              pointerEvents: 'none',
+              zIndex: 9999,
+              boxShadow:
+                '0 12px 32px color-mix(in srgb, var(--text) 26%, transparent)',
+            }}
+          >
+            <span className={`tab-icon tab-icon--${ghost.tab.kind}`} aria-hidden>
+              <KindIcon tab={ghost.tab} />
+            </span>
+            <span className="tab-title">{ghost.tab.title}</span>
+            {ghost.tab.dirty && <span className="tab-dirty" aria-label="unsaved" />}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -726,6 +895,55 @@ function SidebarToggle({ visible }: { visible: boolean }) {
     >
       <PanelIcon side="left" filled={visible} />
     </button>
+  );
+}
+
+/** Pair of split buttons: side-by-side and top-bottom. Clicking
+ *  either focuses this pane (so splitFocused acts on the right leaf,
+ *  not whichever happened to be focused) and then dispatches the
+ *  split. The icons match VS Code's convention — two columns for a
+ *  side-by-side split, two rows for a top-bottom split. */
+function SplitButtons({ paneId }: { paneId: string }) {
+  const split = (direction: 'horizontal' | 'vertical') => {
+    workspace.setFocusedPane(paneId);
+    workspace.splitFocused(direction);
+  };
+  return (
+    <>
+      <button
+        className="tabbar-edge-btn"
+        onClick={() => split('horizontal')}
+        title="Split right"
+        aria-label="Split right"
+      >
+        <SplitIcon orientation="vertical" />
+      </button>
+      <button
+        className="tabbar-edge-btn"
+        onClick={() => split('vertical')}
+        title="Split down"
+        aria-label="Split down"
+      >
+        <SplitIcon orientation="horizontal" />
+      </button>
+    </>
+  );
+}
+
+/** Rounded rectangle with a divider line. `orientation='vertical'`
+ *  means the divider is vertical → two columns (= side-by-side
+ *  split); `orientation='horizontal'` means a horizontal divider →
+ *  two rows (= top-bottom split). */
+function SplitIcon({ orientation }: { orientation: 'vertical' | 'horizontal' }) {
+  return (
+    <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden fill="none">
+      <rect x="2" y="3.5" width="12" height="9" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      {orientation === 'vertical' ? (
+        <line x1="8" y1="3.5" x2="8" y2="12.5" stroke="currentColor" strokeWidth="1.4" />
+      ) : (
+        <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" strokeWidth="1.4" />
+      )}
+    </svg>
   );
 }
 

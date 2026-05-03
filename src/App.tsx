@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LayoutGroup } from 'framer-motion';
 import { useWorkspace, workspace, getActiveSession, getAllLeaves } from './state/workspace';
 import { Sidebar } from './components/Sidebar';
 import { PaneNode } from './components/PaneNode';
@@ -190,19 +191,25 @@ export function App() {
           <Sidebar />
         </aside>
         <div className="panes">
-          {sessions.map((session) => {
-            const multi = getAllLeaves(session.root).length > 1;
-            return (
-              <div
-                key={session.id}
-                className={`session-stack${multi ? ' session-stack--multi' : ''}`}
-                data-session-id={session.id}
-                style={{ display: session.id === activeSessionId ? 'flex' : 'none' }}
-              >
-                <PaneNode node={session.root} sessionId={session.id} />
-              </div>
-            );
-          })}
+          {/* LayoutGroup connects every <Reorder.Item> across panes
+            * so a tab moving between strips animates from its old
+            * position to its new one (via shared layoutId), instead
+            * of disappearing from one and popping into the other. */}
+          <LayoutGroup>
+            {sessions.map((session) => {
+              const multi = getAllLeaves(session.root).length > 1;
+              return (
+                <div
+                  key={session.id}
+                  className={`session-stack${multi ? ' session-stack--multi' : ''}`}
+                  data-session-id={session.id}
+                  style={{ display: session.id === activeSessionId ? 'flex' : 'none' }}
+                >
+                  <PaneNode node={session.root} sessionId={session.id} />
+                </div>
+              );
+            })}
+          </LayoutGroup>
         </div>
         {outlineVisible && (
           <aside className="outline">

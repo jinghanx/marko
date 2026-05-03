@@ -921,9 +921,22 @@ export const workspace = {
       if (!leaf) return prev;
       const len = leaf.tabIds.length;
       if (fromIdx < 0 || fromIdx >= len || toIdx < 0 || toIdx > len) return prev;
+      // Pinned tabs always stay leftmost: clamp the destination so a
+      // pinned tab can't land after a non-pinned tab, and vice versa.
+      // The pinned partition is the count of pinned tabs in the leaf
+      // *excluding* the moving one (since it's removed before reinsert).
+      const pinnedById = new Map(prev.tabs.map((t) => [t.id, !!t.pinned]));
+      const movedId = leaf.tabIds[fromIdx];
+      const movedPinned = !!pinnedById.get(movedId);
       const ids = leaf.tabIds.slice();
       const [moved] = ids.splice(fromIdx, 1);
-      ids.splice(toIdx, 0, moved);
+      let pinnedCount = 0;
+      for (const id of ids) if (pinnedById.get(id)) pinnedCount++;
+      let clamped = toIdx;
+      if (movedPinned) clamped = Math.min(clamped, pinnedCount);
+      else clamped = Math.max(clamped, pinnedCount);
+      if (clamped === fromIdx) return prev;
+      ids.splice(clamped, 0, moved);
       return {
         sessions: patchActiveSession(prev, {
           root: mapLeaf(active.root, leaf.id, (l) => ({ ...l, tabIds: ids })),
@@ -970,6 +983,15 @@ export const workspace = {
       } else {
         newToTabIds = toLeaf.tabIds.slice();
         clampedToIdx = Math.max(0, Math.min(toIdx, newToTabIds.length));
+        // Pinned partition: pinned tabs always stay leftmost in the
+        // destination leaf. A non-pinned tab can't be inserted before
+        // pinnedCount; a pinned tab can't be inserted after.
+        const pinnedById = new Map(prev.tabs.map((t) => [t.id, !!t.pinned]));
+        const movedPinned = !!pinnedById.get(tabId);
+        let pinnedCount = 0;
+        for (const id of newToTabIds) if (pinnedById.get(id)) pinnedCount++;
+        if (movedPinned) clampedToIdx = Math.min(clampedToIdx, pinnedCount);
+        else clampedToIdx = Math.max(clampedToIdx, pinnedCount);
         newToTabIds.splice(clampedToIdx, 0, tabId);
       }
       // Apply both leaf updates in a single tree walk.

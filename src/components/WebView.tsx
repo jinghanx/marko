@@ -1,8 +1,135 @@
-import { createElement, useEffect, useRef, useState } from 'react';
-import { useWorkspace, workspace, findLeaf, getActiveSession } from '../state/workspace';
+import { useEffect, useRef, useState } from 'react';
+import {
+  useWorkspace,
+  workspace,
+  findLeaf,
+  getActiveSession,
+  subscribeWorkspace,
+} from '../state/workspace';
 import { normalizeUrl } from '../lib/actions';
 import { uiBus } from '../lib/uiBus';
 import { useGlideCaret } from '../lib/useGlideCaret';
+
+/** Type of the Electron `<webview>` element with the methods we use.
+ *  React's typings don't model the custom element, so we cast through
+ *  this shape. */
+type WebviewEl = HTMLElement & {
+  canGoBack(): boolean;
+  canGoForward(): boolean;
+  goBack(): void;
+  goForward(): void;
+  reload(): void;
+  loadURL(u: string): void;
+  getURL(): string;
+  executeJavaScript(code: string): Promise<unknown>;
+};
+
+/** Body-level overlay container that holds every web tab's <webview>.
+ *  Reparenting an Electron <webview> between DOM nodes destroys the
+ *  guest WebContents (page goes blank for ~1min while it re-attaches),
+ *  so we never reparent. The webview is appended once into this
+ *  container and absolutely-positioned to overlay whatever pane slot
+ *  the React tree currently shows it in. Position is synced every
+ *  animation frame from the slot's bounding rect.
+ *
+ *  z-index is low (1) so modals/palettes (z-index 999+) layer above. */
+let webviewOverlay: HTMLDivElement | null = null;
+function getWebviewOverlay(): HTMLDivElement {
+  if (!webviewOverlay || !webviewOverlay.isConnected) {
+    webviewOverlay = document.createElement('div');
+    webviewOverlay.style.cssText =
+      'position:fixed; top:0; left:0; width:0; height:0; pointer-events:none; z-index:1;';
+    webviewOverlay.className = 'webview-overlay-root';
+    document.body.appendChild(webviewOverlay);
+  }
+  return webviewOverlay;
+}
+
+/** Persistent <webview> element keyed by tabId — lives in the overlay
+ *  container for the lifetime of the tab. Destroyed only when the tab
+ *  itself is closed. */
+const webviewSessions = new Map<string, WebviewEl>();
+/** The currently-rendered React "slot" for each tab (the placeholder
+ *  div inside the pane). Updated on mount; cleared on unmount. */
+const slotByTab = new Map<string, HTMLElement>();
+/** Per-tab position-sync loop. Started on first session creation and
+ *  cancelled when the session is destroyed. Runs once per frame and
+ *  is essentially free per tab (a getBoundingClientRect + a few style
+ *  writes). */
+const stopByTab = new Map<string, () => void>();
+
+let webviewCleanupSubscribed = false;
+function ensureWebviewCleanupSubscribed() {
+  if (webviewCleanupSubscribed) return;
+  webviewCleanupSubscribed = true;
+  let tracked = new Set<string>();
+  subscribeWorkspace(() => {
+    const tabs = workspace.getState().tabs;
+    const currentIds = new Set(
+      tabs.filter((t) => t.kind === 'web').map((t) => t.id),
+    );
+    for (const id of tracked) {
+      if (!currentIds.has(id)) destroyWebviewSession(id);
+    }
+    tracked = currentIds;
+  });
+}
+function destroyWebviewSession(tabId: string) {
+  stopByTab.get(tabId)?.();
+  stopByTab.delete(tabId);
+  slotByTab.delete(tabId);
+  const el = webviewSessions.get(tabId);
+  if (el) el.remove();
+  webviewSessions.delete(tabId);
+}
+function startPositionLoop(tabId: string) {
+  if (stopByTab.has(tabId)) return;
+  let cancelled = false;
+  const tick = () => {
+    if (cancelled) return;
+    const wv = webviewSessions.get(tabId);
+    if (!wv) return;
+    const slot = slotByTab.get(tabId);
+    if (slot && slot.isConnected) {
+      const r = slot.getBoundingClientRect();
+      // A slot inside a `display:none` editor-host (inactive tab in
+      // the same leaf) reports 0×0. Park the webview offscreen but
+      // KEEP it visible — `display:none` on the webview itself would
+      // pause Chromium and stop audio playback.
+      if (r.width <= 0 || r.height <= 0) {
+        wv.style.top = '-99999px';
+        wv.style.left = '-99999px';
+        wv.style.width = '800px';
+        wv.style.height = '600px';
+      } else {
+        wv.style.top = `${r.top}px`;
+        wv.style.left = `${r.left}px`;
+        wv.style.width = `${r.width}px`;
+        wv.style.height = `${r.height}px`;
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  stopByTab.set(tabId, () => { cancelled = true; });
+}
+function getOrCreateWebviewElement(tabId: string, url: string): WebviewEl {
+  const existing = webviewSessions.get(tabId);
+  if (existing) return existing;
+  const wv = document.createElement('webview') as WebviewEl;
+  wv.setAttribute('src', url);
+  wv.setAttribute('allowpopups', 'true');
+  wv.setAttribute('webpreferences', 'contextIsolation=yes');
+  wv.className = 'webview-frame';
+  // Absolute positioning inside the fixed overlay → free-floating
+  // rectangle that we sync to the slot's bounding rect each frame.
+  wv.style.cssText =
+    'position:absolute; top:-99999px; left:-99999px; width:800px; height:600px; pointer-events:auto; background:white; border:0;';
+  getWebviewOverlay().appendChild(wv);
+  webviewSessions.set(tabId, wv);
+  startPositionLoop(tabId);
+  return wv;
+}
 
 interface Props {
   tabId: string;
@@ -10,17 +137,8 @@ interface Props {
 }
 
 export function WebView({ tabId, url }: Props) {
-  const wvRef = useRef<HTMLElement & {
-    canGoBack(): boolean;
-    canGoForward(): boolean;
-    goBack(): void;
-    goForward(): void;
-    reload(): void;
-    loadURL(u: string): void;
-    getURL(): string;
-    addEventListener(type: string, listener: (e: any) => void): void;
-    removeEventListener(type: string, listener: (e: any) => void): void;
-  } | null>(null);
+  const wvRef = useRef<WebviewEl | null>(null);
+  const frameHostRef = useRef<HTMLDivElement | null>(null);
 
   const [addressBar, setAddressBar] = useState(url);
   const [currentUrl, setCurrentUrl] = useState(url);
@@ -31,13 +149,6 @@ export function WebView({ tabId, url }: Props) {
   const addressRef = useRef<HTMLInputElement | null>(null);
   const { mirrorRef: addrMirrorRef, caretRef: addrCaretRef, bumpInput: addrBump, recompute: addrRecompute } =
     useGlideCaret(addressRef, addressBar);
-  // Snapshot the initial URL once at mount. The webview owns its
-  // current URL internally after that — we MUST NOT pass `url` (which
-  // updates as sync() writes navigation back to tab.filePath) into the
-  // src attribute, because writing to the webview's src on every
-  // re-render triggers another navigation, causing visible flashes
-  // when clicking links inside the page.
-  const initialUrlRef = useRef(url);
   const isActive = useWorkspace((s) => {
     const session = getActiveSession(s);
     const focused = findLeaf(session.root, session.focusedLeafId);
@@ -90,13 +201,8 @@ export function WebView({ tabId, url }: Props) {
     };
     const onMouse = (e: MouseEvent) => {
       if (e.button !== 3 && e.button !== 4) return;
-      // Don't navigate if the click was outside this webview's host —
-      // multiple web tabs in different panes shouldn't all react.
-      const wv = wvRef.current;
-      if (!wv) return;
-      const host = (wv as unknown as HTMLElement).closest('.webview-host') as HTMLElement | null;
-      const target = e.target as Node | null;
-      if (!host || !target || !host.contains(target)) return;
+      // Only the active web tab navigates — the isActive guard above
+      // already restricts the listener to one component instance.
       e.preventDefault();
       navigate(e.button === 3 ? -1 : 1);
     };
@@ -125,6 +231,42 @@ export function WebView({ tabId, url }: Props) {
       window.removeEventListener('keydown', onKey);
     };
   }, [isActive]);
+
+  // Register this slot as the position target for the tab's webview.
+  // The actual <webview> lives in webviewSessions / overlay root, never
+  // moves between DOM parents — a per-frame loop keeps it positioned
+  // over our slot. This avoids Electron's "guest reload on reparent"
+  // pain (page goes blank for ~1min when <webview> is removed and
+  // re-added to the document).
+  useEffect(() => {
+    const slot = frameHostRef.current;
+    if (!slot) return;
+    ensureWebviewCleanupSubscribed();
+    const wv = getOrCreateWebviewElement(tabId, url);
+    slotByTab.set(tabId, slot);
+    wvRef.current = wv;
+    // Re-mount of an already-loaded webview: sync UI state from the
+    // live element so the address bar / nav buttons aren't stale.
+    try {
+      const live = wv.getURL();
+      if (live) {
+        setCurrentUrl(live);
+        setAddressBar(live);
+        setCanBack(wv.canGoBack());
+        setCanForward(wv.canGoForward());
+        setLoading(false);
+      }
+    } catch {
+      /* guest not yet attached */
+    }
+    return () => {
+      // Only clear the slot if it's still ours — a remount may have
+      // already swapped it. Don't stop the position loop or remove
+      // the webview; the next mount picks up where we left off.
+      if (slotByTab.get(tabId) === slot) slotByTab.delete(tabId);
+      wvRef.current = null;
+    };
+  }, [tabId]);
 
   useEffect(() => {
     const wv = wvRef.current;
@@ -176,6 +318,30 @@ export function WebView({ tabId, url }: Props) {
     // hook we use to flip the focused leaf.
     const onFocus = () => workspace.setActiveTab(tabId);
 
+    // Mouse-button history navigation. Mousedown events fire inside
+    // the guest's Chromium process and never bubble to our renderer,
+    // so the host-window listener can't see them. Inject a tiny
+    // capturing listener into the guest itself that maps button 3/4
+    // (raw MX side buttons) to history.back/forward. dom-ready fires
+    // on every navigation, so the script is re-injected after each
+    // page load; the __markoNavBound flag keeps it from double-
+    // binding within a single document.
+    const onDomReady = () => {
+      void wv.executeJavaScript(`
+        (function () {
+          if (window.__markoNavBound) return;
+          window.__markoNavBound = true;
+          window.addEventListener('mousedown', function (e) {
+            if (e.button === 3) { e.preventDefault(); window.history.back(); }
+            else if (e.button === 4) { e.preventDefault(); window.history.forward(); }
+          }, true);
+          window.addEventListener('auxclick', function (e) {
+            if (e.button === 3 || e.button === 4) e.preventDefault();
+          }, true);
+        })();
+      `);
+    };
+
     wv.addEventListener('did-start-loading', onStart);
     wv.addEventListener('did-stop-loading', onStop);
     wv.addEventListener('did-navigate', sync);
@@ -185,6 +351,7 @@ export function WebView({ tabId, url }: Props) {
     wv.addEventListener('media-started-playing', onMediaPlay);
     wv.addEventListener('media-paused', onMediaPause);
     wv.addEventListener('focus', onFocus);
+    wv.addEventListener('dom-ready', onDomReady);
     return () => {
       wv.removeEventListener('did-start-loading', onStart);
       wv.removeEventListener('did-stop-loading', onStop);
@@ -195,6 +362,7 @@ export function WebView({ tabId, url }: Props) {
       wv.removeEventListener('media-started-playing', onMediaPlay);
       wv.removeEventListener('media-paused', onMediaPause);
       wv.removeEventListener('focus', onFocus);
+      wv.removeEventListener('dom-ready', onDomReady);
       workspace.setTabPlaying(tabId, false);
     };
   }, [tabId]);
@@ -267,20 +435,11 @@ export function WebView({ tabId, url }: Props) {
           <div ref={addrCaretRef} className="webview-address-caret" aria-hidden />
         </div>
       </div>
-      {/* `webview` is an Electron-specific element; React's typings don't
-          model its DOM attributes, so we cast props through React.createElement.
-          `allowpopups` is required for OAuth flows that open a sign-in popup
-          (Google, Twitter, GitHub, etc.). */}
-      {createElement('webview', {
-        ref: wvRef,
-        // Use the snapshot — see initialUrlRef. Setting src to a value
-        // that matches React's view of the prop on every render
-        // re-navigates the guest WebContents, which flashes the page.
-        src: initialUrlRef.current,
-        className: 'webview-frame',
-        allowpopups: 'true',
-        webpreferences: 'contextIsolation=yes',
-      })}
+      {/* The actual <webview> lives in webviewSessions (module scope) and
+          is appended into this host imperatively by the mount effect.
+          Lifting it out of React's tree lets it survive component
+          unmounts during pane splits without reloading. */}
+      <div ref={frameHostRef} className="webview-frame-host" />
       <div className="webview-status">{currentUrl}</div>
     </div>
   );

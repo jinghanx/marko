@@ -8,10 +8,6 @@
   --text: #1f1f1e;
   --text-muted: #6b6b67;
   --accent: #2d6cdf;
-  /* Distinct accent for the session strip so it visually contrasts with the
-   *  per-pane file tab accent (which uses --accent). Not theme-overridden —
-   *  this orange reads cleanly in both light and dark modes. */
-  --session-accent: #d97757;
   /* Derived from theme so the tab strip stays in the same color family as
    *  the rest of the app on every color theme (cream / dark / warm / etc). */
   --tab-bg: var(--bg-muted);
@@ -313,14 +309,17 @@ button {
    *  make the pill silhouette readable on first click attempt. */
   background: color-mix(in srgb, var(--text) 8%, transparent);
 }
-/* Active session: solid accent fill on the pill — no top stripe (pill
- *  shape reads cleaner with a uniform colored fill). */
+/* Active session: solid theme-accent fill on the pill — same color
+ *  family as the file-tab top stripe so both bars track the active
+ *  color theme together. Pill shape reads cleaner with a uniform
+ *  fill than with a top stripe, so we don't mirror the file-tab
+ *  gradient here. */
 .session-tab--active,
 .session-tab--active:hover {
-  background: var(--session-accent);
+  background: var(--accent);
   color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--session-accent) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 .session-tab--active .session-tab-close {
   color: rgba(255, 255, 255, 0.7);
@@ -389,11 +388,10 @@ button {
   background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
-/* Drag-reorder feedback for session tabs. The dragged tab dims; the drop
- *  position is shown by an orange bar on the closest edge of the hover target. */
-.session-tab--dragging { opacity: 0.4; }
-.session-tab--drop-before { box-shadow: inset 2px 0 0 var(--session-accent); }
-.session-tab--drop-after { box-shadow: inset -2px 0 0 var(--session-accent); }
+/* Workspace tab drag — same framer-driven pattern as the file tab
+ * bar. Source slot fades while a portaled ghost (with the active-tab
+ * class) follows the cursor. Sibling tabs slide aside to reveal the
+ * drop position; the animation IS the indicator. */
 
 .app-body {
   flex: 1;
@@ -837,6 +835,11 @@ button {
   user-select: none;
   transition: background-color 0.12s;
   flex: 0 0 4px;
+  /* Position context for the ::before hit-area pseudo, and a z-index
+   * so the extended hit area sits above adjacent pane content where
+   * the two overlap. */
+  position: relative;
+  z-index: 2;
 }
 .splitter--horizontal {
   width: 4px;
@@ -844,6 +847,28 @@ button {
 }
 .splitter--vertical {
   height: 4px;
+  cursor: row-resize;
+}
+/* Invisible hit-area extension on each side of the visible 4px
+ * line — gives the drag handle ~12px of grab room without widening
+ * the line itself. The pseudo overlaps 4px into each adjacent pane,
+ * but pane content rarely uses that strip. */
+.splitter--horizontal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  cursor: col-resize;
+}
+.splitter--vertical::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
   cursor: row-resize;
 }
 .splitter:hover,
@@ -892,6 +917,17 @@ button {
 }
 .tabbar::-webkit-scrollbar {
   display: none;
+}
+/* Inner flex row that holds the framer-driven tabs. flex:1 fills the
+ * available space between the sidebar toggle (left) and the +/outline
+ * toggle (right). min-width:0 keeps it from blowing past the strip
+ * when there are many tabs. */
+.tabbar-reorder {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  min-width: 0;
 }
 
 .tab {
@@ -984,10 +1020,16 @@ button {
   box-shadow: 0 1px 2px rgba(217, 119, 87, 0.35);
 }
 
-/* Drag-reorder feedback for file tabs. */
-.tab--dragging { opacity: 0.4; }
-.tab--drop-before { box-shadow: inset 2px 0 0 var(--accent); }
-.tab--drop-after { box-shadow: inset -2px 0 0 var(--accent); }
+/* Tab drag — siblings slide aside via framer's <Reorder.Group>; the
+ * dragged tab itself is hidden in-strip (faded via animate.opacity)
+ * and represented by a portaled ghost at body level. The ghost reads
+ * as a lifted "active" bubble so the user can clearly see what's
+ * being dragged across panes. */
+.tab-drag-ghost {
+  background: var(--bg-elev);
+  color: var(--text);
+  border-radius: 10px;
+}
 
 /* Folder tabs keep an italic title as a subtle marker — color comes from
  *  the shared inactive/active bubble fills rather than a per-kind tint. */
@@ -1247,9 +1289,15 @@ button {
   0%, 50% { opacity: 1; }
   50.01%, 100% { opacity: 0; }
 }
-.webview-frame {
+/* Layout placeholder for the webview. The actual <webview> element
+ * lives in a body-level overlay (so reparenting between pane splits
+ * doesn't destroy the guest WebContents) and is positioned absolutely
+ * over this slot's bounding rect by a per-frame sync loop. */
+.webview-frame-host {
   flex: 1;
-  width: 100%;
+  min-height: 0;
+}
+.webview-frame {
   border: 0;
   background: white;
 }
@@ -1414,24 +1462,31 @@ button {
  *  panel-toggle controls (close sidebar, reveal sidebar, close
  *  outline, reveal outline) read as one consistent control set. */
 .tabbar-edge-btn {
+  /* Match the `.tab-new` (+) button's box exactly so all the right-
+   * side controls (split buttons, outline toggle, sidebar toggle, +)
+   * read as one consistent set — same width, same vertical stretch
+   * via the tabbar's align-items:stretch, same border-radius, same
+   * hover treatment. */
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  align-self: center;
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   padding: 0;
-  margin: 0 4px;
+  margin: 0;
+  transition: background 80ms ease-out, color 80ms ease-out;
 }
 .tabbar-edge-btn:hover {
   color: var(--text);
-  background: var(--bg-elev);
+  /* Text-color-mix overlay (same recipe as .tab-new) reads on any
+   * theme background — `var(--bg-elev)` was too close to the tab-bar
+   * fill to be visible in dark themes. */
+  background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 /* Anchors a tabbar-edge-btn to the right edge of the bar, regardless
  *  of how many tabs precede it. Used by the outline reveal button. */
@@ -1863,13 +1918,15 @@ button {
   margin-left: 0;
 }
 
-/* File palette (⌘P) */
-/* Anchor the palette to the top, not the center, so the input box stays
- *  put as the suggestion list grows or shrinks under it. The combined
- *  selector beats the later .modal-backdrop rule's align-items:center. */
+/* File palette (⌘P), Go to Path (⌘T), and New File (⌘N) all share
+ *  this backdrop. Anchor to the top (not center) so the input box
+ *  stays put as the suggestion list grows/shrinks under it; otherwise
+ *  the modal would jump upward as you type. The clamp scales the
+ *  offset with viewport height so it feels visually centered on
+ *  large windows but doesn't crowd the bottom on small ones. */
 .modal-backdrop.palette-backdrop {
   align-items: flex-start;
-  padding-top: 96px;
+  padding-top: clamp(120px, 18vh, 200px);
 }
 .palette {
   width: min(640px, calc(100% - 48px));
@@ -1880,7 +1937,10 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  max-height: calc(100vh - 192px);
+  /* Reserve room for the top padding (max 200px) plus a comfortable
+   *  bottom buffer so the suggestion list never touches the window
+   *  bottom — even when the result count is huge. */
+  max-height: calc(100vh - 320px);
 }
 /* Palette input wrap holds the input + mirror + glide caret. The
  *  mirror is hidden but matches the input's typography so it can

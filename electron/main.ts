@@ -35,6 +35,20 @@ protocol.registerSchemesAsPrivileged([
       bypassCSP: true,
     },
   },
+  // Production-mode renderer origin. The renderer is served from
+  // `marko-app://app/...` so its origin is a real one — YouTube and
+  // similar embed-restricted sites refuse to load inside iframes
+  // hosted on `file://` (Error 153 / "Watch on YouTube"). In dev the
+  // Vite server already gives us http://localhost:N, which works.
+  {
+    scheme: 'marko-app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
 ]);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -400,7 +414,7 @@ function createLauncherWindow() {
     const devUrl = process.env.VITE_DEV_SERVER_URL!;
     launcherWindow.loadURL(new URL('launcher.html', devUrl).toString());
   } else {
-    launcherWindow.loadFile(path.join(__dirname, '../dist/launcher.html'));
+    launcherWindow.loadURL('marko-app://app/launcher.html');
   }
 }
 
@@ -535,7 +549,10 @@ function createWindow() {
   if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL!);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    // Loaded via the marko-app:// protocol so the renderer's origin
+    // is a real one — YouTube embeds refuse file:// origin in
+    // production (Error 153).
+    mainWindow.loadURL('marko-app://app/index.html');
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -923,6 +940,23 @@ app.whenReady().then(() => {
     return net.fetch(`file://${filePath}`);
   });
 
+  // Production renderer protocol. Maps `marko-app://app/<path>` to
+  // the matching file inside the bundled `dist/` directory. Gives the
+  // renderer a real origin (`marko-app://app`) so embed-restricted
+  // sites like YouTube don't refuse to load inside iframes.
+  const distDir = path.join(__dirname, '..', 'dist');
+  protocol.handle('marko-app', (req) => {
+    const u = new URL(req.url);
+    let pathname = decodeURIComponent(u.pathname || '/');
+    if (pathname === '/' || pathname === '') pathname = '/index.html';
+    const filePath = path.join(distDir, pathname);
+    // Path-traversal guard — refuse anything that escapes distDir.
+    if (!filePath.startsWith(distDir)) {
+      return new Response('forbidden', { status: 403 });
+    }
+    return net.fetch(`file://${filePath}`);
+  });
+
   // Set the dock icon in dev (production builds get the icon from .icns).
   // Try a few candidate paths since __dirname differs between dev and prod.
   const candidates = [
@@ -1208,6 +1242,36 @@ ipcMain.handle('state:write', async (_e, json: string): Promise<{ ok: boolean }>
     return { ok: false };
   }
 });
+
+/** Music tab library (user-added tracks + hidden curated picks) at
+ *  ~/.marko/music-library.json. Lives in the shared dotfile dir so
+ *  dev and packaged builds see the same library — localStorage is
+ *  scoped per app/userData and wouldn't share across them. */
+async function musicLibraryPath(): Promise<string> {
+  const dir = await ensureMarkoDir();
+  return path.join(dir, 'music-library.json');
+}
+ipcMain.handle('music-library:read', async (): Promise<string | null> => {
+  try {
+    return await fs.readFile(await musicLibraryPath(), 'utf8');
+  } catch {
+    return null;
+  }
+});
+ipcMain.handle(
+  'music-library:write',
+  async (_e, json: string): Promise<{ ok: boolean }> => {
+    try {
+      const file = await musicLibraryPath();
+      const tmp = file + '.tmp';
+      await fs.writeFile(tmp, json, 'utf8');
+      await fs.rename(tmp, file);
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  },
+);
 
 ipcMain.handle('state:reset', async (): Promise<{ ok: boolean }> => {
   try {

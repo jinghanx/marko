@@ -116,6 +116,32 @@
         <p class="hero-meta" id="dl-meta">
           macOS 12+ · <a id="alt-arch-link" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-x64.dmg">Intel build</a> · Free &amp; open source
         </p>
+
+        <!--
+          Marko isn't notarized (Apple wants $99/year), so macOS will
+          flag it as "damaged" on first launch and refuse to open.
+          The xattr command below removes the quarantine attribute
+          Safari/Chrome stamp on every download — same trick most
+          unsigned open-source Mac apps recommend.
+        -->
+        <details class="first-run">
+          <summary>
+            First launch on macOS shows <em>"Marko is damaged"</em>? Run this once →
+          </summary>
+          <div class="first-run-body">
+            <p>
+              Marko isn't notarized with Apple ($99/year), so macOS quarantines the
+              download and refuses to open it. Open <strong>Terminal</strong>
+              (<kbd>⌘Space</kbd> → "Terminal") and paste:
+            </p>
+            <pre class="first-run-cmd"><code>xattr -dr com.apple.quarantine /Applications/Marko.app</code></pre>
+            <p class="first-run-foot">
+              Adjust the path if you dragged Marko somewhere other than
+              <code>/Applications</code>. After this, double-click Marko like any
+              other app — you only need to run the command once.
+            </p>
+          </div>
+        </details>
         <script>
           (async function () {
             const btn = document.getElementById('primary-download');

@@ -202,6 +202,11 @@ export interface MarkoApi {
     | { ok: true; title: string; channel: string; description: string; isLive: boolean }
     | { ok: false; error: string }
   >;
+  /** Read / write the music library (~/.marko/music-library.json).
+   *  Lives in the shared dotfile dir so dev and packaged builds see
+   *  the same library. */
+  musicLibraryRead(): Promise<string | null>;
+  musicLibraryWrite(json: string): Promise<{ ok: boolean }>;
   configDir(): Promise<string>;
   notesPath(): Promise<string>;
   createFile(filePath: string): Promise<{ ok: boolean; error?: string }>;

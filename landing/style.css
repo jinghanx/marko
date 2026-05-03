@@ -258,6 +258,90 @@ button {
   font-family: var(--font-mono);
 }
 
+/* First-launch unwedge instructions for unsigned-app quarantine.
+ * Collapsed by default so it doesn't dominate the hero; opens to a
+ * tinted card with a copy-friendly command line. */
+.first-run {
+  margin-top: 14px;
+  max-width: 560px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.first-run > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border-strong, rgba(0, 0, 0, 0.18));
+  background: rgba(0, 0, 0, 0.02);
+  list-style: none;
+  user-select: none;
+  transition: background 120ms ease-out, border-color 120ms ease-out;
+}
+.first-run > summary::-webkit-details-marker { display: none; }
+.first-run > summary em { font-style: italic; color: var(--text); }
+.first-run[open] > summary {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--border-strong, rgba(0, 0, 0, 0.24));
+}
+.first-run-body {
+  padding: 12px 14px 14px;
+  border-radius: 8px;
+  margin-top: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.first-run-body p {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.first-run-body p.first-run-foot { margin: 8px 0 0; opacity: 0.85; }
+.first-run-body code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.first-run-body kbd {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(255, 255, 255, 0.7);
+}
+.first-run-cmd {
+  margin: 6px 0 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #0c0d10;
+  color: #e7eef7;
+  overflow-x: auto;
+  -webkit-user-select: all;
+  user-select: all;
+}
+.first-run-cmd code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .first-run > summary { background: rgba(255, 255, 255, 0.03); }
+  .first-run[open] > summary { background: rgba(255, 255, 255, 0.06); }
+  .first-run-body {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .first-run-body code { background: rgba(255, 255, 255, 0.08); }
+  .first-run-body kbd {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+}
+
 /* ---------- Comic-style story hero ----------
  *  Replaces the title/subhead with Eddie's day-in-the-life comic. Mixed
  *  typography: Bangers for big numbers, Permanent Marker / Caveat for

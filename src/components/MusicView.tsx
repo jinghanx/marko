@@ -156,46 +156,64 @@ function readPersisted(content: string): Persisted {
 }
 
 /** Library state — user-added tracks plus IDs of curated tracks the
- *  user has hidden. Stored in localStorage at this key (not in the
- *  music tab's content) so it survives closing and re-opening the
- *  tab and any restart of the app. */
-const LIBRARY_KEY = 'marko:music:library';
+ *  user has hidden. Persisted as ~/.marko/music-library.json via IPC
+ *  so dev and packaged builds share the same library (localStorage is
+ *  scoped per app userData). The same key is also kept in localStorage
+ *  as a one-time migration source. */
+const LEGACY_LIBRARY_KEY = 'marko:music:library';
 interface MusicLibrary {
   userTracks: Track[];
   hiddenIds: string[];
 }
-function loadLibrary(): MusicLibrary {
+/** Normalize raw library entries — migrates the old `category` field
+ *  to the new `genre`, strips "Live · " prefixes, and ensures the
+ *  isLive flag follows along. */
+function normalizeLibrary(parsed: Partial<MusicLibrary>): MusicLibrary {
+  const rawTracks = Array.isArray(parsed.userTracks) ? parsed.userTracks : [];
+  const userTracks = rawTracks.map((t) => {
+    const legacy = t as unknown as { category?: string };
+    let genre = t.genre ?? legacy.category ?? 'Other';
+    let isLive = !!t.isLive;
+    if (typeof genre === 'string' && genre.startsWith('Live · ')) {
+      isLive = true;
+      genre = genre.slice('Live · '.length);
+    }
+    return { ...t, genre, isLive };
+  });
+  return {
+    userTracks,
+    hiddenIds: Array.isArray(parsed.hiddenIds) ? parsed.hiddenIds : [],
+  };
+}
+async function loadLibrary(): Promise<MusicLibrary> {
   try {
-    const raw = localStorage.getItem(LIBRARY_KEY);
-    if (!raw) return { userTracks: [], hiddenIds: [] };
-    const parsed = JSON.parse(raw) as Partial<MusicLibrary>;
-    const rawTracks = Array.isArray(parsed.userTracks) ? parsed.userTracks : [];
-    // Migrate the old `category` field → new `genre`. Old entries also
-    // had "Live · Lofi" style values; strip the prefix and set isLive.
-    const userTracks = rawTracks.map((t) => {
-      const legacy = t as unknown as { category?: string };
-      let genre = t.genre ?? legacy.category ?? 'Other';
-      let isLive = !!t.isLive;
-      if (genre.startsWith('Live · ')) {
-        isLive = true;
-        genre = genre.slice('Live · '.length);
-      }
-      return { ...t, genre, isLive };
-    });
-    return {
-      userTracks,
-      hiddenIds: Array.isArray(parsed.hiddenIds) ? parsed.hiddenIds : [],
-    };
+    const raw = await window.marko.musicLibraryRead();
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<MusicLibrary>;
+      return normalizeLibrary(parsed);
+    }
   } catch {
-    return { userTracks: [], hiddenIds: [] };
+    /* fall through to legacy */
   }
+  // First-run migration from the old localStorage location. Move it
+  // over to the dotfile then drop the legacy key so we don't keep two
+  // sources of truth.
+  try {
+    const legacy = localStorage.getItem(LEGACY_LIBRARY_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as Partial<MusicLibrary>;
+      const norm = normalizeLibrary(parsed);
+      void window.marko.musicLibraryWrite(JSON.stringify(norm));
+      localStorage.removeItem(LEGACY_LIBRARY_KEY);
+      return norm;
+    }
+  } catch {
+    /* no legacy data, fall through */
+  }
+  return { userTracks: [], hiddenIds: [] };
 }
 function saveLibrary(lib: MusicLibrary) {
-  try {
-    localStorage.setItem(LIBRARY_KEY, JSON.stringify(lib));
-  } catch {
-    /* quota / private mode — best effort */
-  }
+  void window.marko.musicLibraryWrite(JSON.stringify(lib));
 }
 
 function thumbnailUrl(videoId: string): string {
@@ -233,12 +251,28 @@ interface Props {
 
 export function MusicView({ tabId, initialValue }: Props) {
   const initial = useMemo(() => readPersisted(initialValue), [initialValue]);
-  // Library lives in localStorage so it survives tab close/reopen and
-  // app restart. Tab.content only carries per-tab state (current
-  // track + volume).
-  const initialLibrary = useMemo(() => loadLibrary(), []);
-  const [userTracks, setUserTracks] = useState<Track[]>(initialLibrary.userTracks);
-  const [hiddenIds, setHiddenIds] = useState<string[]>(initialLibrary.hiddenIds);
+  // Library lives in ~/.marko/music-library.json (via IPC) so dev
+  // and packaged builds share the same picks, and survives tab
+  // close/reopen + app restart. Tab.content only carries per-tab
+  // state (current track + volume).
+  const [userTracks, setUserTracks] = useState<Track[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  /** Avoid writing the empty initial state back to disk before the
+   *  first load completes — that would clobber whatever's there. */
+  const libraryLoadedRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const lib = await loadLibrary();
+      if (cancelled) return;
+      setUserTracks(lib.userTracks);
+      setHiddenIds(lib.hiddenIds);
+      libraryLoadedRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [showHidden, setShowHidden] = useState(false);
   const [currentTrackId, setCurrentTrackId] = useState<string | null>(
     initial.currentTrackId ?? null,
@@ -287,9 +321,12 @@ export function MusicView({ tabId, initialValue }: Props) {
     workspace.rebaseSavedContent(tabId, JSON.stringify(data));
   }, [tabId, currentTrackId, volume]);
 
-  // Persist the library to localStorage on every change. Survives tab
-  // close, reopen, and app restart.
+  // Persist the library to ~/.marko/music-library.json on every
+  // change. Skip the first render — until the IPC load completes,
+  // userTracks/hiddenIds are still the empty initial state and
+  // would otherwise clobber the on-disk file.
   useEffect(() => {
+    if (!libraryLoadedRef.current) return;
     saveLibrary({ userTracks, hiddenIds });
   }, [userTracks, hiddenIds]);
 

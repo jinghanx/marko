@@ -48,6 +48,10 @@ const api = {
     | { ok: true; title: string; channel: string; description: string; isLive: boolean }
     | { ok: false; error: string }
   > => ipcRenderer.invoke('youtube:metadata', videoId),
+  musicLibraryRead: (): Promise<string | null> =>
+    ipcRenderer.invoke('music-library:read'),
+  musicLibraryWrite: (json: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('music-library:write', json),
   configDir: (): Promise<string> => ipcRenderer.invoke('marko:config-dir'),
   notesPath: (): Promise<string> => ipcRenderer.invoke('marko:notes-path'),
   createFile: (filePath: string): Promise<{ ok: boolean; error?: string }> =>

@@ -747,12 +747,19 @@ export const workspace = {
       const active = getActiveSession(prev);
       const leaf = findLeaf(active.root, active.focusedLeafId);
       if (!leaf) return prev;
-      const cloneTabId = leaf.activeTabId;
+      // New pane starts empty — the WelcomeScreen renders when a leaf
+      // has no tabs. Cloning the active tab id into the new leaf used
+      // to be the default, but it caused real problems: Terminal /
+      // WebView / any other tab whose underlying state lives in a
+      // single DOM element (xterm's host, the <webview> guest, etc.)
+      // can't be rendered twice. Both panes would race to host the
+      // single instance, and the loser would appear empty or "reset".
+      // Empty new pane sidesteps this entirely.
       const newLeaf: LeafNode = {
         kind: 'leaf',
         id: newNodeId('leaf'),
-        tabIds: cloneTabId ? [cloneTabId] : [],
-        activeTabId: cloneTabId,
+        tabIds: [],
+        activeTabId: null,
       };
       const split: SplitNode = {
         kind: 'split',
@@ -880,6 +887,15 @@ export const workspace = {
   renameSession(sessionId: string, name: string) {
     setState((prev) => ({
       sessions: patchSession(prev, sessionId, { name }),
+    }));
+  },
+
+  /** Rename a tab by id. Empty/whitespace names are ignored. */
+  renameTab(tabId: string, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setState((prev) => ({
+      tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, title: trimmed } : t)),
     }));
   },
 

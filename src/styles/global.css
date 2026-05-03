@@ -1297,6 +1297,23 @@ button {
   text-overflow: ellipsis;
 }
 
+/* Inline rename input shown in place of .tab-title when the user
+ *  double-clicks a file tab. Mirrors the workspace strip's rename
+ *  field so both rows share the same edit affordance. */
+.tab-rename {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  padding: 1px 6px;
+  outline: none;
+}
+
 .tab-dirty {
   width: 6px;
   height: 6px;
@@ -2473,39 +2490,31 @@ button {
   line-height: 1.55;
 }
 .codemirror-host .cm-scroller {
-  padding: 14px 0;
+  /* No vertical padding — the previous 14px top/bottom inset read as a
+   *  blank gutter row above line 1 and below the last line, looking
+   *  like a misalignment with the line numbers. */
+  padding: 0;
 }
 .codemirror-host .cm-content {
-  /* Native browser caret hidden — the glideCursorExtension renders
-   *  the visible one. We keep the value defined (transparent) so a
-   *  fallback environment without the extension still styles cleanly. */
+  /* Native browser caret hidden — CodeMirror's drawSelection extension
+   *  renders the visible cursor as a `.cm-cursor` div, which we tint
+   *  via the cm-cursor rule below. */
   caret-color: transparent;
   padding: 0 16px;
 }
 
-/* Smooth-glide cursor for CodeMirror — overlay div appended to
- *  contentDOM by glideCursorExtension, positioned via translate3d
- *  each frame. Lerps between editor selection-head positions. */
-.codemirror-host .cm-glide-cursor {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 1.6px;
-  background: var(--accent);
-  border-radius: 1px;
-  pointer-events: none;
-  will-change: transform, height;
-  transform: translate3d(0, 0, 0);
-  /* z-index above selection but below text — matches default
-   *  .cm-cursor stacking. */
-  z-index: 1;
-}
-.codemirror-host .cm-glide-cursor.glide-caret--idle {
-  animation: cm-glide-caret-blink 1.05s steps(2, jump-none) infinite;
-}
-@keyframes cm-glide-caret-blink {
-  0%, 50% { opacity: 1; }
-  50.01%, 100% { opacity: 0; }
+/* Smooth-glide effect on CodeMirror's own cursor. CSS transition on
+ *  the inline `left` / `top` styles CM writes when the cursor moves
+ *  gives the glide feel without fighting CM's internal layer
+ *  management. The `.cm-cursor-primary` is the main caret; secondary
+ *  cursors (multi-cursor) get the same treatment automatically. */
+.codemirror-host .cm-cursor,
+.codemirror-host .cm-cursor-primary {
+  border-left-color: var(--accent) !important;
+  border-left-width: 2px !important;
+  transition:
+    left 130ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 130ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 /* Match the vim block cursor's overlaid character to the surrounding text. */
 .codemirror-host .cm-fat-cursor {

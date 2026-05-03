@@ -862,22 +862,22 @@ function buildMenu() {
       label: 'Window',
       submenu: [
         {
-          label: 'New Session',
+          label: 'New Workspace',
           accelerator: 'CmdOrCtrl+Alt+N',
           click: () => sendToRenderer('menu:new-session'),
         },
         {
-          label: 'Close Session',
+          label: 'Close Workspace',
           accelerator: 'CmdOrCtrl+Shift+W',
           click: () => sendToRenderer('menu:close-session'),
         },
         {
-          label: 'Previous Session',
+          label: 'Previous Workspace',
           accelerator: 'CmdOrCtrl+Shift+9',
           click: () => sendToRenderer('menu:prev-session'),
         },
         {
-          label: 'Next Session',
+          label: 'Next Workspace',
           accelerator: 'CmdOrCtrl+Shift+0',
           click: () => sendToRenderer('menu:next-session'),
         },

@@ -303,7 +303,16 @@ export async function saveActiveAs() {
 
 export function closeActiveTab() {
   const tab = workspace.getActiveTab();
-  if (!tab) return;
+  if (!tab) {
+    // Empty pane (welcome screen) — there's nothing to close, so
+    // collapse the pane itself. closePane refuses on the session's
+    // last pane, which is exactly what we want.
+    const focused = workspace.getFocusedLeaf();
+    if (focused.tabIds.length === 0) {
+      workspace.closePane(focused.id);
+    }
+    return;
+  }
   // Pinned tabs survive "Close Other Tabs" / "Close Tabs to the Right",
   // but ⌘W on the active pinned tab still drops it. Confirm first so a
   // muscle-memory ⌘W doesn't quietly nuke a tab the user explicitly

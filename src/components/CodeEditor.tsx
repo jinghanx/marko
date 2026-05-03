@@ -9,7 +9,6 @@ import { workspace, useWorkspace, findLeaf, getActiveSession } from '../state/wo
 import { findLanguage } from '../lib/fileType';
 import { useSettings, type EditorKeymap } from '../state/settings';
 import { installVimOverrides } from '../lib/vimSetup';
-import { glideCursorExtension } from '../lib/glideCursorExtension';
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language';
 import { classHighlighter } from '@lezer/highlight';
 import { languages } from '@codemirror/language-data';
@@ -80,11 +79,6 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
           // Comes after basicSetup so it takes precedence over the default
           // highlight style baked into basicSetup.
           syntaxHighlighting(classHighlighter),
-          // Smooth-glide caret — hides CodeMirror's default `.cm-cursor`
-          // and renders an overlay div that lerps to the main
-          // selection's head each frame. Same easing as the launcher
-          // input + terminal cursor.
-          glideCursorExtension,
           keymap.of([indentWithTab]),
           EditorView.lineWrapping,
           langCompartment.of([]),

@@ -6,8 +6,9 @@ export function SessionStrip() {
   const sessions = useWorkspace((s) => s.sessions);
   const activeId = useWorkspace((s) => s.activeSessionId);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  // Hide the strip when there's only one session — discoverable via menu / shortcut.
-  if (sessions.length <= 1) return null;
+  // Always render the strip — even with one workspace, the user needs
+  // to see it to add a second one (and to know workspaces exist as a
+  // concept). Empty-strip case has the "+" button still visible.
   return (
     <Strip
       sessions={sessions}
@@ -77,7 +78,7 @@ function Strip({
                       e.stopPropagation();
                       workspace.closeSession(s.id);
                     }}
-                    aria-label="Close session"
+                    aria-label="Close workspace"
                   >
                     ×
                   </button>
@@ -90,8 +91,8 @@ function Strip({
       <button
         className="session-tab-new"
         onClick={() => workspace.newSession()}
-        title="New session"
-        aria-label="New session"
+        title="New workspace"
+        aria-label="New workspace"
       >
         +
       </button>

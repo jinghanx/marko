@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace, workspace, findLeaf, getActiveSession, type Tab } from '../state/workspace';
 import { useTabDrag } from '../lib/tabDrag';
 
@@ -32,6 +32,7 @@ export function TabBar({ paneId, sessionId, edges = { left: true, right: true } 
   }, [leaf, allTabs]);
   const activeTabId = leaf?.activeTabId ?? null;
   const [menu, setMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!menu) return;
@@ -119,14 +120,22 @@ export function TabBar({ paneId, sessionId, edges = { left: true, right: true } 
               (insertSide === 'before' ? ' tab--drop-before' : '') +
               (insertSide === 'after' ? ' tab--drop-after' : '')
             }
-            draggable
+            draggable={renamingId !== tab.id}
             onDragStart={dragHandlers.onDragStart(i)}
             onDragOver={dragHandlers.onDragOver(i)}
             onDrop={dragHandlers.onDrop(i)}
             onDragEnd={dragHandlers.onDragEnd}
             onClick={() => {
+              if (renamingId === tab.id) return;
               workspace.setActiveTab(tab.id);
               workspace.requestEditorFocus();
+            }}
+            onDoubleClick={(e) => {
+              // Match the workspace strip's rename UX: double-click the
+              // tab to inline-edit its title. Stop propagation so the
+              // single-click activate logic above doesn't double-fire.
+              e.stopPropagation();
+              setRenamingId(tab.id);
             }}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -146,7 +155,18 @@ export function TabBar({ paneId, sessionId, edges = { left: true, right: true } 
             <span className={`tab-icon tab-icon--${tab.kind}`} aria-hidden>
               <KindIcon tab={tab} />
             </span>
-            <span className="tab-title">{tab.title}</span>
+            {renamingId === tab.id ? (
+              <TabRenameInput
+                initial={tab.title}
+                onCommit={(name) => {
+                  workspace.renameTab(tab.id, name);
+                  setRenamingId(null);
+                }}
+                onCancel={() => setRenamingId(null)}
+              />
+            ) : (
+              <span className="tab-title">{tab.title}</span>
+            )}
             {tab.kind === 'markdown' && tab.viewMode === 'raw' && (
               <span className="tab-mode-badge" title="Raw markdown (⌘⇧M cycles)">RAW</span>
             )}
@@ -747,5 +767,47 @@ function PanelIcon({ side, filled }: { side: 'left' | 'right'; filled?: boolean 
         strokeWidth={filled ? undefined : 1}
       />
     </svg>
+  );
+}
+
+/** Inline rename field for a file tab. Mirrors SessionStrip's
+ *  RenameInput — autoselects the existing title on mount, commits on
+ *  Enter or blur, cancels on Escape. */
+function TabRenameInput({
+  initial,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.select();
+    });
+  }, []);
+  return (
+    <input
+      ref={ref}
+      defaultValue={initial}
+      className="tab-rename"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onCommit((e.target as HTMLInputElement).value);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+      onBlur={(e) => onCommit(e.target.value)}
+    />
   );
 }

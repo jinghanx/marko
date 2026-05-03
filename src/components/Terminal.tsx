@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
-import { useWorkspace, workspace, getActiveSession } from '../state/workspace';
+import { useWorkspace, workspace, subscribeWorkspace, getActiveSession } from '../state/workspace';
 import { useActiveTheme, useSettings } from '../state/settings';
 import { xtermThemeFor } from '../lib/themes';
 import { openFileFromPath, openFolderInEditor, openUrlInTab } from '../lib/actions';
@@ -65,6 +65,131 @@ const URL_LINK_RE = new RegExp(
   'g',
 );
 
+/** Hidden offscreen container where xterm's DOM element parks while
+ *  the React Terminal component is unmounted (e.g., during a pane
+ *  split). Without this, React removes the host div from the document
+ *  while xterm's element is still its child — orphaning it. xterm
+ *  internally caches `_core.element`; if we don't explicitly move it
+ *  out of the doomed host first, the move-to-new-host on next mount
+ *  can leave the renderer in a bad state. */
+let terminalLimbo: HTMLDivElement | null = null;
+function getTerminalLimbo(): HTMLDivElement {
+  if (!terminalLimbo || !terminalLimbo.isConnected) {
+    terminalLimbo = document.createElement('div');
+    terminalLimbo.style.cssText =
+      'position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; overflow:hidden; pointer-events:none;';
+    document.body.appendChild(terminalLimbo);
+  }
+  return terminalLimbo;
+}
+
+/** Persistent terminal session — outlives the React component instance.
+ *  When the pane tree restructures (split, close, etc.), React unmounts
+ *  the Terminal component, but the xterm + pty live in this map keyed
+ *  by tabId. The next mount reattaches the same xterm to its new host
+ *  via term.open(), so the running shell, scrollback, and process all
+ *  survive the tree change. Sessions are destroyed only when the tab
+ *  itself is closed (see ensureSessionCleanupSubscribed). */
+interface TermSession {
+  term: XTerm;
+  fit: FitAddon;
+  search: SearchAddon;
+  ptyId: string;
+  inputDispose: () => void;
+  ptyDataDispose: () => void;
+  ptyExitDispose: () => void;
+}
+const terminalSessions = new Map<string, TermSession>();
+let cleanupSubscribed = false;
+function ensureSessionCleanupSubscribed() {
+  if (cleanupSubscribed) return;
+  cleanupSubscribed = true;
+  let tracked = new Set<string>();
+  subscribeWorkspace(() => {
+    const tabs = workspace.getState().tabs;
+    const currentIds = new Set(
+      tabs.filter((t) => t.kind === 'terminal').map((t) => t.id),
+    );
+    for (const id of tracked) {
+      if (!currentIds.has(id)) destroyTerminalSession(id);
+    }
+    tracked = currentIds;
+  });
+}
+function destroyTerminalSession(tabId: string) {
+  const sess = terminalSessions.get(tabId);
+  if (!sess) return;
+  try { sess.inputDispose(); } catch { /* ignore */ }
+  try { sess.ptyDataDispose(); } catch { /* ignore */ }
+  try { sess.ptyExitDispose(); } catch { /* ignore */ }
+  try { sess.term.dispose(); } catch { /* ignore */ }
+  void window.marko.ptyKill(sess.ptyId);
+  terminalSessions.delete(tabId);
+}
+function getOrCreateTerminalSession(
+  tabId: string,
+  opts: { rootDir: string | null; codeFont: string; theme: ReturnType<typeof xtermThemeFor> | Parameters<typeof xtermThemeFor>[0] },
+): TermSession {
+  const existing = terminalSessions.get(tabId);
+  if (existing) return existing;
+  const term = new XTerm({
+    cursorBlink: true,
+    fontFamily: opts.codeFont,
+    fontSize: 13,
+    lineHeight: 1.2,
+    // The theme arg can be either pre-built or the active-theme value;
+    // xtermThemeFor is idempotent so accept either path.
+    theme: typeof opts.theme === 'object' && 'background' in (opts.theme as object)
+      ? (opts.theme as ReturnType<typeof xtermThemeFor>)
+      : xtermThemeFor(opts.theme as Parameters<typeof xtermThemeFor>[0]),
+    scrollback: 10000,
+    allowProposedApi: true,
+  });
+  const fit = new FitAddon();
+  const search = new SearchAddon();
+  term.loadAddon(fit);
+  term.loadAddon(search);
+
+  const ptyId = `pty-${tabId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const inputDisposable = term.onData((data) => {
+    void window.marko.ptyWrite(ptyId, data);
+  });
+  const sess: TermSession = {
+    term,
+    fit,
+    search,
+    ptyId,
+    inputDispose: () => inputDisposable.dispose(),
+    // ptyData / ptyExit subscriptions are wired after the spawn
+    // resolves (we need to know the spawn succeeded). They reassign
+    // these via closure capture below.
+    ptyDataDispose: () => {},
+    ptyExitDispose: () => {},
+  };
+  void window.marko
+    .ptySpawn(ptyId, { cwd: opts.rootDir ?? undefined, cols: term.cols, rows: term.rows })
+    .then((r) => {
+      if (!r.ok) {
+        term.writeln(`\x1b[31mFailed to start shell: ${r.error}\x1b[0m`);
+        return;
+      }
+      sess.ptyDataDispose = window.marko.onPtyData(ptyId, (data) => term.write(data));
+      sess.ptyExitDispose = window.marko.onPtyExit(ptyId, () => {
+        term.writeln('\r\n\x1b[2m[shell exited]\x1b[0m');
+      });
+      // rc files often `cd $HOME` on shell startup, undoing the spawn
+      // cwd. Send an explicit cd after they've run.
+      if (opts.rootDir) {
+        const escaped = opts.rootDir.replace(/'/g, `'\\''`);
+        setTimeout(() => {
+          void window.marko.ptyWrite(ptyId, ` cd '${escaped}' && clear\r`);
+        }, 120);
+      }
+    });
+  terminalSessions.set(tabId, sess);
+  return sess;
+}
+
 export function Terminal({ tabId }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -98,22 +223,21 @@ export function Terminal({ tabId }: Props) {
     const host = hostRef.current;
     if (!host) return;
 
-    const ptyId = `pty-${tabId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    ptyIdRef.current = ptyId;
-
-    const term = new XTerm({
-      cursorBlink: true,
-      fontFamily: codeFont,
-      fontSize: 13,
-      lineHeight: 1.2,
-      theme: xtermThemeFor(activeTheme),
-      scrollback: 10000,
-      allowProposedApi: true,
+    // Session is the source of truth for the xterm + pty pair. It
+    // survives React unmounts (e.g., pane splits) so the running
+    // shell, scrollback, and process are preserved across tree
+    // restructures. Disposed only when the tab itself is closed.
+    ensureSessionCleanupSubscribed();
+    const sess = getOrCreateTerminalSession(tabId, {
+      rootDir,
+      codeFont,
+      theme: activeTheme,
     });
-    const fit = new FitAddon();
-    const search = new SearchAddon();
-    term.loadAddon(fit);
-    term.loadAddon(search);
+    const term = sess.term;
+    const fit = sess.fit;
+    const search = sess.search;
+    const ptyId = sess.ptyId;
+    ptyIdRef.current = ptyId;
 
     // URL link provider. The bundled WebLinksAddon's activation gating is
     // unreliable across versions (and was eating clicks here), so we own
@@ -237,8 +361,17 @@ export function Terminal({ tabId }: Props) {
       },
     });
 
-    term.open(host);
-    fit.fit();
+    // First mount: xterm hasn't rendered yet — open it against this
+    // host. Re-mount (after a pane split): adopt the already-rendered
+    // element into the new host. We avoid calling term.open() twice
+    // because xterm's renderer caches the original parent's geometry
+    // and gets confused when re-opened against a new one.
+    if (!term.element) {
+      term.open(host);
+    } else if (term.element.parentElement !== host) {
+      host.appendChild(term.element);
+    }
+    try { fit.fit(); } catch { /* fit can throw mid-resize */ }
     xtermRef.current = term;
     fitRef.current = fit;
     searchRef.current = search;
@@ -306,38 +439,9 @@ export function Terminal({ tabId }: Props) {
     cursorRaf = requestAnimationFrame(cursorTick);
     // ---- end smooth-glide cursor ------------------------------------
 
-    const cols = term.cols;
-    const rows = term.rows;
-
-    let dispose: (() => void) | null = null;
-    let disposeExit: (() => void) | null = null;
-
-    void window.marko
-      .ptySpawn(ptyId, { cwd: rootDir ?? undefined, cols, rows })
-      .then((r) => {
-        if (!r.ok) {
-          term.writeln(`\x1b[31mFailed to start shell: ${r.error}\x1b[0m`);
-          return;
-        }
-        dispose = window.marko.onPtyData(ptyId, (data) => term.write(data));
-        disposeExit = window.marko.onPtyExit(ptyId, () => {
-          term.writeln('\r\n\x1b[2m[shell exited]\x1b[0m');
-        });
-        // Spawn cwd alone isn't always enough — many users have rc files
-        // that `cd $HOME` on shell startup, undoing the cwd we passed.
-        // Send an explicit cd after a short delay (long enough for the
-        // shell to finish reading rc files but before the user types).
-        if (rootDir) {
-          const escaped = rootDir.replace(/'/g, `'\\''`);
-          setTimeout(() => {
-            void window.marko.ptyWrite(ptyId, ` cd '${escaped}' && clear\r`);
-          }, 120);
-        }
-      });
-
-    const onUserInput = term.onData((data) => {
-      void window.marko.ptyWrite(ptyId, data);
-    });
+    // pty spawn + I/O bridges (term ⇄ pty) are wired at session
+    // creation in getOrCreateTerminalSession, not per-mount, so they
+    // survive a pane-split-induced React remount.
 
     // Cmd+F opens the search overlay; Cmd+K clears the scrollback. Wired on
     // the host element so they only fire when the terminal has focus.
@@ -372,23 +476,49 @@ export function Terminal({ tabId }: Props) {
     term.focus();
 
     return () => {
+      // Per-mount cleanup ONLY — link providers, key handler, resize
+      // observer, cursor RAF. The session (term, pty, I/O) survives
+      // so pane splits / tree restructures don't kill the shell.
       host.removeEventListener('keydown', onKeyDown);
       ro.disconnect();
       cancelAnimationFrame(cursorRaf);
       cursorMoveDispose.dispose();
       cursorResizeDispose.dispose();
-      onUserInput.dispose();
       linkDispose.dispose();
       urlLinkDispose.dispose();
-      dispose?.();
-      disposeExit?.();
-      void window.marko.ptyKill(ptyId);
-      term.dispose();
+      // Park xterm's rendered element offscreen before React removes
+      // the host. The next mount adopts it back via appendChild — see
+      // the mount block above.
+      if (term.element && term.element.parentElement === host) {
+        getTerminalLimbo().appendChild(term.element);
+      }
       xtermRef.current = null;
       fitRef.current = null;
       searchRef.current = null;
     };
-  }, [tabId, codeFont, activeTheme]);
+    // Only re-attach the terminal when the tab itself changes. Font /
+    // theme are applied live via the two effects below; pty + xterm
+    // life-cycle is owned by the module-level session registry.
+  }, [tabId]);
+
+  // Live-apply font changes without remounting the terminal. xterm 5
+  // exposes options as a writable record; setting fontFamily and
+  // re-running fit() is enough to take effect.
+  useEffect(() => {
+    const term = xtermRef.current;
+    if (!term) return;
+    term.options.fontFamily = codeFont;
+    try { fitRef.current?.fit(); } catch { /* fit can throw mid-resize */ }
+  }, [codeFont]);
+
+  // Live-apply theme changes — xterm's theme is a colors object; we
+  // build a new one via xtermThemeFor so the ANSI palette tracks the
+  // active app theme.
+  useEffect(() => {
+    const term = xtermRef.current;
+    if (!term) return;
+    term.options.theme = xtermThemeFor(activeTheme);
+  }, [activeTheme]);
 
   // Drive the search addon when the query changes (live results).
   useEffect(() => {

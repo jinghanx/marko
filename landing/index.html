@@ -23,13 +23,19 @@
     <nav class="nav">
       <div class="nav-inner">
         <a class="brand" href="/">
-          <img src="/icon.png?v=2" alt="" width="28" height="28" />
+          <img src="/icon.png?v=2" alt="" width="40" height="40" />
           <span>Marko</span>
         </a>
         <div class="nav-links">
           <a href="#features">Features</a>
           <a href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">GitHub</a>
-          <a class="nav-cta" href="#download">Download</a>
+          <a
+            id="nav-download"
+            class="nav-cta"
+            href="https://github.com/jinghanx/marko/releases/latest/download/Marko-arm64.dmg"
+            data-arm64-href="https://github.com/jinghanx/marko/releases/latest/download/Marko-arm64.dmg"
+            data-x64-href="https://github.com/jinghanx/marko/releases/latest/download/Marko-x64.dmg"
+          >Download</a>
         </div>
       </div>
     </nav>
@@ -42,27 +48,25 @@
         <p class="story-line story-line--lead">
           <span class="story-eddie">Eddie</span> opens his laptop.
         </p>
-        <p class="story-line">
-          He has <em class="story-mark story-mark--yellow">one</em> pull request to review.
+
+        <p class="story-paragraph">
+          He has <em class="story-mark story-mark--yellow">one</em> pull request to review —
+          should be an easy day. He opens
+          <span class="app app--bear">Bear</span> for the spec,
+          <span class="app app--cursor">Cursor</span> for the code,
+          <span class="app app--tower">Tower</span> for the diff,
+          <span class="app app--terminal">Terminal</span> when Tower hides things,
+          <span class="app app--chrome">Chrome</span> for Stack&nbsp;Overflow,
+          <span class="app app--chatgpt">ChatGPT</span> because the top answer is from 2014,
+          <span class="app app--postman">Postman</span> to hit the API,
+          <span class="app app--finder">Finder</span> to dig up a test fixture,
+          <span class="app app--excalidraw">Excalidraw</span> to sketch the bug,
+          <span class="app app--claude">Claude&nbsp;Code</span> for an AI that's actually read his source,
+          <span class="app app--notion">Notion</span> because someone said <em>"write it up,"</em>
+          and finally <span class="app app--spotify">Spotify</span> for focus music.
+          Somehow it's <strong>1 PM</strong>, his coffee is cold, the PR is still not reviewed,
+          and his MacBook's fan sounds like an aircraft taking off.
         </p>
-        <p class="story-line story-aside">That's it. <span class="story-strike">Easy day.</span> One PR.</p>
-
-        <ul class="story-stack">
-          <li>He opens <span class="app app--bear">Bear</span> for the spec.</li>
-          <li>Then <span class="app app--cursor">Cursor</span> for the actual code.</li>
-          <li>Then <span class="app app--tower">Tower</span> for the diff.</li>
-          <li>Then <span class="app app--terminal">Terminal</span> — Tower hides things.</li>
-          <li>Then <span class="app app--chrome">Chrome</span>, for Stack&nbsp;Overflow.</li>
-          <li>Then <span class="app app--chatgpt">ChatGPT</span>, because Stack&nbsp;Overflow's top answer is from <em>2014</em>.</li>
-          <li>Then <span class="app app--postman">Postman</span> to hit the API.</li>
-          <li>Then <span class="app app--finder">Finder</span> to find the test fixture.</li>
-          <li>Then <span class="app app--excalidraw">Excalidraw</span> to sketch the bug.</li>
-          <li>Then <span class="app app--claude">Claude Code</span> to debug it with an AI that's actually seen the source.</li>
-          <li>Then <span class="app app--notion">Notion</span>, because someone said <em>"write it up."</em></li>
-          <li>Then <span class="app app--spotify">Spotify</span>. Somehow it's <strong>1 PM</strong>.</li>
-        </ul>
-
-        <p class="story-line story-aside">Eddie's coffee is cold. The PR is not reviewed.</p>
 
         <div class="story-tally">
           <div class="story-tally-item">
@@ -78,8 +82,6 @@
             <span class="story-num-label">RAM available</span>
           </div>
         </div>
-
-        <p class="story-line story-aside">His MacBook fan sounds like an aircraft taking off.</p>
 
         <div class="story-bubble">
           <p>"Why is this not just <em>one window?</em>"</p>
@@ -137,8 +139,8 @@
             <pre class="first-run-cmd"><code>xattr -dr com.apple.quarantine /Applications/Marko.app</code></pre>
             <p class="first-run-foot">
               Adjust the path if you dragged Marko somewhere other than
-              <code>/Applications</code>. After this, double-click Marko like any
-              other app — you only need to run the command once.
+              <code>/Applications</code>. You'll need to run this again every time
+              you download a new version — every fresh download gets re-quarantined.
             </p>
           </div>
         </details>
@@ -147,6 +149,7 @@
             const btn = document.getElementById('primary-download');
             const label = document.getElementById('primary-download-label');
             const alt = document.getElementById('alt-arch-link');
+            const navBtn = document.getElementById('nav-download');
             if (!btn || !label || !alt) return;
             let arch = 'arm';
             try {
@@ -161,6 +164,7 @@
               label.textContent = 'Download for Intel';
               alt.href = btn.dataset.arm64Href;
               alt.textContent = 'Apple Silicon build';
+              if (navBtn) navBtn.href = navBtn.dataset.x64Href;
             }
           })();
         </script>
@@ -595,48 +599,42 @@
       </div>
     </section>
 
-    <!-- Tab kinds cloud -->
+    <!-- Functionality table -->
     <section class="kinds-cloud">
       <header class="section-head">
         <h2><em>One keystroke.</em> Whichever tab you needed.</h2>
-        <p>Hit <kbd class="inline-kbd">⌘T</kbd>, type a hint, the right tool opens. We keep adding kinds. We'll stop eventually.</p>
+        <p>Hit <kbd class="inline-kbd">⌘T</kbd>, type a hint, the right tool opens.</p>
       </header>
-      <div class="kinds-grid">
-        <div class="kind-card"><span class="kind-icon">📝</span><span class="kind-name">Markdown</span></div>
-        <div class="kind-card"><span class="kind-icon">⟨⟩</span><span class="kind-name">Code</span></div>
-        <div class="kind-card"><span class="kind-icon">🖼</span><span class="kind-name">Image</span></div>
-        <div class="kind-card"><span class="kind-icon">▶</span><span class="kind-name">Media</span></div>
-        <div class="kind-card"><span class="kind-icon">PDF</span><span class="kind-name">PDF</span></div>
-        <div class="kind-card"><span class="kind-icon">▤</span><span class="kind-name">CSV / TSV</span></div>
-        <div class="kind-card"><span class="kind-icon">{ }</span><span class="kind-name">JSON</span></div>
-        <div class="kind-card"><span class="kind-icon">±</span><span class="kind-name">Diff</span></div>
-        <div class="kind-card"><span class="kind-icon">📁</span><span class="kind-name">Folder</span></div>
-        <div class="kind-card"><span class="kind-icon">◯</span><span class="kind-name">Web</span></div>
-        <div class="kind-card"><span class="kind-icon">▍</span><span class="kind-name">Terminal</span></div>
-        <div class="kind-card"><span class="kind-icon">📊</span><span class="kind-name">Activity</span></div>
-        <div class="kind-card"><span class="kind-icon">⎇</span><span class="kind-name">Git</span></div>
-        <div class="kind-card"><span class="kind-icon">🔎</span><span class="kind-name">Find</span></div>
-        <div class="kind-card"><span class="kind-icon">→</span><span class="kind-name">HTTP</span></div>
-        <div class="kind-card"><span class="kind-icon">✏︎</span><span class="kind-name">Whiteboard</span></div>
-        <div class="kind-card"><span class="kind-icon">✨</span><span class="kind-name">AI Chat</span></div>
-        <div class="kind-card"><span class="kind-icon">⌂</span><span class="kind-name">Welcome</span></div>
-      </div>
-    </section>
-
-    <section class="cta-band">
-      <div class="cta-band-inner">
-        <h2>Replace <span class="num">15</span> apps with <em>one</em> slightly worse app.</h2>
-        <p>Drop it into Applications. Give it an afternoon. We're not asking for forever.</p>
-        <div class="cta-row">
-          <a class="btn btn-primary" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-arm64.dmg">
-            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 1v9m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Apple Silicon
-          </a>
-          <a class="btn btn-ghost" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-x64.dmg">Intel</a>
-          <a class="btn btn-ghost" href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">Source</a>
-        </div>
+      <div class="kinds-table-wrap">
+        <table class="kinds-table">
+          <thead>
+            <tr>
+              <th>Functionality</th>
+              <th>What you'd usually open</th>
+              <th class="kt-check">Marko</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Markdown editor</td><td>Typora · Obsidian · Bear</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Code editor</td><td>VS Code · Sublime · Cursor</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Folder browser</td><td>Finder</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Web browser</td><td>Safari · Chrome · Arc</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Terminal</td><td>Terminal · iTerm2 · Warp</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Image viewer</td><td>Preview</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Video / audio player</td><td>QuickTime · VLC</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>PDF viewer</td><td>Preview · Acrobat</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>CSV / TSV viewer</td><td>Numbers · TablePlus</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>JSON viewer</td><td>VS Code · jq</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Diff viewer</td><td>Kaleidoscope · FileMerge</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Process / activity</td><td>Activity Monitor</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Git client</td><td>Tower · GitHub Desktop · Sourcetree</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Find in files</td><td>ripgrep · BBEdit · VS Code search</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>HTTP client</td><td>Postman · Insomnia · Bruno</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Whiteboard</td><td>Excalidraw · Apple Freeform</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>AI chat</td><td>ChatGPT · Claude</td><td class="kt-check"><span>✓</span></td></tr>
+            <tr><td>Focus music</td><td>Spotify · YouTube Music</td><td class="kt-check"><span>✓</span></td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 

@@ -94,13 +94,15 @@ button {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  font-size: 16px;
+  font-size: 19px;
 }
 .brand img {
-  border-radius: 7px;
+  border-radius: 9px;
+  width: 40px;
+  height: 40px;
 }
 
 .nav-links {
@@ -426,6 +428,27 @@ button {
 }
 .story-mark--yellow { background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%); }
 
+/* Single flowing paragraph that retells the day-in-the-life. Keeps
+ * the comic-coloured app pills inline; loses the bulleted "Then ...
+ * Then ..." TODO-list cadence the earlier draft had. One typeface
+ * for the prose so it reads like a narrator, not a UI. */
+.story-paragraph {
+  margin: 6px 0 0;
+  font-family: var(--font-sans);
+  font-size: clamp(16px, 1.65vw, 19px);
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--text);
+  max-width: 720px;
+}
+.story-paragraph em {
+  font-style: italic;
+  color: var(--text);
+}
+
+/* Legacy aside / strike classes — no longer used in the rewritten
+ * paragraph, but kept here so any future inline use renders without
+ * surprise. */
 .story-aside {
   font-family: 'Caveat', cursive;
   font-size: clamp(20px, 2.4vw, 28px);
@@ -440,33 +463,6 @@ button {
   text-decoration-color: #ff4f5e;
   color: #888;
 }
-
-/* The relentless app stack — punchy bulleted list with brand-coloured
- *  pill-tags. Mild stagger via per-child rotation makes it feel taped-on. */
-.story-stack {
-  list-style: none;
-  margin: 6px 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: clamp(17px, 1.9vw, 21px);
-  font-weight: 500;
-  color: var(--text);
-}
-.story-stack li {
-  padding-left: 14px;
-  position: relative;
-}
-.story-stack li::before {
-  content: '→';
-  position: absolute;
-  left: -4px;
-  color: var(--text-muted);
-  opacity: 0.6;
-  font-weight: 700;
-}
-
 .app {
   display: inline-block;
   padding: 1px 10px;
@@ -480,21 +476,21 @@ button {
   white-space: nowrap;
   box-shadow: 1px 1px 0 rgba(0,0,0,0.15);
 }
-/* Each app gets its real-world brand colour and a slight rotation. The
- *  rotations alternate so the rhythm of the list reads visually
- *  scattered, like sticker labels stuck to a notebook. */
-.app--bear        { background: #ff4f5e; transform: rotate(-1.4deg); }
-.app--cursor      { background: #7c3aed; transform: rotate(0.8deg); }
-.app--tower       { background: #4d8fcc; transform: rotate(-0.6deg); }
-.app--terminal    { background: #1a1a1a; transform: rotate(1.1deg); }
-.app--chrome      { background: #ea4335; transform: rotate(-0.9deg); }
-.app--chatgpt     { background: #10a37f; transform: rotate(0.7deg); }
-.app--postman     { background: #ff6c37; transform: rotate(-1.2deg); }
-.app--finder      { background: #1e90ff; transform: rotate(0.4deg); }
-.app--excalidraw  { background: #6c63ff; transform: rotate(-0.8deg); }
-.app--claude      { background: #d97757; transform: rotate(1.3deg); }
-.app--notion      { background: #2f2f2f; transform: rotate(-0.5deg); }
-.app--spotify     { background: #1db954; transform: rotate(0.9deg); }
+/* Each app gets its real-world brand colour. Rotations dropped — in a
+ * flowing paragraph the per-pill tilts crowded the line; the colours
+ * alone carry the visual rhythm. */
+.app--bear        { background: #ff4f5e; }
+.app--cursor      { background: #7c3aed; }
+.app--tower       { background: #4d8fcc; }
+.app--terminal    { background: #1a1a1a; }
+.app--chrome      { background: #ea4335; }
+.app--chatgpt     { background: #10a37f; }
+.app--postman     { background: #ff6c37; }
+.app--finder      { background: #1e90ff; }
+.app--excalidraw  { background: #6c63ff; }
+.app--claude      { background: #d97757; }
+.app--notion      { background: #2f2f2f; }
+.app--spotify     { background: #1db954; }
 
 /* Tally — three big numbers in a row, centered, comic punchline before
  *  the climax. Bangers font for the comic-book feel. */
@@ -653,7 +649,7 @@ button {
 /* Mobile: tighten everything, kill horizontal rotations that overflow. */
 @media (max-width: 640px) {
   .story { gap: 12px; }
-  .story-stack { font-size: 16px; }
+  .story-paragraph { font-size: 16px; line-height: 1.65; }
   .app { font-size: 13px; padding: 1px 8px; }
   .story-bubble { margin-left: 0; }
   .story-tally { gap: 14px; padding: 14px 0; }
@@ -1660,96 +1656,99 @@ button {
   padding: 70px 24px 90px;
   background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 4%, transparent), transparent);
 }
-.kinds-grid {
-  max-width: 1080px;
-  margin: 30px auto 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-}
-.kind-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
-}
-.kind-card:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  box-shadow: var(--shadow-sm);
-}
-.kind-icon {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--accent);
-  min-width: 28px;
-  text-align: center;
-}
-.kind-name { font-weight: 500; }
-
-/* ---------- Mid CTA band ---------- */
-
-.cta-band {
-  padding: 80px 24px;
-}
-.cta-band-inner {
-  max-width: 760px;
-  margin: 0 auto;
-  text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 56px 32px;
-  box-shadow: var(--shadow-md);
-  position: relative;
+/* Functionality table — comic-strip personality to match the rest of
+ * the page: Permanent Marker header, struck-through "apps you'd
+ * usually open" (the visual gag is "Marko replaces these"), yellow
+ * highlighter ✓ stamp, slight off-axis shadow. */
+.kinds-table-wrap {
+  max-width: 780px;
+  margin: 36px auto 0;
+  border: 2px solid var(--text);
+  border-radius: 14px;
   overflow: hidden;
+  background: var(--surface);
+  /* Off-axis flat shadow gives the "sticker on a notebook" look that
+   * matches the comic hero. */
+  box-shadow: 6px 6px 0 var(--text);
+  transform: rotate(-0.4deg);
 }
-.cta-band-inner::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(400px 240px at 20% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent),
-    radial-gradient(400px 240px at 80% 100%, color-mix(in srgb, var(--accent-2) 16%, transparent), transparent);
-  pointer-events: none;
+.kinds-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
 }
-.cta-band-inner > * {
-  position: relative;
-}
-.cta-band h2 {
-  font-family: var(--font-sans);
-  font-weight: 900;
-  font-size: clamp(30px, 4.4vw, 48px);
-  letter-spacing: -0.028em;
-  line-height: 1.05;
-  margin: 0 0 10px;
-}
-.cta-band h2 em {
-  font-style: normal;
-  background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%);
-  padding: 0 4px;
-}
-.cta-band h2 .num {
-  font-family: 'Bangers', 'Impact', sans-serif;
+.kinds-table thead th {
+  font-family: 'Permanent Marker', var(--font-sans);
   font-weight: 400;
-  letter-spacing: 0.04em;
-  font-size: 1.4em;
-  color: #ff4f5e;
-  text-shadow: 3px 3px 0 #ffd400;
-  display: inline-block;
-  transform: rotate(-3deg);
-  margin: 0 4px;
-  vertical-align: -0.06em;
+  font-size: 17px;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  text-align: left;
+  padding: 16px 22px 14px;
+  background: #ffe14a;
+  border-bottom: 2px solid var(--text);
 }
-.cta-band p {
-  margin: 0 0 20px;
+.kinds-table thead th.kt-check {
+  text-align: center;
+}
+.kinds-table tbody td {
+  padding: 13px 22px;
+  border-bottom: 1px dashed color-mix(in srgb, var(--text) 18%, transparent);
+  vertical-align: middle;
+  transition: background 100ms ease-out;
+}
+.kinds-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.kinds-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.kinds-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.kinds-table tbody td:first-child {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+.kinds-table tbody td:nth-child(2) {
+  font-family: var(--font-sans);
   color: var(--text-muted);
-  font-size: 16px;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: color-mix(in srgb, #ff4f5e 80%, transparent);
+}
+.kinds-table .kt-check {
+  text-align: center;
+  width: 80px;
+}
+/* Yellow highlighter pill stamping each ✓ — same motif as the <em>
+ * highlights in the comic hero headings. */
+.kinds-table tbody td.kt-check span {
+  display: inline-block;
+  background: #ffe14a;
+  padding: 3px 16px 5px;
+  border-radius: 999px;
+  font-family: 'Bangers', 'Impact', var(--font-sans);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  /* Subtle hand-drawn outline so it reads as a "stamp" against light
+   * row backgrounds. */
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 18%, transparent);
+}
+@media (max-width: 600px) {
+  .kinds-table-wrap { transform: none; box-shadow: 4px 4px 0 var(--text); }
+  .kinds-table { font-size: 13.5px; }
+  .kinds-table thead th { font-size: 15px; padding: 12px 14px; }
+  .kinds-table tbody td { padding: 11px 14px; }
+  .kinds-table .kt-check { width: 56px; }
+  .kinds-table tbody td.kt-check span {
+    font-size: 18px;
+    padding: 3px 12px 4px;
+  }
 }
 
 /* ---------- Footer ---------- */
@@ -1972,8 +1971,7 @@ button {
 
   /* Story hero — keep the comic feel but stop the numbers wrapping. */
   .hero--story { padding: 36px 16px 24px; }
-  .story-stack { font-size: 16px; }
-  .story-stack li { padding-left: 12px; }
+  .story-paragraph { font-size: 15.5px; line-height: 1.65; }
   .app { font-size: 13px; padding: 1px 8px; }
   .story-bubble {
     margin: 16px 0;
@@ -2054,15 +2052,8 @@ button {
   .mock-term { font-size: 11px; }
   .mock-term-line { white-space: pre-wrap; word-break: break-word; }
 
-  /* Tab kinds cloud — already auto-fill but tighten the gap. */
+  /* Functionality table on small screens. */
   .kinds-cloud { padding: 50px 16px; }
-  .kinds-grid { gap: 8px; }
-  .kind-card { padding: 14px 10px; }
-
-  /* Mid CTA — pull padding in so the giant `15` doesn't wrap awkwardly. */
-  .cta-band { padding: 50px 16px; }
-  .cta-band-inner { padding: 36px 20px; }
-  .cta-band h2 .num { font-size: 1.2em; }
 
   /* Showcase tag rotations look pasted-on at desktop sizes; on mobile
    *  the slight tilt overflows the narrow column — flatten it. */

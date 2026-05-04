@@ -463,6 +463,67 @@ export function Terminal({ tabId }: Props) {
     };
     host.addEventListener('keydown', onKeyDown);
 
+    // Drag-and-drop file paths into the terminal — same UX as Ghostty,
+    // Terminal.app, iTerm. Drop a file/folder from Finder (or anywhere
+    // else) onto the terminal and its absolute path is typed in,
+    // shell-quoted so spaces / special chars don't break the command.
+    // Useful for piping things into `claude` / `codex` / `cat` etc.
+    const shellQuote = (p: string): string => {
+      // Single-quote and escape any embedded single quotes by closing
+      // the quoted run, escaping the quote, and reopening — the
+      // standard POSIX trick: `' \' '` becomes `'\''`.
+      return `'${p.replace(/'/g, `'\\''`)}'`;
+    };
+    const onDragOver = (e: DragEvent) => {
+      // dataTransfer.types is the only thing we can inspect during
+      // dragover (the file list is hidden until drop). Accept anything
+      // that looks file-shaped.
+      if (
+        e.dataTransfer?.types.includes('Files') ||
+        e.dataTransfer?.types.includes('text/uri-list')
+      ) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }
+    };
+    const onDrop = (e: DragEvent) => {
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      // Prefer the URI list (carries the actual filesystem paths).
+      // `dt.files` has File objects but no full path on the web —
+      // Electron's File extends with `path`, so we fall back to that.
+      const paths: string[] = [];
+      const uri = dt.getData('text/uri-list');
+      if (uri) {
+        for (const line of uri.split(/\r?\n/)) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          if (trimmed.startsWith('file://')) {
+            try {
+              paths.push(decodeURIComponent(new URL(trimmed).pathname));
+            } catch {
+              /* malformed line — skip */
+            }
+          } else {
+            paths.push(trimmed);
+          }
+        }
+      }
+      if (paths.length === 0 && dt.files && dt.files.length > 0) {
+        for (const f of Array.from(dt.files)) {
+          // Electron exposes `path` on File for desktop drops.
+          const p = (f as File & { path?: string }).path;
+          if (p) paths.push(p);
+        }
+      }
+      if (paths.length === 0) return;
+      e.preventDefault();
+      const out = paths.map(shellQuote).join(' ') + ' ';
+      void window.marko.ptyWrite(ptyId, out);
+    };
+    host.addEventListener('dragover', onDragOver);
+    host.addEventListener('drop', onDrop);
+
     const ro = new ResizeObserver(() => {
       try {
         fit.fit();
@@ -480,6 +541,8 @@ export function Terminal({ tabId }: Props) {
       // observer, cursor RAF. The session (term, pty, I/O) survives
       // so pane splits / tree restructures don't kill the shell.
       host.removeEventListener('keydown', onKeyDown);
+      host.removeEventListener('dragover', onDragOver);
+      host.removeEventListener('drop', onDrop);
       ro.disconnect();
       cancelAnimationFrame(cursorRaf);
       cursorMoveDispose.dispose();

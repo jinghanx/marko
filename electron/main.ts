@@ -1406,6 +1406,35 @@ ipcMain.handle('settings:write', async (_e, json: string): Promise<{ ok: boolean
   }
 });
 
+/** "Save for later" reading list at ~/.marko/later.json — pages,
+ *  videos, anything saved from a web tab via the bookmark button.
+ *  Same shared-dotfile pattern as music-library. */
+async function laterListPath(): Promise<string> {
+  const dir = await ensureMarkoDir();
+  return path.join(dir, 'later.json');
+}
+ipcMain.handle('later:read', async (): Promise<string | null> => {
+  try {
+    return await fs.readFile(await laterListPath(), 'utf8');
+  } catch {
+    return null;
+  }
+});
+ipcMain.handle(
+  'later:write',
+  async (_e, json: string): Promise<{ ok: boolean }> => {
+    try {
+      const file = await laterListPath();
+      const tmp = file + '.tmp';
+      await fs.writeFile(tmp, json, 'utf8');
+      await fs.rename(tmp, file);
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  },
+);
+
 /** Music tab library (user-added tracks + hidden curated picks) at
  *  ~/.marko/music-library.json. Lives in the shared dotfile dir so
  *  dev and packaged builds see the same library — localStorage is

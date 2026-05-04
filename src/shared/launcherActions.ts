@@ -17,6 +17,7 @@ export type LauncherAction =
   | { type: 'open-notes' }
   | { type: 'open-shortcuts' }
   | { type: 'open-music' }
+  | { type: 'open-later' }
   | { type: 'open-folder'; path: string }
   | { type: 'open-home-folder'; sub: string }
   | { type: 'open-app'; appPath: string }
@@ -39,7 +40,8 @@ export type LauncherIconKind =
   | 'markdown'
   | 'folder'
   | 'code'
-  | 'music';
+  | 'music'
+  | 'later';
 
 export interface LauncherCommand {
   /** First keyword is the canonical name; rest are aliases. */
@@ -134,6 +136,13 @@ export const LAUNCHER_COMMANDS: LauncherCommand[] = [
     category: 'Music',
     iconKind: 'music',
     action: { type: 'open-music' },
+  },
+  {
+    keywords: ['later', 'save', 'bookmarks', 'reading', 'queue', 'pocket'],
+    label: 'Open Later (saved pages)',
+    category: 'Later',
+    iconKind: 'later',
+    action: { type: 'open-later' },
   },
   {
     keywords: ['activity', 'processes', 'process', 'top', 'htop'],

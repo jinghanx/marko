@@ -77,13 +77,13 @@ export function TabBar({ paneId, sessionId, edges = { left: true, right: true } 
   >(null);
   useEffect(() => {
     if (draggingRef.current) return;
-    if (
-      tabs.length !== localTabs.length ||
-      tabs.some((t, i) => t.id !== localTabs[i]?.id)
-    ) {
-      setLocalTabs(tabs);
-    }
-  }, [tabs, localTabs]);
+    // Re-sync on every workspace change (renames, dirty toggles,
+    // viewMode flips, etc.) — not just structural id/length diffs,
+    // which silently dropped non-order updates and made tab renames
+    // appear to revert. Drag state still gates the sync so framer's
+    // animation isn't clobbered mid-drag.
+    setLocalTabs(tabs);
+  }, [tabs]);
 
   const handleReorder = (next: Tab[]) => {
     // Pinned partition: pinned tabs always live to the left. As the
@@ -292,7 +292,20 @@ export function TabBar({ paneId, sessionId, edges = { left: true, right: true } 
                 <TabRenameInput
                   initial={tab.title}
                   onCommit={(name) => {
+                    const trimmed = name.trim();
                     workspace.renameTab(tab.id, name);
+                    // Mirror the rename into localTabs synchronously —
+                    // the post-render useEffect would normally handle
+                    // this, but framer's <Reorder.Group> seems to
+                    // suppress the secondary re-render in some cases,
+                    // making the rename appear stale until another
+                    // workspace event (open tab, switch focus, etc.)
+                    // forces another render.
+                    if (trimmed) {
+                      setLocalTabs((prev) =>
+                        prev.map((t) => (t.id === tab.id ? { ...t, title: trimmed } : t)),
+                      );
+                    }
                     setRenamingId(null);
                   }}
                   onCancel={() => setRenamingId(null)}
@@ -433,10 +446,25 @@ function KindIcon({ tab }: { tab: Tab }) {
       return <ShortcutsTabGlyph />;
     case 'music':
       return <MusicGlyph />;
+    case 'later':
+      return <BookmarkTabGlyph />;
     case 'code':
     default:
       return <CodeGlyph />;
   }
+}
+
+function BookmarkTabGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <path
+        d="M3.5 2 a0.5 0.5 0 0 1 0.5 -0.5 h8 a0.5 0.5 0 0 1 0.5 0.5 v12 l-4.5 -2.8 l-4.5 2.8 z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function MusicGlyph() {

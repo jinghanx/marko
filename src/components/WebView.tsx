@@ -9,6 +9,12 @@ import {
 import { normalizeUrl } from '../lib/actions';
 import { uiBus } from '../lib/uiBus';
 import { useGlideCaret } from '../lib/useGlideCaret';
+import { saveForLater, isYoutubeUrl } from '../lib/laterStore';
+import {
+  saveTrackToLibrary,
+  parseVideoId,
+  detectGenre,
+} from '../lib/musicLibraryStore';
 
 /** Type of the Electron `<webview>` element with the methods we use.
  *  React's typings don't model the custom element, so we cast through
@@ -146,6 +152,11 @@ export function WebView({ tabId, url }: Props) {
   const [canForward, setCanForward] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
+  const [pageFavicon, setPageFavicon] = useState<string | null>(null);
+  // Visual confirmation when a save button is hit — flips the icon
+  // for ~1.5s so the user sees feedback without a toast or modal.
+  const [savedToLater, setSavedToLater] = useState(false);
+  const [savedToMusic, setSavedToMusic] = useState(false);
   const addressRef = useRef<HTMLInputElement | null>(null);
   const { mirrorRef: addrMirrorRef, caretRef: addrCaretRef, bumpInput: addrBump, recompute: addrRecompute } =
     useGlideCaret(addressRef, addressBar);
@@ -304,6 +315,7 @@ export function WebView({ tabId, url }: Props) {
       const urls: string[] | undefined = e?.favicons;
       const url = urls && urls.length > 0 ? urls[0] : null;
       if (!url) return;
+      setPageFavicon(url);
       workspace.setState((prev) => ({
         tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, favicon: url } : t)),
       }));
@@ -384,6 +396,53 @@ export function WebView({ tabId, url }: Props) {
     }));
   }, [pageTitle, tabId]);
 
+  /** Save the current page into ~/.marko/later.json so the user can
+   *  read it from the Later tab later on. The bookmark icon flips to
+   *  a check for ~1.5s as visual feedback. */
+  const handleSaveLater = async () => {
+    if (!currentUrl) return;
+    await saveForLater({
+      url: currentUrl,
+      title: pageTitle ?? currentUrl,
+      favicon: pageFavicon ?? undefined,
+    });
+    setSavedToLater(true);
+    setTimeout(() => setSavedToLater(false), 1500);
+  };
+
+  /** Save a YouTube video into the music library — same flow as the
+   *  Add Link modal in MusicView, just driven from the address bar.
+   *  Fetches metadata for proper title / channel / live flag and
+   *  guesses a genre from the description. */
+  const handleSaveToMusic = async () => {
+    const videoId = parseVideoId(currentUrl);
+    if (!videoId) return;
+    let title = pageTitle ?? '';
+    let channel = '';
+    let isLive = false;
+    let genre: string | null = null;
+    try {
+      const meta = await window.marko.youtubeMetadata(videoId);
+      if (meta.ok) {
+        if (meta.title) title = meta.title;
+        if (meta.channel) channel = meta.channel;
+        isLive = meta.isLive;
+        genre = detectGenre(`${meta.title}\n${meta.description}`);
+      }
+    } catch {
+      /* metadata fetch failed — save with whatever we have */
+    }
+    await saveTrackToLibrary({
+      videoId,
+      title,
+      channel,
+      genre: genre ?? 'Other',
+      isLive,
+    });
+    setSavedToMusic(true);
+    setTimeout(() => setSavedToMusic(false), 1500);
+  };
+
   const loadAddress = () => {
     const next = normalizeUrl(addressBar);
     wvRef.current?.loadURL(next);
@@ -441,6 +500,34 @@ export function WebView({ tabId, url }: Props) {
           <span ref={addrMirrorRef} className="webview-address-mirror" aria-hidden />
           <div ref={addrCaretRef} className="webview-address-caret" aria-hidden />
         </div>
+        {/* Music save — only on YouTube URLs. Hits the same metadata
+          * fetch + genre detector the Add Link modal uses, so the
+          * resulting library entry matches what the modal would
+          * produce. */}
+        {isYoutubeUrl(currentUrl) && (
+          <button
+            className={
+              'webview-btn' + (savedToMusic ? ' webview-btn--saved' : '')
+            }
+            onClick={() => void handleSaveToMusic()}
+            title={savedToMusic ? 'Saved to Music' : 'Save to Music'}
+            aria-label="Save to Music"
+          >
+            {savedToMusic ? <CheckGlyph /> : <NoteGlyph />}
+          </button>
+        )}
+        {/* Save for later — works on any web page. Reads the current
+          * URL + title + favicon and writes to ~/.marko/later.json. */}
+        <button
+          className={
+            'webview-btn' + (savedToLater ? ' webview-btn--saved' : '')
+          }
+          onClick={() => void handleSaveLater()}
+          title={savedToLater ? 'Saved for later' : 'Save for later'}
+          aria-label="Save for later"
+        >
+          {savedToLater ? <CheckGlyph /> : <BookmarkGlyph />}
+        </button>
       </div>
       {/* The actual <webview> lives in webviewSessions (module scope) and
           is appended into this host imperatively by the mount effect.
@@ -458,6 +545,49 @@ function Chev({ dir }: { dir: 'left' | 'right' }) {
       <path
         d={dir === 'left' ? 'M10 3 L5 8 L10 13' : 'M6 3 L11 8 L6 13'}
         fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function BookmarkGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden fill="none">
+      <path
+        d="M4 2.5 a0.5 0.5 0 0 1 0.5 -0.5 h7 a0.5 0.5 0 0 1 0.5 0.5 v11 l-4 -2.5 l-4 2.5 z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function NoteGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden fill="none">
+      <path
+        d="M6 11.5 V3 L13 2 V10"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="4.4" cy="11.6" rx="1.8" ry="1.3" fill="currentColor" />
+      <ellipse cx="11.4" cy="10.6" rx="1.8" ry="1.3" fill="currentColor" />
+    </svg>
+  );
+}
+
+function CheckGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden fill="none">
+      <path
+        d="M3 8.5 L6.5 12 L13 4"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"

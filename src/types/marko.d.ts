@@ -207,6 +207,12 @@ export interface MarkoApi {
    *  the same library. */
   musicLibraryRead(): Promise<string | null>;
   musicLibraryWrite(json: string): Promise<{ ok: boolean }>;
+  /** Read / write the "save for later" list (~/.marko/later.json) —
+   *  pages, articles, videos saved from web tabs via the bookmark
+   *  button. Same dotfile / shared-across-builds pattern as the
+   *  music library. */
+  laterRead(): Promise<string | null>;
+  laterWrite(json: string): Promise<{ ok: boolean }>;
   /** Settings JSON blob from ~/.marko/settings.json, read
    *  synchronously by preload at boot so settings.ts can hydrate
    *  without becoming async. `null` if the file doesn't exist or

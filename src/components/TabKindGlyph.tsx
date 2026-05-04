@@ -26,9 +26,23 @@ export function TabKindGlyph({ kind }: { kind: TabKind }) {
     case 'settings': return <SettingsGlyph />;
     case 'sqlite': return <SqliteGlyph />;
     case 'music': return <MusicGlyph />;
+    case 'later': return <BookmarkGlyph />;
     case 'code':
     default: return <CodeGlyph />;
   }
+}
+
+export function BookmarkGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      <path
+        d="M3.5 2 a0.5 0.5 0 0 1 0.5 -0.5 h8 a0.5 0.5 0 0 1 0.5 0.5 v12 l-4.5 -2.8 l-4.5 2.8 z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export function MusicGlyph() {

@@ -23,7 +23,8 @@ export type TabKind =
   | 'settings'
   | 'sqlite'
   | 'shortcuts'
-  | 'music';
+  | 'music'
+  | 'later';
 
 export interface Tab {
   id: string;

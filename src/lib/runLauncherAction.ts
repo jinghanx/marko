@@ -12,6 +12,7 @@ import {
   openSettingsTab,
   openShortcutsTab,
   openMusicTab,
+  openLaterTab,
   openFileFromPath,
   openFolderInEditor,
   openUrlInTab,
@@ -87,6 +88,9 @@ export async function runLauncherAction(action: LauncherAction): Promise<void> {
       return;
     case 'open-music':
       openMusicTab();
+      return;
+    case 'open-later':
+      openLaterTab();
       return;
     case 'open-notes': {
       const file = await window.marko.notesPath();

@@ -64,6 +64,9 @@ const api = {
     ipcRenderer.invoke('music-library:read'),
   musicLibraryWrite: (json: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('music-library:write', json),
+  laterRead: (): Promise<string | null> => ipcRenderer.invoke('later:read'),
+  laterWrite: (json: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('later:write', json),
   /** Initial settings blob — read synchronously by preload from
    *  ~/.marko/settings.json so settings.ts can hydrate without
    *  becoming async. `null` on first run / unreadable file. */

@@ -54,6 +54,16 @@ export function GitView() {
   const [branches, setBranches] = useState<GitBranchInfo | null>(null);
   const [stashes, setStashes] = useState<GitStashEntry[]>([]);
   const [selected, setSelected] = useState<SelectedFile | null>(null);
+  /** Multi-select set keyed by `${section}:${path}` — `S` for staged,
+   *  `W` for working/untracked. Cmd-click toggles, shift-click selects
+   *  a range from the last single-clicked row. Right-click opens a
+   *  menu that operates on this whole set if non-empty. */
+  const [multiSelected, setMultiSelected] = useState<Set<string>>(new Set());
+  const [lastClickedKey, setLastClickedKey] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<
+    | { x: number; y: number; targetKey: string; targetPath: string; targetStaged: boolean }
+    | null
+  >(null);
   const [diff, setDiff] = useState<string | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
   const [showBranches, setShowBranches] = useState(false);
@@ -453,6 +463,133 @@ export function GitView() {
     return out;
   }, [status]);
 
+  /** Flat ordered list of every visible row across the three sections,
+   *  so shift-click range selection can resolve "from / to" anywhere in
+   *  the list. Order matches the rendered DOM: staged → unstaged →
+   *  untracked. */
+  const allRows = useMemo(() => {
+    const rows: { key: string; path: string; staged: boolean; isUntracked: boolean }[] = [];
+    for (const f of staged) {
+      rows.push({ key: `S:${f.path}`, path: f.path, staged: true, isUntracked: false });
+    }
+    for (const f of unstaged) {
+      rows.push({ key: `W:${f.path}`, path: f.path, staged: false, isUntracked: false });
+    }
+    for (const f of untracked) {
+      rows.push({ key: `W:${f.path}`, path: f.path, staged: false, isUntracked: true });
+    }
+    return rows;
+  }, [staged, unstaged, untracked]);
+
+  /** Clear stale entries from multiSelected when the file list changes
+   *  (after stage / unstage / commit etc.) — otherwise dead keys stick
+   *  around and re-select the wrong rows on next refresh. */
+  useEffect(() => {
+    const live = new Set(allRows.map((r) => r.key));
+    setMultiSelected((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const k of prev) {
+        if (live.has(k)) next.add(k);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [allRows]);
+
+  // Close the context menu on any outside click or keypress.
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onMouse = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest('.ctx-menu')) return;
+      setContextMenu(null);
+    };
+    const onKey = () => setContextMenu(null);
+    document.addEventListener('mousedown', onMouse, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onMouse, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [contextMenu]);
+
+  const handleRowMouseDown = (
+    key: string,
+    path: string,
+    isStaged: boolean,
+    isUntracked: boolean,
+  ) => (e: React.MouseEvent) => {
+    // Right-click is reserved for opening the context menu — onContextMenu
+    // handles selection-aware logic separately.
+    if (e.button !== 0) return;
+    if (e.shiftKey && lastClickedKey) {
+      e.preventDefault();
+      const startIdx = allRows.findIndex((r) => r.key === lastClickedKey);
+      const endIdx = allRows.findIndex((r) => r.key === key);
+      if (startIdx >= 0 && endIdx >= 0) {
+        const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        setMultiSelected(new Set(allRows.slice(lo, hi + 1).map((r) => r.key)));
+      }
+      return;
+    }
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      setMultiSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+      setLastClickedKey(key);
+      return;
+    }
+    // Plain click: clear multi-selection, select just this row, and
+    // surface it in the diff pane.
+    setMultiSelected(new Set([key]));
+    setLastClickedKey(key);
+    setSelected({ path, staged: isStaged, isUntracked });
+  };
+
+  const handleRowContextMenu = (
+    key: string,
+    path: string,
+    isStaged: boolean,
+  ) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // If the right-clicked row isn't in the current multi-selection,
+    // collapse to just this one (matches Finder behaviour).
+    setMultiSelected((prev) => {
+      if (prev.has(key)) return prev;
+      return new Set([key]);
+    });
+    setLastClickedKey(key);
+    setContextMenu({ x: e.clientX, y: e.clientY, targetKey: key, targetPath: path, targetStaged: isStaged });
+  };
+
+  /** Resolve which rows the context menu should operate on. If the
+   *  right-clicked row is part of a multi-selection, all of them.
+   *  Otherwise just the single row. Returns paths split by where they
+   *  came from so callers can route to stage/unstage/discard. */
+  const contextTargets = useMemo(() => {
+    const out = { stagedPaths: [] as string[], unstagedPaths: [] as string[], untrackedPaths: [] as string[] };
+    if (!contextMenu) return out;
+    const keys =
+      multiSelected.size > 0 && multiSelected.has(contextMenu.targetKey)
+        ? multiSelected
+        : new Set([contextMenu.targetKey]);
+    const byKey = new Map(allRows.map((r) => [r.key, r]));
+    for (const k of keys) {
+      const row = byKey.get(k);
+      if (!row) continue;
+      if (row.staged) out.stagedPaths.push(row.path);
+      else if (row.isUntracked) out.untrackedPaths.push(row.path);
+      else out.unstagedPaths.push(row.path);
+    }
+    return out;
+  }, [contextMenu, multiSelected, allRows]);
+
   if (!rootDir) {
     return (
       <div className="git-view git-view--empty">
@@ -587,8 +724,10 @@ export function GitView() {
             onAction={() => unstage(staged.map((f) => f.path))}
             onPerFile={(f) => unstage([f.path])}
             selected={selected}
-            setSelected={setSelected}
             staged
+            multiSelected={multiSelected}
+            onRowMouseDown={handleRowMouseDown}
+            onRowContextMenu={handleRowContextMenu}
           />
           <Section
             title="Changes"
@@ -599,8 +738,10 @@ export function GitView() {
             onPerFile={(f) => stage([f.path])}
             onDiscard={(f) => discard([f.path])}
             selected={selected}
-            setSelected={setSelected}
             staged={false}
+            multiSelected={multiSelected}
+            onRowMouseDown={handleRowMouseDown}
+            onRowContextMenu={handleRowContextMenu}
           />
           <Section
             title="Untracked"
@@ -611,8 +752,10 @@ export function GitView() {
             onPerFile={(f) => stage([f.path])}
             onDiscard={(f) => void trashUntracked([f.path])}
             selected={selected}
-            setSelected={setSelected}
             staged={false}
+            multiSelected={multiSelected}
+            onRowMouseDown={handleRowMouseDown}
+            onRowContextMenu={handleRowContextMenu}
           />
 
           {staged.length === 0 && unstaged.length === 0 && untracked.length === 0 && (
@@ -874,6 +1017,113 @@ export function GitView() {
         </button>
       </div>
       )}
+
+      {contextMenu && (
+        <GitFileContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          stagedPaths={contextTargets.stagedPaths}
+          unstagedPaths={contextTargets.unstagedPaths}
+          untrackedPaths={contextTargets.untrackedPaths}
+          rootDir={rootDir}
+          onClose={() => setContextMenu(null)}
+          onStage={(paths) => stage(paths)}
+          onUnstage={(paths) => unstage(paths)}
+          onDiscard={(paths) => discard(paths)}
+          onTrashUntracked={(paths) => void trashUntracked(paths)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Right-click menu for git file rows. Routes each operation against
+ *  the subset of selected files where it actually applies — e.g.
+ *  "Stage" only acts on the unstaged + untracked subset, "Unstage"
+ *  only on the staged subset. Menu items only render when their
+ *  target list is non-empty. */
+function GitFileContextMenu({
+  x,
+  y,
+  stagedPaths,
+  unstagedPaths,
+  untrackedPaths,
+  rootDir,
+  onClose,
+  onStage,
+  onUnstage,
+  onDiscard,
+  onTrashUntracked,
+}: {
+  x: number;
+  y: number;
+  stagedPaths: string[];
+  unstagedPaths: string[];
+  untrackedPaths: string[];
+  rootDir: string | null;
+  onClose: () => void;
+  onStage: (paths: string[]) => void;
+  onUnstage: (paths: string[]) => void;
+  onDiscard: (paths: string[]) => void;
+  onTrashUntracked: (paths: string[]) => void;
+}) {
+  const totalCount = stagedPaths.length + unstagedPaths.length + untrackedPaths.length;
+  const stageable = [...unstagedPaths, ...untrackedPaths];
+  const allPaths = [...stagedPaths, ...unstagedPaths, ...untrackedPaths];
+  const wrap = (fn: () => void) => () => {
+    onClose();
+    fn();
+  };
+  return (
+    <div
+      className="ctx-menu"
+      style={{ left: x, top: y, position: 'fixed' }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {stageable.length > 0 && (
+        <button className="ctx-menu-item" onClick={wrap(() => onStage(stageable))}>
+          Stage{stageable.length > 1 ? ` ${stageable.length} files` : ''}
+        </button>
+      )}
+      {stagedPaths.length > 0 && (
+        <button className="ctx-menu-item" onClick={wrap(() => onUnstage(stagedPaths))}>
+          Unstage{stagedPaths.length > 1 ? ` ${stagedPaths.length} files` : ''}
+        </button>
+      )}
+      {unstagedPaths.length > 0 && (
+        <button className="ctx-menu-item" onClick={wrap(() => onDiscard(unstagedPaths))}>
+          Discard changes
+          {unstagedPaths.length > 1 ? ` (${unstagedPaths.length})` : ''}
+        </button>
+      )}
+      {untrackedPaths.length > 0 && (
+        <button className="ctx-menu-item" onClick={wrap(() => onTrashUntracked(untrackedPaths))}>
+          Move to Trash
+          {untrackedPaths.length > 1 ? ` (${untrackedPaths.length})` : ''}
+        </button>
+      )}
+      {totalCount > 0 && allPaths[0] && (
+        <>
+          <div className="ctx-menu-sep" />
+          <button
+            className="ctx-menu-item"
+            onClick={wrap(() => {
+              const text = allPaths.map((p) => (rootDir ? `${rootDir}/${p}` : p)).join('\n');
+              void navigator.clipboard.writeText(text);
+            })}
+          >
+            Copy {totalCount > 1 ? `${totalCount} paths` : 'path'}
+          </button>
+          {rootDir && (
+            <button
+              className="ctx-menu-item"
+              onClick={wrap(() => void window.marko.revealInFinder(`${rootDir}/${allPaths[0]}`))}
+            >
+              Reveal in Finder
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -887,8 +1137,10 @@ function Section({
   onPerFile,
   onDiscard,
   selected,
-  setSelected,
   staged,
+  multiSelected,
+  onRowMouseDown,
+  onRowContextMenu,
 }: {
   title: string;
   count: number;
@@ -898,8 +1150,23 @@ function Section({
   onPerFile: (f: GitFileEntry) => void;
   onDiscard?: (f: GitFileEntry) => void;
   selected: SelectedFile | null;
-  setSelected: (s: SelectedFile | null) => void;
   staged: boolean;
+  /** Cmd/Shift-aware mouse handler — see GitView's handleRowMouseDown. */
+  onRowMouseDown: (
+    key: string,
+    path: string,
+    isStaged: boolean,
+    isUntracked: boolean,
+  ) => (e: React.MouseEvent) => void;
+  /** Right-click opens the operations menu over the targeted row. */
+  onRowContextMenu: (
+    key: string,
+    path: string,
+    isStaged: boolean,
+  ) => (e: React.MouseEvent) => void;
+  /** Set of row keys (`S:path` or `W:path`) currently part of the
+   *  multi-selection — drives the row's `--multi` styling. */
+  multiSelected: Set<string>;
 }) {
   if (count === 0) return null;
   return (
@@ -913,19 +1180,21 @@ function Section({
       </div>
       <div className="git-section-files">
         {files.map((f) => {
+          const key = `${staged ? 'S' : 'W'}:${f.path}`;
           const isActive =
             selected && selected.path === f.path && selected.staged === staged;
+          const isMulti = multiSelected.has(key);
+          const isUntracked = f.index === '?' && f.workingDir === '?';
           return (
             <div
-              key={`${staged ? 'S' : 'W'}:${f.path}`}
-              className={`git-file${isActive ? ' git-file--active' : ''}`}
-              onClick={() =>
-                setSelected({
-                  path: f.path,
-                  staged,
-                  isUntracked: f.index === '?' && f.workingDir === '?',
-                })
+              key={key}
+              className={
+                'git-file' +
+                (isActive ? ' git-file--active' : '') +
+                (isMulti ? ' git-file--multi' : '')
               }
+              onMouseDown={onRowMouseDown(key, f.path, staged, isUntracked)}
+              onContextMenu={onRowContextMenu(key, f.path, staged)}
             >
               <FileStatusBadge index={f.index} workingDir={f.workingDir} staged={staged} />
               <FilePathLabel path={f.path} />

@@ -179,6 +179,19 @@ export function openShortcutsTab(opts: { focus?: boolean } = {}) {
 
 /** Reveal the existing settings tab if one is open, otherwise open a fresh
  *  one. Settings are global, so a single instance is the right model. */
+export function openLaterTab(opts: { focus?: boolean } = {}) {
+  const focus = opts.focus ?? true;
+  const existing = workspace.getState().tabs.find((t) => t.kind === 'later');
+  if (existing) {
+    workspace.revealTab(existing.id);
+    if (focus) workspace.requestEditorFocus();
+    return existing;
+  }
+  const tab = workspace.openNewTab({ kind: 'later', title: 'Later' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
 export function openSettingsTab(opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? true;
   const existing = workspace.getState().tabs.find((t) => t.kind === 'settings');

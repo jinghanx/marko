@@ -39,13 +39,12 @@ function Strip({
   const draggingRef = useRef(false);
   useEffect(() => {
     if (draggingRef.current) return;
-    if (
-      sessions.length !== localSessions.length ||
-      sessions.some((s, i) => s.id !== localSessions[i]?.id)
-    ) {
-      setLocalSessions(sessions);
-    }
-  }, [sessions, localSessions]);
+    // Re-sync on every workspace change (renames, new sessions, etc.)
+    // not just structural id/length diffs — the diff guard silently
+    // dropped name updates so workspace renames appeared to revert
+    // until another store event forced a re-render.
+    setLocalSessions(sessions);
+  }, [sessions]);
 
   // Free-floating ghost rendered via portal so the dragged workspace
   // tab visually follows the cursor anywhere on screen — same pattern
@@ -137,7 +136,16 @@ function Strip({
               <RenameInput
                 initial={s.name}
                 onCommit={(name) => {
-                  if (name.trim()) workspace.renameSession(s.id, name.trim());
+                  const trimmed = name.trim();
+                  if (trimmed) {
+                    workspace.renameSession(s.id, trimmed);
+                    // Mirror into localSessions so framer's <Reorder.Group>
+                    // doesn't suppress the post-rename re-render — same
+                    // workaround as the file tab bar's rename path.
+                    setLocalSessions((prev) =>
+                      prev.map((x) => (x.id === s.id ? { ...x, name: trimmed } : x)),
+                    );
+                  }
                   setRenamingId(null);
                 }}
                 onCancel={() => setRenamingId(null)}

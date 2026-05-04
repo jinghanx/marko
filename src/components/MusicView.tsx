@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { workspace } from '../state/workspace';
+import { subscribeMusicLibrary } from '../lib/musicLibraryStore';
 
 
 /** Spotify-style focus-music tab. Curated YouTube videos & live streams
@@ -262,15 +263,22 @@ export function MusicView({ tabId, initialValue }: Props) {
   const libraryLoadedRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    const reload = async () => {
       const lib = await loadLibrary();
       if (cancelled) return;
       setUserTracks(lib.userTracks);
       setHiddenIds(lib.hiddenIds);
       libraryLoadedRef.current = true;
-    })();
+    };
+    void reload();
+    // Subscribe to library mutations from elsewhere (the WebView's
+    // ♫ button on YouTube pages writes via the shared store and
+    // emits this event). Re-read so new tracks show up immediately
+    // without having to close + reopen the tab.
+    const off = subscribeMusicLibrary(() => void reload());
     return () => {
       cancelled = true;
+      off();
     };
   }, []);
   const [showHidden, setShowHidden] = useState(false);

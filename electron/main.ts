@@ -13,6 +13,30 @@ import { simpleGit, type SimpleGit, type StatusResult } from 'simple-git';
 
 const require = createRequire(import.meta.url);
 
+// Single-instance lock — without this, two Marko processes (e.g. a
+// login-item launch + manual double-click, or a stale dev build still
+// running) fight for the global launcher hotkey. The OS only honours
+// one registration; whichever process registered first wins, and the
+// second one's `globalShortcut.register` returns false silently.
+// Bailing here lets the existing instance handle the new launch.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  // Important: stop module-level side-effects from running below.
+  // app.quit() schedules an async exit so we still execute past this
+  // point unless we throw; an explicit early-exit keeps things tidy.
+  // eslint-disable-next-line no-undef
+  process.exit(0);
+}
+app.on('second-instance', () => {
+  // Another launch attempt — bring the existing main window forward
+  // (or pop the launcher) so the user sees something happen.
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
 // Pin the user-visible name early — affects app menu, dock label, and
 // `app.name` everywhere. Without this we'd fall through to the bundled
 // Electron's "Electron" name in dev.
@@ -241,11 +265,35 @@ function buildTrayMenu(): Menu {
       click: () => trayOpenPath(b.path),
     }));
 
+  // Surfaced at the top of the tray menu so the user can see at a
+  // glance whether the global hotkey actually bound — common failure
+  // mode is another app already owning the shortcut, which makes
+  // globalShortcut.register return false silently. The retry item
+  // lets them re-attempt without restarting Marko.
+  const hotkeyOk = !!currentLauncherHotkey;
+  const desiredHotkey = lastRequestedLauncherHotkey ?? DEFAULT_LAUNCHER_HOTKEY;
   return Menu.buildFromTemplate([
     {
       label: 'Open Launcher',
       accelerator: currentLauncherHotkey ?? undefined,
       click: () => toggleLauncher(),
+    },
+    {
+      label: hotkeyOk
+        ? `Hotkey: ${currentLauncherHotkey} ✓`
+        : `Hotkey ${desiredHotkey} not bound — click to retry`,
+      enabled: !hotkeyOk,
+      click: () => {
+        const ok = registerLauncherHotkey(desiredHotkey);
+        if (!ok && tray) {
+          tray.displayBalloon?.({
+            title: 'Marko',
+            content: `Could not bind ${desiredHotkey}. Another app may own it.`,
+          });
+        }
+        // Rebuild the menu so the status line updates.
+        tray?.setContextMenu(buildTrayMenu());
+      },
     },
     { type: 'separator' },
     {
@@ -436,6 +484,10 @@ const LAUNCHER_H = 420;
  *  process lifetime. */
 const DEFAULT_LAUNCHER_HOTKEY = 'Alt+Space';
 let currentLauncherHotkey: string | null = null;
+/** Tracks what the user *wanted* even if registration failed. Read
+ *  by the tray menu so the "Hotkey not bound — retry" item knows
+ *  which accelerator to attempt. */
+let lastRequestedLauncherHotkey: string | null = null;
 
 function registerLauncherHotkey(accel: string): boolean {
   if (currentLauncherHotkey) {
@@ -443,8 +495,10 @@ function registerLauncherHotkey(accel: string): boolean {
   }
   if (!accel) {
     currentLauncherHotkey = null;
+    lastRequestedLauncherHotkey = null;
     return false;
   }
+  lastRequestedLauncherHotkey = accel;
   try {
     const ok = globalShortcut.register(accel, toggleLauncher);
     if (ok) {
@@ -1141,6 +1195,12 @@ app.whenReady().then(async () => {
     /* file missing / unreadable — stick with the default */
   }
   registerLauncherHotkey(bootHotkey);
+  // Refresh the tray menu so the "Hotkey: Cmd+Space ✓" / retry line
+  // reflects whether the registration actually took. The tray boots
+  // async (canvas-rendered icons) so this may run before the tray
+  // exists; updateTrayState() and createTray() both rebuild the menu
+  // when they finish.
+  if (tray) tray.setContextMenu(buildTrayMenu());
 
   app.on('activate', () => {
     // Re-assert the regular activation policy on every reactivation. We

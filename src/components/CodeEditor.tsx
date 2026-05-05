@@ -47,9 +47,12 @@ interface Props {
   initialValue: string;
   filePath: string | null;
   language?: string;
+  /** Fires once after the EditorView mounts. The split markdown view uses
+   *  this to attach a scroll listener for preview sync. */
+  onReady?: (view: EditorView) => void;
 }
 
-export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
+export function CodeEditor({ tabId, initialValue, filePath, language, onReady }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   // The compartment swaps in the chosen modal-keymap extension when the
@@ -94,6 +97,7 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
       parent: host,
     });
     viewRef.current = view;
+    onReady?.(view);
 
     // Auto-focus on mount if this tab is active in the focused pane.
     const focusedLeaf = workspace.getFocusedLeaf();

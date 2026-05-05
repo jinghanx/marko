@@ -21,12 +21,12 @@ function classify(filePath: string, content: string): { kind: TabKind; content: 
 }
 
 export async function openFileViaDialog() {
-  const result = await window.marko.openFileDialog();
+  const result = await window.milu.openFileDialog();
   if (!result) return;
-  const title = await window.marko.basename(result.filePath);
+  const title = await window.milu.basename(result.filePath);
   const kindByExt = detectKind(result.filePath);
   if (kindByExt === 'image') {
-    const dataUrl = await window.marko.loadImage(result.filePath);
+    const dataUrl = await window.milu.loadImage(result.filePath);
     workspace.openFileTab(result.filePath, dataUrl, title, 'image');
     settings.pushRecentFile(result.filePath);
     workspace.requestEditorFocus();
@@ -112,6 +112,30 @@ export function openExcalidrawTab(opts: { focus?: boolean } = {}) {
 export function openChatTab(opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? true;
   const tab = workspace.openNewTab({ kind: 'chat', title: 'Chat' });
+  if (focus) workspace.requestEditorFocus();
+  return tab;
+}
+
+/** Open a new ACP-agent session tab. Each tab carries its own
+ *  reqId — that's how the renderer addresses the live subprocess in
+ *  main. We don't persist anything else in `tab.content` because the
+ *  subprocess (and therefore the conversation history) dies with the
+ *  app; reopening a saved snapshot would resurrect a dead reqId. */
+export function openAgentTab(
+  agentId: string,
+  agentName: string,
+  opts: { focus?: boolean } = {},
+) {
+  const focus = opts.focus ?? true;
+  const reqId = `acp-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+  const tab = workspace.openNewTab({
+    kind: 'agent',
+    title: agentName,
+  });
+  workspace.rebaseSavedContent(
+    tab.id,
+    JSON.stringify({ agentId, reqId }),
+  );
   if (focus) workspace.requestEditorFocus();
   return tab;
 }
@@ -221,14 +245,14 @@ export function openUrlInTab(rawUrl: string, opts: { focus?: boolean } = {}) {
 
 export async function openFolderInEditor(folderPath: string, opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? false;
-  const title = await window.marko.basename(folderPath);
+  const title = await window.milu.basename(folderPath);
   workspace.openFileTab(folderPath, '', title || folderPath, 'folder');
   maybeRevealInTree(folderPath);
   if (focus) workspace.requestEditorFocus();
 }
 
 export async function openFolderViaDialog() {
-  const dir = await window.marko.openFolderDialog();
+  const dir = await window.milu.openFolderDialog();
   if (!dir) return;
   workspace.setRootDir(dir);
   workspace.setSidebarVisible(true);
@@ -237,7 +261,7 @@ export async function openFolderViaDialog() {
 export async function openFileFromPath(filePath: string, opts: { focus?: boolean } = {}) {
   const focus = opts.focus ?? true;
   const kindByExt = detectKind(filePath);
-  const title = await window.marko.basename(filePath);
+  const title = await window.milu.basename(filePath);
   if (kindByExt === 'binary') {
     workspace.openFileTab(filePath, '', title, 'binary');
     settings.pushRecentFile(filePath);
@@ -245,7 +269,7 @@ export async function openFileFromPath(filePath: string, opts: { focus?: boolean
     return;
   }
   if (kindByExt === 'image') {
-    const dataUrl = await window.marko.loadImage(filePath);
+    const dataUrl = await window.milu.loadImage(filePath);
     workspace.openFileTab(filePath, dataUrl, title, 'image');
     settings.pushRecentFile(filePath);
     maybeRevealInTree(filePath);
@@ -253,7 +277,7 @@ export async function openFileFromPath(filePath: string, opts: { focus?: boolean
     return;
   }
   if (kindByExt === 'media') {
-    // No content to load — MediaViewer streams the file via marko-file://.
+    // No content to load — MediaViewer streams the file via milu-file://.
     workspace.openFileTab(filePath, '', title, 'media');
     settings.pushRecentFile(filePath);
     maybeRevealInTree(filePath);
@@ -261,7 +285,7 @@ export async function openFileFromPath(filePath: string, opts: { focus?: boolean
     return;
   }
   if (kindByExt === 'pdf') {
-    // Same story for PDFs — PdfViewer streams via marko-file://.
+    // Same story for PDFs — PdfViewer streams via milu-file://.
     workspace.openFileTab(filePath, '', title, 'pdf');
     settings.pushRecentFile(filePath);
     maybeRevealInTree(filePath);
@@ -277,7 +301,7 @@ export async function openFileFromPath(filePath: string, opts: { focus?: boolean
     if (focus) workspace.requestEditorFocus();
     return;
   }
-  const content = await window.marko.readFile(filePath);
+  const content = await window.milu.readFile(filePath);
   const { kind, content: c } = classify(filePath, content);
   workspace.openFileTab(filePath, c, title, kind);
   settings.pushRecentFile(filePath);
@@ -291,7 +315,7 @@ export async function saveActive() {
   if (!tab.filePath) {
     return saveActiveAs();
   }
-  await window.marko.writeFile(tab.filePath, tab.content);
+  await window.milu.writeFile(tab.filePath, tab.content);
   workspace.markSaved(tab.id, tab.filePath, tab.title);
 }
 
@@ -307,10 +331,10 @@ export async function saveActiveAs() {
         : '.txt');
   const baseTitle = tab.title || 'untitled';
   const suggested = tab.filePath ?? (baseTitle.endsWith(ext) ? baseTitle : `${baseTitle}${ext}`);
-  const filePath = await window.marko.saveAsDialog(suggested);
+  const filePath = await window.milu.saveAsDialog(suggested);
   if (!filePath) return;
-  await window.marko.writeFile(filePath, tab.content);
-  const title = await window.marko.basename(filePath);
+  await window.milu.writeFile(filePath, tab.content);
+  const title = await window.milu.basename(filePath);
   workspace.markSaved(tab.id, filePath, title);
 }
 
@@ -336,7 +360,18 @@ export function closeActiveTab() {
     );
     if (!confirmClose) return;
   }
-  if (tab.dirty) {
+  // Only confirm dirty-close for kinds whose `dirty` flag actually
+  // means "unsaved file content the user could lose". Chat / agent /
+  // terminal / search / etc. are live UI state — closing them is
+  // intentional and the modal is just friction.
+  const isFileBackedKind =
+    tab.kind === 'markdown' ||
+    tab.kind === 'code' ||
+    tab.kind === 'json' ||
+    tab.kind === 'csv' ||
+    tab.kind === 'excalidraw' ||
+    tab.kind === 'diff';
+  if (tab.dirty && isFileBackedKind) {
     const confirmClose = window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`);
     if (!confirmClose) return;
   }

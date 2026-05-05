@@ -10,10 +10,12 @@ import { spawn } from 'node:child_process';
 import * as pty from 'node-pty';
 import type { IPty } from 'node-pty';
 import { simpleGit, type SimpleGit, type StatusResult } from 'simple-git';
+import { AcpSession, acpSessions } from './acpSession.js';
+import { reviewRegistry } from './acpReview.js';
 
 const require = createRequire(import.meta.url);
 
-// Single-instance lock — without this, two Marko processes (e.g. a
+// Single-instance lock — without this, two Milu processes (e.g. a
 // login-item launch + manual double-click, or a stale dev build still
 // running) fight for the global launcher hotkey. The OS only honours
 // one registration; whichever process registered first wins, and the
@@ -40,9 +42,9 @@ app.on('second-instance', () => {
 // Pin the user-visible name early — affects app menu, dock label, and
 // `app.name` everywhere. Without this we'd fall through to the bundled
 // Electron's "Electron" name in dev.
-app.setName('Marko');
+app.setName('Milu');
 
-// Force the regular macOS activation policy at boot. Marko keeps this
+// Force the regular macOS activation policy at boot. Milu keeps this
 // for the lifetime of the process — dock icon never disappears.
 applyRegularActivationPolicy();
 
@@ -52,7 +54,7 @@ applyRegularActivationPolicy();
 // can fetch from it without CORS / mixed-content rejection.
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: 'marko-file',
+    scheme: 'milu-file',
     privileges: {
       standard: true,
       secure: true,
@@ -62,12 +64,12 @@ protocol.registerSchemesAsPrivileged([
     },
   },
   // Production-mode renderer origin. The renderer is served from
-  // `marko-app://app/...` so its origin is a real one — YouTube and
+  // `milu-app://app/...` so its origin is a real one — YouTube and
   // similar embed-restricted sites refuse to load inside iframes
   // hosted on `file://` (Error 153 / "Watch on YouTube"). In dev the
   // Vite server already gives us http://localhost:N, which works.
   {
-    scheme: 'marko-app',
+    scheme: 'milu-app',
     privileges: {
       standard: true,
       secure: true,
@@ -81,7 +83,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
-/** Cached snapshot of ~/.marko/settings.json read once at app boot.
+/** Cached snapshot of ~/.milu/settings.json read once at app boot.
  *  Shipped to every BrowserWindow via webPreferences.additionalArguments
  *  so the preload can hand it to the renderer synchronously without
  *  having to do its own fs read (Node imports inside the preload
@@ -89,20 +91,20 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL;
 let initialSettingsBlob = '';
 function loadInitialSettingsSync(): void {
   try {
-    const file = path.join(os.homedir(), '.marko', 'settings.json');
+    const file = path.join(os.homedir(), '.milu', 'settings.json');
     if (existsSync(file)) initialSettingsBlob = readFileSync(file, 'utf8');
   } catch {
     initialSettingsBlob = '';
   }
 }
 function settingsArg(): string {
-  return `--marko-initial-settings=${initialSettingsBlob}`;
+  return `--milu-initial-settings=${initialSettingsBlob}`;
 }
 
 /** Production renderer URL — populated by `startRendererServer()`
  *  during app boot. We serve `dist/` over a random localhost port
  *  so the renderer's origin is `http://127.0.0.1:<port>` rather
- *  than `file://` or `marko-app://`. YouTube's embed policy only
+ *  than `file://` or `milu-app://`. YouTube's embed policy only
  *  honours http(s) origins, so without this every embedded YouTube
  *  iframe in a packaged build refuses with Error 153. */
 let prodRendererUrl: string | null = null;
@@ -195,12 +197,26 @@ let trayState: {
 ipcMain.on('tray:push-state', (_e, state: typeof trayState) => {
   trayState = state ?? { recentFiles: [], bookmarks: [] };
 });
-/** Set when the user actually wants to quit Marko (Cmd+Q, app menu →
+/** Set when the user actually wants to quit Milu (Cmd+Q, app menu →
  *  Quit). Lets the main-window close handler distinguish "user X'd the
  *  window" (which we intercept to hide instead) from "user is quitting"
  *  (which we let through). */
 let appIsQuitting = false;
 app.on('before-quit', () => { appIsQuitting = true; });
+
+/** Last-resort safety net: an unhandled exception or rejection in
+ *  the main process is otherwise fatal — Electron exits the whole
+ *  app immediately, which has been observed to take Milu down
+ *  mid-operation (e.g., when an ACP subprocess dies and a stray
+ *  EPIPE leaks past a stream listener). Logging instead of crashing
+ *  is the right tradeoff for an editor: lose one feature, not the
+ *  whole session. */
+process.on('uncaughtException', (err) => {
+  console.error('[milu] uncaughtException:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[milu] unhandledRejection:', reason);
+});
 
 /** Timestamp (Date.now) of the most recent `did-resign-active`.
  *  app.hide() / ⌘H / clicking another app all fire this. We use it to
@@ -212,11 +228,11 @@ app.on('did-resign-active', () => {
   lastResignAt = Date.now();
 });
 
-/** Marko's dock icon stays visible at all times — we never flip the
+/** Milu's dock icon stays visible at all times — we never flip the
  *  activation policy after boot. Closing the main window hides it but
  *  doesn't put us in accessory mode.
  *  Note: do NOT call app.dock.show() here. On macOS that internally
- *  invokes NSApplication.unhide:, which can re-activate Marko and
+ *  invokes NSApplication.unhide:, which can re-activate Milu and
  *  steal focus from other apps the user is trying to use. */
 function applyRegularActivationPolicy() {
   if (process.platform === 'darwin' && app.setActivationPolicy) {
@@ -242,7 +258,7 @@ function trayOpenPath(p: string) {
 }
 
 /** Build the tray icon's right-click menu. Rebuilt every time the
- *  state changes so labels stay accurate ("Show Marko" vs "Hide Marko")
+ *  state changes so labels stay accurate ("Show Milu" vs "Hide Milu")
  *  and the recent-files / bookmarks submenus reflect the latest state. */
 function buildTrayMenu(): Menu {
   const mainVisible = !!mainWindow?.isVisible();
@@ -269,7 +285,7 @@ function buildTrayMenu(): Menu {
   // glance whether the global hotkey actually bound — common failure
   // mode is another app already owning the shortcut, which makes
   // globalShortcut.register return false silently. The retry item
-  // lets them re-attempt without restarting Marko.
+  // lets them re-attempt without restarting Milu.
   const hotkeyOk = !!currentLauncherHotkey;
   const desiredHotkey = lastRequestedLauncherHotkey ?? DEFAULT_LAUNCHER_HOTKEY;
   return Menu.buildFromTemplate([
@@ -287,7 +303,7 @@ function buildTrayMenu(): Menu {
         const ok = registerLauncherHotkey(desiredHotkey);
         if (!ok && tray) {
           tray.displayBalloon?.({
-            title: 'Marko',
+            title: 'Milu',
             content: `Could not bind ${desiredHotkey}. Another app may own it.`,
           });
         }
@@ -297,7 +313,7 @@ function buildTrayMenu(): Menu {
     },
     { type: 'separator' },
     {
-      label: mainVisible ? 'Hide Main Window' : 'Show Marko',
+      label: mainVisible ? 'Hide Main Window' : 'Show Milu',
       click: () => {
         if (!mainWindow) return;
         if (mainWindow.isVisible()) mainWindow.hide();
@@ -343,7 +359,7 @@ function buildTrayMenu(): Menu {
     },
     { type: 'separator' },
     {
-      label: 'Quit Marko',
+      label: 'Quit Milu',
       accelerator: 'Cmd+Q',
       click: () => app.quit(),
     },
@@ -356,7 +372,7 @@ function updateTrayState() {
   if (!tray) return;
   const visible = !!mainWindow?.isVisible();
   tray.setImage((visible ? trayIconActive : trayIconDormant) ?? nativeImage.createEmpty());
-  tray.setToolTip(visible ? 'Marko' : 'Marko (hidden — click to open launcher)');
+  tray.setToolTip(visible ? 'Milu' : 'Milu (hidden — click to open launcher)');
 }
 
 async function createTray() {
@@ -365,7 +381,7 @@ async function createTray() {
   trayIconActive = icons.active;     // filled M — confident
   trayIconDormant = icons.dormant;   // outlined M — quieter
   tray = new Tray(trayIconActive);
-  tray.setToolTip('Marko');
+  tray.setToolTip('Milu');
   // Single click → open the launcher. Right-click shows the context
   // menu. We don't attach the menu via setContextMenu directly,
   // because that overrides the click handler too — instead we open it
@@ -505,11 +521,11 @@ function registerLauncherHotkey(accel: string): boolean {
       currentLauncherHotkey = accel;
       return true;
     }
-    console.warn('[marko] failed to register launcher hotkey', accel);
+    console.warn('[milu] failed to register launcher hotkey', accel);
     currentLauncherHotkey = null;
     return false;
   } catch (err) {
-    console.warn('[marko] launcher hotkey error', (err as Error).message);
+    console.warn('[milu] launcher hotkey error', (err as Error).message);
     currentLauncherHotkey = null;
     return false;
   }
@@ -522,7 +538,7 @@ function createLauncherWindow() {
     height: LAUNCHER_H,
     // Normal NSWindow type. Tried 'panel' to avoid activation-policy
     // demotion on launcher show, but with the offscreen anchor window
-    // already keeping Marko classified as regular, the panel type was
+    // already keeping Milu classified as regular, the panel type was
     // unnecessary and might have been triggering its own demotion path
     // (when an NSPanel is the only "real" frontmost window, macOS can
     // still classify the app as utility).
@@ -586,7 +602,7 @@ function showLauncher() {
   launcherWindow.show();
   launcherWindow.focus();
   launcherWindow.webContents.send('launcher:show');
-  // No setActivationPolicy() here. The anchor window keeps Marko
+  // No setActivationPolicy() here. The anchor window keeps Milu
   // classified as regular continuously, and re-asserting at runtime
   // calls activate() under the hood — which forces the main window
   // forward (whether it was hidden or in the background). The whole
@@ -609,11 +625,11 @@ function toggleLauncher() {
 let suppressLauncherBlur = false;
 
 
-/** Dismiss the launcher. On macOS, app.hide() runs FIRST so Marko
+/** Dismiss the launcher. On macOS, app.hide() runs FIRST so Milu
  *  deactivates and all windows vanish in a single frame — preventing
  *  the visible "main flashes between launcher hide and app deactivate"
  *  race. The launcher.hide() that follows marks the launcher as
- *  explicitly orderOut'd so re-activating Marko (dock click, Cmd+Tab)
+ *  explicitly orderOut'd so re-activating Milu (dock click, Cmd+Tab)
  *  brings only the main window back, not the launcher. */
 function hideLauncher() {
   if (!launcherWindow) return;
@@ -634,7 +650,7 @@ function createWindow() {
     trafficLightPosition: { x: 14, y: 14 },
     backgroundColor: '#ffffff',
     show: false,
-    // OS-level fullscreen of the main window is disabled. Marko's
+    // OS-level fullscreen of the main window is disabled. Milu's
     // activation policy flips between regular and accessory based on
     // window visibility, and macOS treats apps that ever go accessory
     // as "utility" for Space allocation purposes — fullscreen calls
@@ -667,7 +683,7 @@ function createWindow() {
   });
 
   // Raycast-style lifecycle: the main window's red X / Cmd+Shift+W hides
-  // it instead of closing. Marko stays running in the background.
+  // it instead of closing. Milu stays running in the background.
   // Cmd+Q sets appIsQuitting and bypasses this so quit still works.
   mainWindow.on('close', (e) => {
     if (appIsQuitting) return;
@@ -677,10 +693,10 @@ function createWindow() {
 
   // Tie activation policy to main-window visibility:
   //   visible main window → 'regular' → dock icon, in ⌘Tab
-  //   hidden main window → 'accessory' → no dock, no ⌘Tab, but Marko
+  //   hidden main window → 'accessory' → no dock, no ⌘Tab, but Milu
   //                                       still runs and the launcher
   //                                       hotkey still works.
-  // The launcher's "Show Marko" command (or any other path that calls
+  // The launcher's "Show Milu" command (or any other path that calls
   // mainWindow.show()) flips us back to regular automatically. This
   // matches every other macOS app's mental model — dock icon presence
   // tracks "the app has a window open" — so we stop fighting the OS.
@@ -689,7 +705,7 @@ function createWindow() {
       app.setActivationPolicy('regular');
       // accessory→regular re-creates the dock entry from the bundle's
       // default icon (Electron's diamond in dev). Re-apply our cached
-      // PNG so the dock always shows Marko's brand mark.
+      // PNG so the dock always shows Milu's brand mark.
       if (cachedDockIcon && app.dock) {
         app.dock.setIcon(cachedDockIcon);
       }
@@ -731,7 +747,7 @@ function createWindow() {
   });
 }
 
-/** Intercept popups opened from <webview> tags inside Marko (e.g., OAuth
+/** Intercept popups opened from <webview> tags inside Milu (e.g., OAuth
  *  sign-in flows for Google, Twitter, GitHub). The default behavior opens
  *  them at full size without a sensible parent — we want a small floating
  *  window above the main one, sharing the default session so cookies set
@@ -762,25 +778,25 @@ app.on('web-contents-created', (_e, contents) => {
       };
     }
     // Anything else — middle-click, ⌘-click, target="_blank", plain
-    // window.open — forward to the main renderer to open as a Marko
+    // window.open — forward to the main renderer to open as a Milu
     // web tab. We don't filter on `disposition` because Chromium
     // sometimes reports edge cases as 'other' or 'default' for
     // perfectly normal links.
     if (url) {
-      console.log('[marko] webview:open-url forwarding:', url);
+      console.log('[milu] webview:open-url forwarding:', url);
       mainWindow?.webContents.send('webview:open-url', url);
     }
     return { action: 'deny' };
   });
 
   // Tab-navigation shortcuts: a focused <webview> normally swallows
-  // these keys before they reach Marko's app menu, so once a user
+  // these keys before they reach Milu's app menu, so once a user
   // clicks into a web tab they can't ⌘⇧[ / ⌘⇧] back out. Intercept
   // them at the guest's before-input-event and forward to the main
   // renderer so the menu IPC handler runs as if the keystroke had
   // hit the host window.
   // Suppress the guest's default context menu — the WebView
-  // component renders its own Marko-aware menu (Open Link in New
+  // component renders its own Milu-aware menu (Open Link in New
   // Tab, Save Link to Later, Search Selection, etc.) via the
   // webview tag's `context-menu` event in the renderer.
   contents.on('context-menu', (event) => {
@@ -803,18 +819,18 @@ app.on('web-contents-created', (_e, contents) => {
       // layouts/keyboards that don't shift to the parens.
       if (input.key === '9' || input.key === '(') return send('menu:prev-session');
       if (input.key === '0' || input.key === ')') return send('menu:next-session');
-      // ⌘⇧T — reopen the most recently closed Marko tab. Mirrors
+      // ⌘⇧T — reopen the most recently closed Milu tab. Mirrors
       // browser convention; webview otherwise has no semantics for it.
       if (input.key === 't' || input.key === 'T') return send('menu:reopen-closed-tab');
     } else {
       // ⌘1-8 and ⌘9 — tab jump shortcuts also get eaten by the guest.
       if (/^[1-8]$/.test(input.key)) return send(`menu:goto-tab-${input.key}`);
       if (input.key === '9') return send('menu:goto-tab-last');
-      // ⌘W — close current Marko tab. The webview otherwise has no
+      // ⌘W — close current Milu tab. The webview otherwise has no
       // close-tab semantics, so it's safe to forward.
       if (input.key === 'w' || input.key === 'W') return send('menu:close-tab');
       // ⌘F — find on page. The webview swallows this otherwise so the
-      // user can never open Marko's find bar once they've clicked
+      // user can never open Milu's find bar once they've clicked
       // into a page.
       if (input.key === 'f' || input.key === 'F') return send('menu:find-on-page');
       // ⌘H — hide the app. macOS's standard hide shortcut also gets
@@ -861,7 +877,7 @@ function buildMenu() {
                 label: `Hide ${app.name}`,
                 accelerator: 'Command+H',
                 click: () => {
-                  console.log('[marko] menu Hide clicked');
+                  console.log('[milu] menu Hide clicked');
                   app.hide();
                 },
               },
@@ -1132,20 +1148,20 @@ app.whenReady().then(async () => {
   // Both the main and launcher windows inherit it via additionalArguments.
   loadInitialSettingsSync();
 
-  // First-launch: enrol Marko in macOS Login Items so the global
+  // First-launch: enrol Milu in macOS Login Items so the global
   // Cmd+Space launcher is available whenever the user logs in. We
   // mark a flag the first time we do this so subsequent launches
-  // don't override the user's choice if they later remove Marko
+  // don't override the user's choice if they later remove Milu
   // from System Settings → General → Login Items themselves.
   if (process.platform === 'darwin') {
     void (async () => {
       try {
-        const dir = path.join(os.homedir(), '.marko');
+        const dir = path.join(os.homedir(), '.milu');
         await fs.mkdir(dir, { recursive: true });
         const flagPath = path.join(dir, '.login-item-set');
         try {
           await fs.access(flagPath);
-          // Flag exists — user already had Marko enrolled (or
+          // Flag exists — user already had Milu enrolled (or
           // explicitly opted out by removing it). Don't touch it.
           return;
         } catch {
@@ -1153,16 +1169,16 @@ app.whenReady().then(async () => {
         }
         app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
         await fs.writeFile(flagPath, new Date().toISOString(), 'utf8');
-        console.log('[marko] enrolled in macOS login items (first launch)');
+        console.log('[milu] enrolled in macOS login items (first launch)');
       } catch (err) {
-        console.warn('[marko] login item enrol failed:', err);
+        console.warn('[milu] login item enrol failed:', err);
       }
     })();
   }
 
   // Stream local files into the renderer through net.fetch — supports HTTP
   // range requests so <video> seeking works without buffering the whole clip.
-  protocol.handle('marko-file', (req) => {
+  protocol.handle('milu-file', (req) => {
     const u = new URL(req.url);
     const filePath = decodeURIComponent(u.pathname);
     return net.fetch(`file://${filePath}`);
@@ -1175,9 +1191,9 @@ app.whenReady().then(async () => {
   if (!isDev) {
     try {
       prodRendererUrl = await startRendererServer();
-      console.log('[marko] renderer server:', prodRendererUrl);
+      console.log('[milu] renderer server:', prodRendererUrl);
     } catch (err) {
-      console.error('[marko] renderer server failed:', err);
+      console.error('[milu] renderer server failed:', err);
       // Fall back to file:// — app still works, just no YouTube
       // embeds. Better than refusing to launch.
     }
@@ -1208,7 +1224,7 @@ app.whenReady().then(async () => {
       setIconResult = (err as Error).message;
     }
   }
-  console.log('[marko] dock icon:', setIconResult);
+  console.log('[milu] dock icon:', setIconResult);
 
   buildMenu();
   // Tray creation is async (renders the procedural M icons via a
@@ -1224,7 +1240,7 @@ app.whenReady().then(async () => {
   void loadClipboardLog().then(() => startClipboardWatcher());
 
   // Boot the launcher hotkey directly from the persisted settings
-  // file (~/.marko/settings.json) instead of waiting for the renderer
+  // file (~/.milu/settings.json) instead of waiting for the renderer
   // to push it via IPC. The renderer push still runs once
   // settings.ts loads, but it might not — slow load, hot-reload, blank
   // renderer, etc. Doing it here means Cmd+Space (or whatever the
@@ -1393,7 +1409,7 @@ ipcMain.handle('path:basename', async (_e, p: string) => path.basename(p));
  *  leaves HTML fullscreen. We use `setSimpleFullScreen` instead of
  *  native `setFullScreen` because native fullscreen allocates a new
  *  macOS Space, which fails (the window vanishes) when the app's
- *  activation policy is `accessory` — the state Marko flips to when
+ *  activation policy is `accessory` — the state Milu flips to when
  *  its main window is hidden. Simple fullscreen just stretches the
  *  window to cover the screen without Space allocation, so it works
  *  under any activation policy. */
@@ -1461,18 +1477,18 @@ ipcMain.handle(
 
 ipcMain.handle('path:home', async () => os.homedir());
 
-/** ~/.marko is Marko's per-user config/data directory. We use it for the
+/** ~/.milu is Milu's per-user config/data directory. We use it for the
  *  global notes file and any future user-specific persisted state. */
-async function ensureMarkoDir(): Promise<string> {
-  const dir = path.join(os.homedir(), '.marko');
+async function ensureMiluDir(): Promise<string> {
+  const dir = path.join(os.homedir(), '.milu');
   await fs.mkdir(dir, { recursive: true });
   return dir;
 }
 
-ipcMain.handle('marko:config-dir', async () => ensureMarkoDir());
+ipcMain.handle('milu:config-dir', async () => ensureMiluDir());
 
-ipcMain.handle('marko:notes-path', async (): Promise<string> => {
-  const dir = await ensureMarkoDir();
+ipcMain.handle('milu:notes-path', async (): Promise<string> => {
+  const dir = await ensureMiluDir();
   const file = path.join(dir, 'notes.txt');
   try {
     // Create the file with an empty body if it doesn't exist; preserve content otherwise.
@@ -1483,10 +1499,10 @@ ipcMain.handle('marko:notes-path', async (): Promise<string> => {
   return file;
 });
 
-/** Persisted workspace snapshot at ~/.marko/state.json. Renderer owns the
+/** Persisted workspace snapshot at ~/.milu/state.json. Renderer owns the
  *  schema; main just reads/writes/clears the blob. */
 async function statePath(): Promise<string> {
-  const dir = await ensureMarkoDir();
+  const dir = await ensureMiluDir();
   return path.join(dir, 'state.json');
 }
 
@@ -1512,12 +1528,12 @@ ipcMain.handle('state:write', async (_e, json: string): Promise<{ ok: boolean }>
   }
 });
 
-/** App settings at ~/.marko/settings.json. Lives in the shared
+/** App settings at ~/.milu/settings.json. Lives in the shared
  *  dotfile dir so dev and packaged builds see the same prefs.
  *  Initial read happens synchronously in preload (settings.ts loads
  *  synchronously); writes go through the async IPC below. */
 async function settingsFilePath(): Promise<string> {
-  const dir = await ensureMarkoDir();
+  const dir = await ensureMiluDir();
   return path.join(dir, 'settings.json');
 }
 ipcMain.handle('settings:write', async (_e, json: string): Promise<{ ok: boolean }> => {
@@ -1532,11 +1548,11 @@ ipcMain.handle('settings:write', async (_e, json: string): Promise<{ ok: boolean
   }
 });
 
-/** "Save for later" reading list at ~/.marko/later.json — pages,
+/** "Save for later" reading list at ~/.milu/later.json — pages,
  *  videos, anything saved from a web tab via the bookmark button.
  *  Same shared-dotfile pattern as music-library. */
 async function laterListPath(): Promise<string> {
-  const dir = await ensureMarkoDir();
+  const dir = await ensureMiluDir();
   return path.join(dir, 'later.json');
 }
 ipcMain.handle('later:read', async (): Promise<string | null> => {
@@ -1562,11 +1578,11 @@ ipcMain.handle(
 );
 
 /** Music tab library (user-added tracks + hidden curated picks) at
- *  ~/.marko/music-library.json. Lives in the shared dotfile dir so
+ *  ~/.milu/music-library.json. Lives in the shared dotfile dir so
  *  dev and packaged builds see the same library — localStorage is
  *  scoped per app/userData and wouldn't share across them. */
 async function musicLibraryPath(): Promise<string> {
-  const dir = await ensureMarkoDir();
+  const dir = await ensureMiluDir();
   return path.join(dir, 'music-library.json');
 }
 ipcMain.handle('music-library:read', async (): Promise<string | null> => {
@@ -2845,18 +2861,18 @@ const DEFAULT_PROVIDERS: AiProvider[] = [
     needsKey: true,
     isLocal: false,
     extraHeaders: {
-      'HTTP-Referer': 'https://github.com/jinghanx/marko',
-      'X-Title': 'Marko',
+      'HTTP-Referer': 'https://github.com/jinghanx/milu',
+      'X-Title': 'Milu',
     },
   },
 ];
 
 async function aiProvidersPath(): Promise<string> {
-  const dir = await ensureMarkoDir();
+  const dir = await ensureMiluDir();
   return path.join(dir, 'ai-providers.json');
 }
 async function aiKeysPath(): Promise<string> {
-  const dir = await ensureMarkoDir();
+  const dir = await ensureMiluDir();
   return path.join(dir, 'ai-keys.json');
 }
 
@@ -2983,6 +2999,251 @@ ipcMain.handle(
     const map = await readKeys();
     delete map[id];
     await writeKeys(map);
+    return { ok: true };
+  },
+);
+
+// ---------- ACP agents (Agent Client Protocol) ----------
+// Configured agents are kept in `~/.milu/acp-agents.json` mirroring
+// the AI-providers pattern: a flat list of records the renderer reads
+// to populate the agent picker, edits via the settings UI, and the
+// AcpSession layer reads to spawn the right binary. No secrets here —
+// auth is delegated to each agent's own login flow (e.g. claude-login).
+interface AcpAgent {
+  id: string;
+  name: string;
+  /** Argv[0] passed to spawn — typically a binary on PATH or an
+   *  absolute path. We deliberately don't shell-expand to avoid
+   *  injection footguns; users wanting `npx foo` write it as
+   *  `command: 'npx', args: ['foo']`. */
+  command: string;
+  args: string[];
+  /** Extra env vars merged into process.env for this agent. */
+  env?: Record<string, string>;
+}
+
+const DEFAULT_ACP_AGENTS: AcpAgent[] = [
+  {
+    id: 'claude-code',
+    name: 'Claude Code',
+    // The Zed adapter is currently the canonical entrypoint for
+    // Claude over ACP. It's a peer dep of Milu (in node_modules), so
+    // calling its bin name resolves via the local .bin shim during
+    // dev and via the bundled node_modules in production.
+    command: 'claude-code-acp',
+    args: [],
+  },
+];
+
+async function acpAgentsPath(): Promise<string> {
+  const dir = await ensureMiluDir();
+  return path.join(dir, 'acp-agents.json');
+}
+
+async function readAcpAgents(): Promise<AcpAgent[]> {
+  try {
+    const raw = await fs.readFile(await acpAgentsPath(), 'utf8');
+    const parsed = JSON.parse(raw) as AcpAgent[];
+    if (Array.isArray(parsed)) {
+      // Backfill any default agents that aren't yet in the user's list
+      // (newly-shipped defaults appear automatically).
+      const known = new Set(parsed.map((a) => a.id));
+      const merged = [...parsed];
+      let added = false;
+      for (const def of DEFAULT_ACP_AGENTS) {
+        if (!known.has(def.id)) {
+          merged.push(def);
+          added = true;
+        }
+      }
+      if (added) await writeAcpAgents(merged).catch(() => {});
+      return merged;
+    }
+  } catch {
+    // missing or corrupt → defaults
+  }
+  return DEFAULT_ACP_AGENTS;
+}
+
+async function writeAcpAgents(list: AcpAgent[]): Promise<void> {
+  const file = await acpAgentsPath();
+  await fs.writeFile(file, JSON.stringify(list, null, 2), 'utf8');
+}
+
+ipcMain.handle('acp:agents', readAcpAgents);
+
+ipcMain.handle(
+  'acp:agent-save',
+  async (_e, a: AcpAgent): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const list = await readAcpAgents();
+      const idx = list.findIndex((x) => x.id === a.id);
+      if (idx >= 0) list[idx] = a;
+      else list.push(a);
+      await writeAcpAgents(list);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  'acp:agent-delete',
+  async (_e, id: string): Promise<{ ok: boolean }> => {
+    try {
+      const list = await readAcpAgents();
+      await writeAcpAgents(list.filter((a) => a.id !== id));
+    } catch {
+      // ignore
+    }
+    return { ok: true };
+  },
+);
+
+// ---------- ACP session lifecycle IPC ----------
+// Each tab in the renderer owns a stable reqId; the AcpSession holds
+// the live subprocess + JSON-RPC connection. Events stream back on
+// `acp:event:${reqId}`. The handlers below are the renderer's only
+// way to drive a session.
+ipcMain.handle(
+  'acp:start',
+  async (
+    e,
+    reqId: string,
+    agentId: string,
+    cwd: string,
+  ): Promise<{ ok: boolean; sessionId?: string; error?: string }> => {
+    if (acpSessions.has(reqId)) {
+      return { ok: false, error: 'reqId already in use' };
+    }
+    const list = await readAcpAgents();
+    const agent = list.find((a) => a.id === agentId);
+    if (!agent) return { ok: false, error: `unknown agent: ${agentId}` };
+    const session = new AcpSession(reqId, e.sender, cwd);
+    acpSessions.set(reqId, session);
+    const r = await session.start(agent);
+    if (!r.ok) {
+      acpSessions.delete(reqId);
+      session.dispose();
+    }
+    return r;
+  },
+);
+
+ipcMain.handle(
+  'acp:prompt',
+  async (
+    _e,
+    reqId: string,
+    text: string,
+  ): Promise<{ ok: boolean; stopReason?: string; error?: string }> => {
+    const session = acpSessions.get(reqId);
+    if (!session) return { ok: false, error: 'no such session' };
+    return session.prompt(text);
+  },
+);
+
+ipcMain.handle(
+  'acp:cancel',
+  async (_e, reqId: string): Promise<{ ok: boolean }> => {
+    const session = acpSessions.get(reqId);
+    if (!session) return { ok: false };
+    await session.cancel();
+    return { ok: true };
+  },
+);
+
+ipcMain.handle(
+  'acp:dispose',
+  async (_e, reqId: string): Promise<{ ok: boolean }> => {
+    const session = acpSessions.get(reqId);
+    if (!session) return { ok: true };
+    session.dispose();
+    acpSessions.delete(reqId);
+    return { ok: true };
+  },
+);
+
+ipcMain.handle(
+  'acp:permission-resolve',
+  async (
+    _e,
+    reqId: string,
+    permId: string,
+    response: import('@agentclientprotocol/sdk').RequestPermissionResponse,
+  ): Promise<{ ok: boolean }> => {
+    const session = acpSessions.get(reqId);
+    if (!session) return { ok: false };
+    session.resolvePermission(permId, response);
+    return { ok: true };
+  },
+);
+
+// ---------- ACP write-review IPC ----------
+// Renderer reads pending reviews + commits user decisions through
+// these handlers. The registry holds the structured-patch hunks; the
+// renderer's review UI sends decisions back hunk-by-hunk and then a
+// final resolve() that writes the merged content to disk and
+// unblocks the agent.
+ipcMain.handle('acp-review:list', async (_e, reqId: string) => {
+  return reviewRegistry.list(reqId).map((c) => ({
+    id: c.id,
+    path: c.path,
+    unifiedDiff: c.unifiedDiff,
+    hunks: c.hunks.map((h) => ({
+      index: h.index,
+      oldStart: h.oldStart,
+      oldLines: h.oldLines,
+      newStart: h.newStart,
+      newLines: h.newLines,
+      decision: h.decision,
+    })),
+    createdAt: c.createdAt,
+  }));
+});
+
+ipcMain.handle('acp-review:get', async (_e, id: string) => {
+  const c = reviewRegistry.get(id);
+  if (!c) return null;
+  return {
+    id: c.id,
+    path: c.path,
+    baseContent: c.baseContent,
+    proposedContent: c.proposedContent,
+    unifiedDiff: c.unifiedDiff,
+    hunks: c.hunks,
+  };
+});
+
+ipcMain.handle(
+  'acp-review:set-hunk',
+  async (
+    _e,
+    id: string,
+    hunkIdx: number,
+    decision: 'pending' | 'accepted' | 'rejected',
+  ): Promise<{ ok: boolean }> => {
+    reviewRegistry.setHunkDecision(id, hunkIdx, decision);
+    return { ok: true };
+  },
+);
+
+ipcMain.handle(
+  'acp-review:resolve',
+  async (
+    _e,
+    id: string,
+    mode: 'accept-all' | 'reject-all' | 'partial',
+  ): Promise<{ ok: boolean; error?: string }> => {
+    return reviewRegistry.resolve(id, mode);
+  },
+);
+
+ipcMain.handle(
+  'acp-review:abandon',
+  async (_e, id: string): Promise<{ ok: boolean }> => {
+    reviewRegistry.abandon(id);
     return { ok: true };
   },
 );
@@ -3287,12 +3548,12 @@ ipcMain.handle(
 
 // =====================================================================
 // Chat history archive — every chat conversation persists as its own JSON
-// file under ~/.marko/chats/. Tabs save on each turn; closing a tab doesn't
+// file under ~/.milu/chats/. Tabs save on each turn; closing a tab doesn't
 // delete the archive, so the user can browse / reopen later.
 // =====================================================================
 
 async function chatsDir(): Promise<string> {
-  const dir = path.join(await ensureMarkoDir(), 'chats');
+  const dir = path.join(await ensureMiluDir(), 'chats');
   await fs.mkdir(dir, { recursive: true });
   return dir;
 }
@@ -3377,9 +3638,9 @@ ipcMain.handle(
 
 // =====================================================================
 // Clipboard history — polls the system clipboard every CLIPBOARD_POLL_MS
-// and records changes to ~/.marko/clipboard.json. Image entries spill to
-// PNG files in ~/.marko/clipboard-images/ so the renderer can stream them
-// through the marko-file:// protocol instead of base64. Renderers never
+// and records changes to ~/.milu/clipboard.json. Image entries spill to
+// PNG files in ~/.milu/clipboard-images/ so the renderer can stream them
+// through the milu-file:// protocol instead of base64. Renderers never
 // poll; they subscribe to the 'clipboard:changed' broadcast.
 // =====================================================================
 
@@ -3413,13 +3674,13 @@ let clipboardLastFingerprint = '';
 let clipboardWatchTimer: NodeJS.Timeout | null = null;
 
 async function clipboardImagesDir(): Promise<string> {
-  const dir = path.join(await ensureMarkoDir(), 'clipboard-images');
+  const dir = path.join(await ensureMiluDir(), 'clipboard-images');
   await fs.mkdir(dir, { recursive: true });
   return dir;
 }
 
 async function clipboardLogPath(): Promise<string> {
-  return path.join(await ensureMarkoDir(), 'clipboard.json');
+  return path.join(await ensureMiluDir(), 'clipboard.json');
 }
 
 async function loadClipboardLog() {
@@ -3685,7 +3946,7 @@ function loadSqliteModule(): BetterSqlite3Constructor | null {
     SqliteCtor = (mod.default ?? mod) as BetterSqlite3Constructor;
     return SqliteCtor;
   } catch (err) {
-    console.error('[marko] failed to load better-sqlite3:', (err as Error).message);
+    console.error('[milu] failed to load better-sqlite3:', (err as Error).message);
     return null;
   }
 }
@@ -3938,7 +4199,7 @@ ipcMain.handle('apps:icon', async (_e, appPath: string): Promise<string | null> 
     appIconCache.set(appPath, dataUrl);
     return dataUrl;
   } catch (err) {
-    console.warn('[marko] apps:icon failed for', appPath, (err as Error).message);
+    console.warn('[milu] apps:icon failed for', appPath, (err as Error).message);
     appIconCache.set(appPath, null);
     return null;
   }
@@ -3966,7 +4227,7 @@ ipcMain.handle('launcher:dispatch', async (_e, action: unknown): Promise<{ ok: b
   // External-app launches: hide the launcher (it's a macOS panel, so
   // hiding returns focus naturally — no app.hide() needed) and let
   // shell.openPath bring the target app forward. Removed the prior
-  // app.hide() here because it was occasionally demoting Marko's
+  // app.hide() here because it was occasionally demoting Milu's
   // activation policy and stealing focus on re-show.
   if (a?.type === 'open-app' && typeof a.appPath === 'string') {
     suppressLauncherBlur = true;
@@ -3974,13 +4235,13 @@ ipcMain.handle('launcher:dispatch', async (_e, action: unknown): Promise<{ ok: b
     try {
       await shell.openPath(a.appPath);
     } catch (err) {
-      console.warn('[marko] open-app failed:', (err as Error).message);
+      console.warn('[milu] open-app failed:', (err as Error).message);
     }
     setTimeout(() => { suppressLauncherBlur = false; }, 50);
     return { ok: true };
   }
 
-  // Marko-internal actions need the main window. Hide the launcher
+  // Milu-internal actions need the main window. Hide the launcher
   // (suppressing the blur-hide path so this isn't treated as a user
   // dismiss) and bring main forward.
   suppressLauncherBlur = true;

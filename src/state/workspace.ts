@@ -24,7 +24,8 @@ export type TabKind =
   | 'sqlite'
   | 'shortcuts'
   | 'music'
-  | 'later';
+  | 'later'
+  | 'agent';
 
 export interface Tab {
   id: string;
@@ -82,7 +83,7 @@ export type PaneTree = LeafNode | SplitNode;
 export interface FolderSelectionInfo {
   tabId: string;
   currentPath: string;
-  selected: import('../types/marko').DirEntry[];
+  selected: import('../types/milu').DirEntry[];
   totalCount: number;
   folderCount: number;
   fileCount: number;
@@ -463,6 +464,7 @@ function toClosedTab(t: Tab): ClosedTab | null {
     case 'search':
     case 'http':
     case 'chat':
+    case 'agent':
       return null;
   }
   // Everything else either has a filePath we can re-open (file/folder
@@ -1217,8 +1219,8 @@ export const workspace = {
     setState((prev) => ({ sessions: patchActiveSession(prev, { rootDir: dir }) }));
     // Remember it so we can restore on next launch.
     try {
-      if (dir) localStorage.setItem('marko:lastWorkspace', dir);
-      else localStorage.removeItem('marko:lastWorkspace');
+      if (dir) localStorage.setItem('milu:lastWorkspace', dir);
+      else localStorage.removeItem('milu:lastWorkspace');
     } catch {
       // localStorage may be unavailable in unusual contexts
     }
@@ -1376,11 +1378,13 @@ interface Snapshot {
 
 /** Build a JSON-safe snapshot of the current workspace. */
 export function serializeWorkspace(): Snapshot {
-  // Drop tabs we can't restore: terminal (PTY can't be revived).
+  // Drop tabs we can't restore: terminal (PTY can't be revived) and
+  // agent (subprocess + reqId both die with the app — restoring would
+  // hand the renderer a stale reqId pointing at nothing).
   const persistableTabs: PersistedTab[] = [];
   const droppedTabIds = new Set<string>();
   for (const tab of state.tabs) {
-    if (tab.kind === 'terminal') {
+    if (tab.kind === 'terminal' || tab.kind === 'agent') {
       droppedTabIds.add(tab.id);
       continue;
     }
@@ -1532,7 +1536,7 @@ export async function hydrateFromSnapshot(snapshot: Snapshot): Promise<void> {
       if (!p.filePath) return; // scratch already filled in via stubTabs
       try {
         if (p.kind === 'image') {
-          const dataUrl = await window.marko.loadImage(p.filePath);
+          const dataUrl = await window.milu.loadImage(p.filePath);
           setState((prev) => ({
             tabs: prev.tabs.map((t) =>
               t.id === p.id ? { ...t, content: dataUrl, savedContent: dataUrl } : t,
@@ -1548,7 +1552,7 @@ export async function hydrateFromSnapshot(snapshot: Snapshot): Promise<void> {
         ) {
           // Nothing to load — these have no editable content.
         } else {
-          const content = await window.marko.readFile(p.filePath);
+          const content = await window.milu.readFile(p.filePath);
           setState((prev) => ({
             tabs: prev.tabs.map((t) =>
               t.id === p.id ? { ...t, content, savedContent: content, dirty: false } : t,

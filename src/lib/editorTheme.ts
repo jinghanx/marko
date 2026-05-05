@@ -19,7 +19,7 @@ const URLS: Record<EditorTheme, { light: string; dark: string }> = {
   nord: { light: nordLight, dark: nordDark },
 };
 
-const LINK_ID = 'marko-editor-theme';
+const LINK_ID = 'milu-editor-theme';
 
 function effectiveDark(appTheme: 'system' | 'light' | 'dark'): boolean {
   if (appTheme === 'dark') return true;

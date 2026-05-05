@@ -22,7 +22,7 @@ export function DiffViewer({ leftPath, rightPath }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLeft({ path: leftPath, content: null, error: null });
-    window.marko
+    window.milu
       .readFile(leftPath)
       .then((c) => !cancelled && setLeft({ path: leftPath, content: c, error: null }))
       .catch((e: Error) =>
@@ -36,7 +36,7 @@ export function DiffViewer({ leftPath, rightPath }: Props) {
   useEffect(() => {
     let cancelled = false;
     setRight({ path: rightPath, content: null, error: null });
-    window.marko
+    window.milu
       .readFile(rightPath)
       .then((c) => !cancelled && setRight({ path: rightPath, content: c, error: null }))
       .catch((e: Error) =>

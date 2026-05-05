@@ -50,7 +50,7 @@ export function FilePalette({ open, replace = false, onClose }: Props) {
       setItems(null);
     }
     let cancelled = false;
-    window.marko
+    window.milu
       .walkDir(rootDir)
       .then((paths) => {
         if (cancelled) return;

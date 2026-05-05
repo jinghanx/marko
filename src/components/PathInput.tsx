@@ -65,7 +65,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
     setActiveIndex(0);
     requestAnimationFrame(() => inputRef.current?.focus());
     if (!homeDirRef.current) {
-      window.marko.homeDir().then((h) => (homeDirRef.current = h));
+      window.milu.homeDir().then((h) => (homeDirRef.current = h));
     }
   }, [open]);
 
@@ -112,7 +112,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
     const parent = resolved.slice(0, slash) || '/';
     const prefix = resolved.slice(slash + 1);
     let cancelled = false;
-    window.marko
+    window.milu
       .listDir(parent)
       .then((entries) => {
         if (cancelled) return;
@@ -161,8 +161,8 @@ export function PathInput({ open, replace = false, onClose }: Props) {
     for (const s of pathChildren) push(s);
 
     // Empty query: rank by usage recency so frequent commands bubble
-    // up. `show-marko` is dropped entirely — it's the global
-    // launcher's home action; once you're already inside Marko (which
+    // up. `show-milu` is dropped entirely — it's the global
+    // launcher's home action; once you're already inside Milu (which
     // is the only way to open this palette) it's a no-op.
     const cmdMatches: Command[] = (
       trimmed
@@ -172,7 +172,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
             const ub = settingsState.commandUsage[b.keywords[0]] ?? 0;
             return ub - ua;
           })
-    ).filter((c) => c.action.type !== 'show-marko');
+    ).filter((c) => c.action.type !== 'show-milu');
     for (const cmd of cmdMatches) {
       push({ kind: 'command', cmd, key: `cmd:${cmd.keywords[0]}` });
     }
@@ -254,7 +254,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
       // drill into directories.
       setBusy(true);
       try {
-        const stat = await window.marko.stat(s.absPath);
+        const stat = await window.milu.stat(s.absPath);
         if (!stat.exists) {
           setError(`Path doesn't exist: ${s.absPath}`);
           return;
@@ -286,7 +286,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const stat = await window.marko.stat(resolved);
+      const stat = await window.milu.stat(resolved);
       if (!stat.exists) {
         setError(`Path doesn't exist: ${resolved}`);
         return;
@@ -425,8 +425,8 @@ function SuggestionRow({
   let tag: string | null = null;
 
   if (s.kind === 'command') {
-    if (s.cmd.iconKind === 'marko') {
-      glyph = <span className="pathinput-marko">M</span>;
+    if (s.cmd.iconKind === 'milu') {
+      glyph = <span className="pathinput-milu">M</span>;
     } else {
       glyph = (
         <span className={`pathinput-tabicon pathinput-tabicon--${s.cmd.iconKind}`}>

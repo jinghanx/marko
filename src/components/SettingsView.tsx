@@ -203,6 +203,7 @@ export function SettingsView() {
           </Section>
 
           <AiProvidersSection />
+          <AcpAgentsSection />
       </div>
     </div>
   );
@@ -341,7 +342,7 @@ function FontSelect({
 }
 
 function AiProvidersSection() {
-  const [providers, setProviders] = useState<import('../types/marko').AiProvider[]>([]);
+  const [providers, setProviders] = useState<import('../types/milu').AiProvider[]>([]);
   const [haveKey, setHaveKey] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [keyInput, setKeyInput] = useState('');
@@ -354,11 +355,11 @@ function AiProvidersSection() {
   });
 
   const load = async () => {
-    const list = await window.marko.aiProviders();
+    const list = await window.milu.aiProviders();
     setProviders(list);
     const flags: Record<string, boolean> = {};
     for (const p of list) {
-      if (p.needsKey) flags[p.id] = await window.marko.aiHasKey(p.id);
+      if (p.needsKey) flags[p.id] = await window.milu.aiHasKey(p.id);
     }
     setHaveKey(flags);
   };
@@ -369,7 +370,7 @@ function AiProvidersSection() {
 
   const saveKey = async (id: string) => {
     if (!keyInput.trim()) return;
-    const r = await window.marko.aiSetKey(id, keyInput.trim());
+    const r = await window.milu.aiSetKey(id, keyInput.trim());
     if (r.ok) {
       setEditing(null);
       setKeyInput('');
@@ -381,20 +382,20 @@ function AiProvidersSection() {
 
   const removeKey = async (id: string) => {
     if (!window.confirm('Remove API key?')) return;
-    await window.marko.aiDeleteKey(id);
+    await window.milu.aiDeleteKey(id);
     await load();
   };
 
   const removeProvider = async (id: string) => {
     if (!window.confirm('Remove this provider?')) return;
-    await window.marko.aiProviderDelete(id);
+    await window.milu.aiProviderDelete(id);
     await load();
   };
 
   const saveDraft = async () => {
     if (!draft.name.trim() || !draft.baseURL.trim()) return;
     const id = `custom-${Date.now()}`;
-    await window.marko.aiProviderSave({
+    await window.milu.aiProviderSave({
       id,
       name: draft.name.trim(),
       baseURL: draft.baseURL.trim(),
@@ -554,6 +555,152 @@ function AiProvidersSection() {
         )}
       </div>
     </Section>
+  );
+}
+
+/** ACP-agent registry — drives Milu's agent picker. Each entry maps
+ *  to a subprocess Milu spawns when the user opens an agent tab.
+ *  Auth (e.g. claude-login) lives outside this UI; users run the
+ *  agent's own login command in a terminal. */
+function AcpAgentsSection() {
+  const [agents, setAgents] = useState<import('../types/milu').AcpAgent[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const blankDraft = { name: '', command: '', args: '' };
+  const [draft, setDraft] = useState(blankDraft);
+
+  const load = async () => {
+    setAgents(await window.milu.acpAgents());
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const startEdit = (a: import('../types/milu').AcpAgent) => {
+    setEditingId(a.id);
+    setDraft({ name: a.name, command: a.command, args: a.args.join(' ') });
+  };
+
+  const startAdd = () => {
+    setAdding(true);
+    setEditingId(null);
+    setDraft(blankDraft);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setAdding(false);
+    setDraft(blankDraft);
+  };
+
+  const save = async () => {
+    if (!draft.name.trim() || !draft.command.trim()) return;
+    const args = draft.args.trim() ? draft.args.trim().split(/\s+/) : [];
+    const id = editingId ?? `custom-${Date.now()}`;
+    const r = await window.milu.acpAgentSave({
+      id,
+      name: draft.name.trim(),
+      command: draft.command.trim(),
+      args,
+    });
+    if (!r.ok) {
+      window.alert(r.error ?? 'Failed to save agent');
+      return;
+    }
+    cancelEdit();
+    await load();
+  };
+
+  const remove = async (id: string) => {
+    if (!window.confirm('Remove this agent?')) return;
+    await window.milu.acpAgentDelete(id);
+    await load();
+  };
+
+  return (
+    <Section label="Agents (ACP)">
+      <div className="ai-providers">
+        {agents.map((a) => (
+          <div
+            key={a.id}
+            className={`ai-provider-row${editingId === a.id ? ' ai-provider-row--editing' : ''}`}
+          >
+            <div className="ai-provider-top">
+              <div className="ai-provider-info">
+                <div className="ai-provider-name">{a.name}</div>
+                <div className="ai-provider-url">
+                  <code>{a.command}{a.args.length > 0 ? ' ' + a.args.join(' ') : ''}</code>
+                </div>
+              </div>
+              <div className="ai-provider-actions">
+                {editingId !== a.id && (
+                  <>
+                    <button className="btn btn-ghost" onClick={() => startEdit(a)}>
+                      Edit
+                    </button>
+                    <button className="btn btn-ghost" onClick={() => void remove(a.id)}>
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            {editingId === a.id && (
+              <AcpAgentForm draft={draft} setDraft={setDraft} onSave={save} onCancel={cancelEdit} />
+            )}
+          </div>
+        ))}
+
+        {adding ? (
+          <div className="ai-provider-row ai-provider-row--editing">
+            <AcpAgentForm draft={draft} setDraft={setDraft} onSave={save} onCancel={cancelEdit} />
+          </div>
+        ) : (
+          <button className="btn btn-ghost ai-provider-add" onClick={startAdd}>
+            + Add agent
+          </button>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+function AcpAgentForm({
+  draft,
+  setDraft,
+  onSave,
+  onCancel,
+}: {
+  draft: { name: string; command: string; args: string };
+  setDraft: (d: { name: string; command: string; args: string }) => void;
+  onSave: () => void | Promise<void>;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="ai-key-edit" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+      <input
+        className="ai-key-input"
+        placeholder="Name (e.g. Claude Code)"
+        value={draft.name}
+        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+      />
+      <input
+        className="ai-key-input"
+        placeholder="Command (binary on PATH or absolute path)"
+        value={draft.command}
+        onChange={(e) => setDraft({ ...draft, command: e.target.value })}
+      />
+      <input
+        className="ai-key-input"
+        placeholder="Args (space-separated, optional)"
+        value={draft.args}
+        onChange={(e) => setDraft({ ...draft, args: e.target.value })}
+      />
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" onClick={() => void onSave()}>Save</button>
+      </div>
+    </div>
   );
 }
 

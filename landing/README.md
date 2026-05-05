@@ -1,6 +1,6 @@
-# Marko landing page
+# Milu landing page
 
-A static, single-page landing site for Marko. No build step — just plain HTML, CSS, and an icon.
+A static, single-page landing site for Milu. No build step — just plain HTML, CSS, and an icon.
 
 ## Local preview
 
@@ -31,20 +31,20 @@ If you'd rather link the GitHub repo to a Vercel project from the dashboard, set
 
 - `index.html` — single page with hero, mock window, features, shortcuts, footer
 - `style.css` — typography, layout, light/dark theme via `prefers-color-scheme`
-- `icon.png` — Marko app icon (copy of `../build/icon.png`)
+- `icon.png` — Milu app icon (copy of `../build/icon.png`)
 - `vercel.json` — caching headers + clean URLs
 
 ## Update the download link
 
 The download buttons currently point to
-`https://github.com/jinghanx/marko/releases/latest`. Once you publish a release
+`https://github.com/jinghanx/milu/releases/latest`. Once you publish a release
 with the `.dmg` attached, that URL renders the latest release's assets list.
 
 If you'd prefer direct `.dmg` links, change the `href` in `index.html`:
 
 ```html
 <a class="btn btn-primary"
-   href="https://github.com/jinghanx/marko/releases/download/v0.1.0/Marko-0.1.0-arm64.dmg">
+   href="https://github.com/jinghanx/milu/releases/download/v0.1.0/Milu-0.1.0-arm64.dmg">
   Download for Apple Silicon
 </a>
 ```

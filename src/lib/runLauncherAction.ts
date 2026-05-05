@@ -6,6 +6,7 @@ import {
   openGitTab,
   openExcalidrawTab,
   openChatTab,
+  openAgentTab,
   openSearchTab,
   openHttpTab,
   openClipboardTab,
@@ -20,7 +21,7 @@ import {
 import { settings, buildSearchUrl } from '../state/settings';
 
 async function openHomeFolder(sub: string): Promise<void> {
-  const home = await window.marko.homeDir();
+  const home = await window.milu.homeDir();
   const full = sub ? `${home}/${sub}` : home;
   await openFolderInEditor(full, { focus: true });
 }
@@ -51,7 +52,7 @@ function recordCommandUsage(action: LauncherAction): void {
 export async function runLauncherAction(action: LauncherAction): Promise<void> {
   recordCommandUsage(action);
   switch (action.type) {
-    case 'show-marko':
+    case 'show-milu':
       // No-op in the renderer — main has already done mainWindow.show()
       // and mainWindow.focus() before forwarding the action. The
       // dispatch case exists only so the switch is exhaustive.
@@ -61,6 +62,9 @@ export async function runLauncherAction(action: LauncherAction): Promise<void> {
       return;
     case 'open-chat':
       openChatTab();
+      return;
+    case 'open-agent':
+      openAgentTab(action.agentId, action.agentName);
       return;
     case 'open-search':
       openSearchTab();
@@ -93,7 +97,7 @@ export async function runLauncherAction(action: LauncherAction): Promise<void> {
       openLaterTab();
       return;
     case 'open-notes': {
-      const file = await window.marko.notesPath();
+      const file = await window.milu.notesPath();
       await openFileFromPath(file, { focus: true });
       return;
     }
@@ -104,14 +108,14 @@ export async function runLauncherAction(action: LauncherAction): Promise<void> {
       await openHomeFolder(action.sub);
       return;
     case 'open-app':
-      await window.marko.openDefault(action.appPath);
+      await window.milu.openDefault(action.appPath);
       return;
     case 'web-search': {
-      console.log('[marko] web-search action received, query:', action.query);
+      console.log('[milu] web-search action received, query:', action.query);
       const { url } = buildSearchUrl(settings.get(), action.query);
-      console.log('[marko] built search url:', url);
+      console.log('[milu] built search url:', url);
       openUrlInTab(url);
-      console.log('[marko] openUrlInTab called');
+      console.log('[milu] openUrlInTab called');
       return;
     }
   }

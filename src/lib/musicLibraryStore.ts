@@ -1,9 +1,9 @@
-/** Shared mutator for the music library file (~/.marko/music-library.json).
+/** Shared mutator for the music library file (~/.milu/music-library.json).
  *  Lets the WebView's ♫ button and the MusicView tab append tracks
  *  without duplicating the read-write-emit dance. Consumers listen
- *  for the `marko:music-library-changed` window event. */
+ *  for the `milu:music-library-changed` window event. */
 
-const CHANGED_EVENT = 'marko:music-library-changed';
+const CHANGED_EVENT = 'milu:music-library-changed';
 
 export interface MusicLibraryTrack {
   id: string;
@@ -23,7 +23,7 @@ export interface MusicLibrary {
 
 async function readLibraryRaw(): Promise<MusicLibrary> {
   try {
-    const raw = await window.marko.musicLibraryRead();
+    const raw = await window.milu.musicLibraryRead();
     if (!raw) return { userTracks: [], hiddenIds: [] };
     const parsed = JSON.parse(raw) as Partial<MusicLibrary>;
     return {
@@ -36,7 +36,7 @@ async function readLibraryRaw(): Promise<MusicLibrary> {
 }
 
 async function writeLibrary(lib: MusicLibrary): Promise<void> {
-  await window.marko.musicLibraryWrite(JSON.stringify(lib));
+  await window.milu.musicLibraryWrite(JSON.stringify(lib));
   window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
 }
 

@@ -274,7 +274,7 @@ export function WebView({ tabId, url }: Props) {
   }, []);
 
   // Right-click context menu — intercept the webview's `context-menu`
-  // event and render our own Marko-aware menu (Open in New Tab, Save
+  // event and render our own Milu-aware menu (Open in New Tab, Save
   // Link to Later, Search Selection, etc.) instead of letting the
   // guest show its default. Coordinates are page-relative; we add
   // the webview element's viewport offset before positioning.
@@ -469,13 +469,13 @@ export function WebView({ tabId, url }: Props) {
     // capturing listener into the guest itself that maps button 3/4
     // (raw MX side buttons) to history.back/forward. dom-ready fires
     // on every navigation, so the script is re-injected after each
-    // page load; the __markoNavBound flag keeps it from double-
+    // page load; the __miluNavBound flag keeps it from double-
     // binding within a single document.
     const onDomReady = () => {
       void wv.executeJavaScript(`
         (function () {
-          if (window.__markoNavBound) return;
-          window.__markoNavBound = true;
+          if (window.__miluNavBound) return;
+          window.__miluNavBound = true;
           // Only fire on bare back/forward mouse-button presses. If
           // any modifier is held, bail — Logitech Options+ profiles
           // can synthesize both a keystroke (Cmd+Shift+[) and the
@@ -584,7 +584,7 @@ export function WebView({ tabId, url }: Props) {
     }, 50);
   };
 
-  /** Save the current page into ~/.marko/later.json so the user can
+  /** Save the current page into ~/.milu/later.json so the user can
    *  read it from the Later tab later on. The bookmark icon flips to
    *  a check for ~1.5s as visual feedback. */
   const handleSaveLater = async () => {
@@ -610,7 +610,7 @@ export function WebView({ tabId, url }: Props) {
     let isLive = false;
     let genre: string | null = null;
     try {
-      const meta = await window.marko.youtubeMetadata(videoId);
+      const meta = await window.milu.youtubeMetadata(videoId);
       if (meta.ok) {
         if (meta.title) title = meta.title;
         if (meta.channel) channel = meta.channel;
@@ -705,7 +705,7 @@ export function WebView({ tabId, url }: Props) {
           </button>
         )}
         {/* Save for later — works on any web page. Reads the current
-          * URL + title + favicon and writes to ~/.marko/later.json. */}
+          * URL + title + favicon and writes to ~/.milu/later.json. */}
         <button
           className={
             'webview-btn' + (savedToLater ? ' webview-btn--saved' : '')

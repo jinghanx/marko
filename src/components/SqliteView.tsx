@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SqliteSchema, SqliteSchemaTable, SqliteQueryResult } from '../types/marko';
+import type { SqliteSchema, SqliteSchemaTable, SqliteQueryResult } from '../types/milu';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
@@ -50,7 +50,7 @@ export function SqliteView({ tabId, filePath }: Props) {
   const [schema, setSchema] = useState<SqliteSchema | null>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
   const [query, setQuery] = useState<string>(() => {
-    const stored = sessionStorage.getItem(`marko:sqlite:query:${tabId}`);
+    const stored = sessionStorage.getItem(`milu:sqlite:query:${tabId}`);
     return stored ?? '-- Click a table on the left, or write any SQL and press ⌘↵\n';
   });
   const [result, setResult] = useState<SqliteQueryResult | null>(null);
@@ -59,7 +59,7 @@ export function SqliteView({ tabId, filePath }: Props) {
   const [filter, setFilter] = useState('');
 
   const refreshSchema = useCallback(async () => {
-    const r = await window.marko.sqliteSchema(filePath);
+    const r = await window.milu.sqliteSchema(filePath);
     if (r.ok && r.data) {
       setSchema(r.data);
       setSchemaError(null);
@@ -72,7 +72,7 @@ export function SqliteView({ tabId, filePath }: Props) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const open = await window.marko.sqliteOpen(filePath);
+      const open = await window.milu.sqliteOpen(filePath);
       if (cancelled) return;
       if (!open.ok) {
         setSchemaError(open.error ?? 'Failed to open database');
@@ -91,7 +91,7 @@ export function SqliteView({ tabId, filePath }: Props) {
   // Persist the in-flight query so re-mounts (StrictMode, tab switching)
   // don't lose the user's draft. Tab content is empty for sqlite tabs.
   useEffect(() => {
-    sessionStorage.setItem(`marko:sqlite:query:${tabId}`, query);
+    sessionStorage.setItem(`milu:sqlite:query:${tabId}`, query);
   }, [tabId, query]);
 
   const runQuery = useCallback(
@@ -100,7 +100,7 @@ export function SqliteView({ tabId, filePath }: Props) {
       if (!trimmed) return;
       setBusy(true);
       try {
-        const r = await window.marko.sqliteQuery(filePath, trimmed);
+        const r = await window.milu.sqliteQuery(filePath, trimmed);
         setResult(r);
         // Schema may have changed for write queries — refresh.
         if (r.ok && r.isReadOnly === false) {

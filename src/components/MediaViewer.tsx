@@ -9,12 +9,12 @@ interface Props {
 }
 
 /** Renders mp3/mp4-style files with native <audio>/<video> controls. The
- *  source streams over the privileged `marko-file://` protocol registered in
+ *  source streams over the privileged `milu-file://` protocol registered in
  *  electron/main.ts, so seeking works (HTTP range requests) without buffering
  *  the whole clip. */
 export function MediaViewer({ tabId, filePath, title }: Props) {
   const src = useMemo(
-    () => `marko-file://stream${encodeURI(filePath)}`,
+    () => `milu-file://stream${encodeURI(filePath)}`,
     [filePath],
   );
   const isVideo = isVideoExt(filePath);

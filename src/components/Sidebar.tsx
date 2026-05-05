@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace, workspace, getActiveSession } from '../state/workspace';
 import { openFolderViaDialog, openFileFromPath, openFolderInEditor } from '../lib/actions';
 import { settings, useSettings } from '../state/settings';
-import type { DirEntry } from '../types/marko';
+import type { DirEntry } from '../types/milu';
 
 type EditMode = 'rename' | 'new-file' | 'new-folder';
 interface EditState {
@@ -62,7 +62,7 @@ export function Sidebar() {
 
   const loadDir = useCallback(async (dir: string) => {
     try {
-      const entries = await window.marko.listDir(dir);
+      const entries = await window.milu.listDir(dir);
       setEntriesMap((m) => {
         const next = new Map(m);
         next.set(dir, entries);
@@ -248,7 +248,7 @@ export function Sidebar() {
         cancelEdit();
         return;
       }
-      const result = await window.marko.rename(oldPath, newPath);
+      const result = await window.milu.rename(oldPath, newPath);
       if (!result.ok) {
         setError(result.error ?? 'rename failed');
         return;
@@ -263,8 +263,8 @@ export function Sidebar() {
       const newPath = `${parent}/${trimmed}`;
       const result =
         edit.mode === 'new-file'
-          ? await window.marko.createFile(newPath)
-          : await window.marko.createDir(newPath);
+          ? await window.milu.createFile(newPath)
+          : await window.milu.createDir(newPath);
       if (!result.ok) {
         setError(result.error ?? 'create failed');
         return;
@@ -279,7 +279,7 @@ export function Sidebar() {
   const doTrash = async (path: string) => {
     const ok = window.confirm(`Move "${basename(path)}" to Trash?`);
     if (!ok) return;
-    const result = await window.marko.trash(path);
+    const result = await window.milu.trash(path);
     if (!result.ok) {
       setError(result.error ?? 'trash failed');
       return;
@@ -448,7 +448,7 @@ export function Sidebar() {
           }}
           onTrash={() => void doTrash(menu.path)}
           onCopyPath={() => void navigator.clipboard.writeText(menu.path)}
-          onReveal={() => void window.marko.revealInFinder(menu.path)}
+          onReveal={() => void window.milu.revealInFinder(menu.path)}
           onOpenAsWorkspace={() => workspace.setRootDir(menu.path)}
           onBookmark={() => {
             const cur = settings.get();

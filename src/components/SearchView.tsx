@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { SearchMatch } from '../types/marko';
+import type { SearchMatch } from '../types/milu';
 import { useWorkspace, getActiveSession } from '../state/workspace';
 import { openFileFromPath } from '../lib/actions';
 
@@ -33,7 +33,7 @@ export function SearchView() {
   useEffect(() => {
     return () => {
       const id = reqIdRef.current;
-      if (id) void window.marko.searchCancel(id);
+      if (id) void window.milu.searchCancel(id);
     };
   }, []);
 
@@ -56,7 +56,7 @@ export function SearchView() {
     // Cancel any prior in-flight search.
     const prior = reqIdRef.current;
     if (prior) {
-      await window.marko.searchCancel(prior);
+      await window.milu.searchCancel(prior);
     }
     const reqId = `search-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     reqIdRef.current = reqId;
@@ -66,7 +66,7 @@ export function SearchView() {
 
     let collected: SearchMatch[] = [];
     let stopped = false;
-    const offMatch = window.marko.onSearchMatch(reqId, (m) => {
+    const offMatch = window.milu.onSearchMatch(reqId, (m) => {
       if (stopped) return;
       collected.push(m);
       // Throttle setState — flush in batches of 32 to keep React render cheap.
@@ -75,10 +75,10 @@ export function SearchView() {
       }
       if (collected.length >= MAX_RESULTS) {
         stopped = true;
-        void window.marko.searchCancel(reqId);
+        void window.milu.searchCancel(reqId);
       }
     });
-    const offDone = window.marko.onSearchDone(reqId, (r) => {
+    const offDone = window.milu.onSearchDone(reqId, (r) => {
       offMatch();
       offDone();
       setMatches([...collected]);
@@ -87,7 +87,7 @@ export function SearchView() {
       reqIdRef.current = null;
     });
 
-    const start = await window.marko.searchStart(reqId, {
+    const start = await window.milu.searchStart(reqId, {
       rootDir,
       query,
       caseSensitive,
@@ -106,7 +106,7 @@ export function SearchView() {
 
   const cancel = () => {
     const id = reqIdRef.current;
-    if (id) void window.marko.searchCancel(id);
+    if (id) void window.milu.searchCancel(id);
   };
 
   // Group matches by file path.
@@ -135,7 +135,7 @@ export function SearchView() {
     // listens for. (If the editor doesn't support it, this is a no-op.)
     setTimeout(() => {
       window.dispatchEvent(
-        new CustomEvent('marko:goto-line', { detail: { path: m.path, line: m.lineNumber } }),
+        new CustomEvent('milu:goto-line', { detail: { path: m.path, line: m.lineNumber } }),
       );
     }, 60);
   };

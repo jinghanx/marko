@@ -112,6 +112,43 @@ export interface AiChatMessage {
   content: string;
 }
 
+/** A configured ACP agent (Agent Client Protocol) — entry in the
+ *  user's `~/.milu/acp-agents.json`. Maps to a subprocess that
+ *  speaks ACP over stdio (e.g. the Claude Code adapter). */
+export interface AcpAgent {
+  id: string;
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+/** One agent-proposed file edit awaiting user review. The `hunks`
+ *  list mirrors the `diff` library's structuredPatch hunks; each
+ *  carries an independent decision flag the user can flip. */
+export interface AcpReviewHunk {
+  index: number;
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  decision: 'pending' | 'accepted' | 'rejected';
+}
+export interface AcpReviewSummary {
+  id: string;
+  path: string;
+  unifiedDiff: string;
+  hunks: AcpReviewHunk[];
+  createdAt: number;
+}
+export interface AcpReviewDetail extends AcpReviewSummary {
+  baseContent: string;
+  proposedContent: string;
+  /** Same hunks as `summary.hunks` but with the full body lines for
+   *  rendering. */
+  hunks: Array<AcpReviewHunk & { lines: string[] }>;
+}
+
 export interface AiChatStartArgs {
   providerId: string;
   model: string;
@@ -214,7 +251,7 @@ export interface SqliteQueryResult {
   error?: string;
 }
 
-export interface MarkoApi {
+export interface MiluApi {
   readFile(filePath: string): Promise<string>;
   writeFile(filePath: string, content: string): Promise<boolean>;
   openFileDialog(): Promise<{ filePath: string; content: string } | null>;
@@ -230,12 +267,12 @@ export interface MarkoApi {
     | { ok: true; title: string; channel: string; description: string; isLive: boolean }
     | { ok: false; error: string }
   >;
-  /** Read / write the music library (~/.marko/music-library.json).
+  /** Read / write the music library (~/.milu/music-library.json).
    *  Lives in the shared dotfile dir so dev and packaged builds see
    *  the same library. */
   musicLibraryRead(): Promise<string | null>;
   musicLibraryWrite(json: string): Promise<{ ok: boolean }>;
-  /** Read / write the "save for later" list (~/.marko/later.json) —
+  /** Read / write the "save for later" list (~/.milu/later.json) —
    *  pages, articles, videos saved from web tabs via the bookmark
    *  button. Same dotfile / shared-across-builds pattern as the
    *  music library. */
@@ -245,7 +282,7 @@ export interface MarkoApi {
    *  WebView when a video inside the page enters / leaves HTML
    *  fullscreen so the whole window goes fullscreen with it. */
   setWindowFullscreen(fs: boolean): Promise<{ ok: boolean }>;
-  /** Settings JSON blob from ~/.marko/settings.json, read
+  /** Settings JSON blob from ~/.milu/settings.json, read
    *  synchronously by preload at boot so settings.ts can hydrate
    *  without becoming async. `null` if the file doesn't exist or
    *  couldn't be read. */
@@ -309,6 +346,43 @@ export interface MarkoApi {
   aiChatCancel(reqId: string): Promise<{ ok: boolean }>;
   onAiChatChunk(reqId: string, handler: (chunk: string) => void): () => void;
   onAiChatDone(reqId: string, handler: (r: { ok: boolean; error?: string }) => void): () => void;
+  acpAgents(): Promise<AcpAgent[]>;
+  acpAgentSave(a: AcpAgent): Promise<{ ok: boolean; error?: string }>;
+  acpAgentDelete(id: string): Promise<{ ok: boolean }>;
+  acpStart(
+    reqId: string,
+    agentId: string,
+    cwd: string,
+  ): Promise<{ ok: boolean; sessionId?: string; error?: string }>;
+  acpPrompt(
+    reqId: string,
+    text: string,
+  ): Promise<{ ok: boolean; stopReason?: string; error?: string }>;
+  acpCancel(reqId: string): Promise<{ ok: boolean }>;
+  acpDispose(reqId: string): Promise<{ ok: boolean }>;
+  acpResolvePermission(
+    reqId: string,
+    permId: string,
+    response: unknown,
+  ): Promise<{ ok: boolean }>;
+  onAcpEvent(
+    reqId: string,
+    handler: (e: { event: string; payload?: unknown }) => void,
+  ): () => void;
+  /** Pending agent-write reviews for one session. Re-list whenever a
+   *  `review-created` event fires on the session. */
+  acpReviewList(reqId: string): Promise<AcpReviewSummary[]>;
+  acpReviewGet(id: string): Promise<AcpReviewDetail | null>;
+  acpReviewSetHunk(
+    id: string,
+    hunkIdx: number,
+    decision: 'pending' | 'accepted' | 'rejected',
+  ): Promise<{ ok: boolean }>;
+  acpReviewResolve(
+    id: string,
+    mode: 'accept-all' | 'reject-all' | 'partial',
+  ): Promise<{ ok: boolean; error?: string }>;
+  acpReviewAbandon(id: string): Promise<{ ok: boolean }>;
   searchStart(reqId: string, args: SearchArgs): Promise<{ ok: boolean; error?: string }>;
   searchCancel(reqId: string): Promise<{ ok: boolean }>;
   onSearchMatch(reqId: string, handler: (m: SearchMatch) => void): () => void;
@@ -408,7 +482,7 @@ export interface MarkoApi {
   onPtyExit(id: string, handler: (exitCode: number) => void): () => void;
 }
 
-export interface MarkoLauncherApi {
+export interface MiluLauncherApi {
   hide(): Promise<{ ok: boolean }>;
   dispatch(action: unknown): Promise<{ ok: boolean }>;
   onShow(handler: () => void): () => void;
@@ -416,8 +490,8 @@ export interface MarkoLauncherApi {
 
 declare global {
   interface Window {
-    marko: MarkoApi;
-    markoLauncher: MarkoLauncherApi;
+    milu: MiluApi;
+    miluLauncher: MiluLauncherApi;
   }
 }
 

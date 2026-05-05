@@ -52,15 +52,15 @@ export function App() {
       // gone or unreadable.
       let chosen: string | null = null;
       try {
-        const saved = localStorage.getItem('marko:lastWorkspace');
+        const saved = localStorage.getItem('milu:lastWorkspace');
         if (saved) {
-          const st = await window.marko.stat(saved);
+          const st = await window.milu.stat(saved);
           if (st.exists && st.isDirectory) chosen = saved;
         }
       } catch {
         // ignore
       }
-      if (!chosen) chosen = await window.marko.homeDir();
+      if (!chosen) chosen = await window.milu.homeDir();
       if (!cancelled && getActiveSession().rootDir == null) {
         workspace.setRootDir(chosen);
       }
@@ -73,20 +73,20 @@ export function App() {
   useEffect(() => {
     const offs = [
       // Launcher (global hotkey window) dispatches actions back here.
-      window.marko.onLauncherRun((action) => {
-        console.log('[marko] onLauncherRun fired with action:', action);
+      window.milu.onLauncherRun((action) => {
+        console.log('[milu] onLauncherRun fired with action:', action);
         void runLauncherAction(action as Parameters<typeof runLauncherAction>[0]);
       }),
       // New-tab links inside web tabs are forwarded from main — open
-      // them as a Marko web tab in the active session.
-      window.marko.onWebviewOpenUrl?.((url) => {
-        console.log('[marko] webview:open-url received:', url);
+      // them as a Milu web tab in the active session.
+      window.milu.onWebviewOpenUrl?.((url) => {
+        console.log('[milu] webview:open-url received:', url);
         openUrlInTab(url);
       }) ?? (() => {}),
       // Tray menu → recent file / workspace bookmark click. Main
       // dispatches the path; we route through the standard
       // openFileFromPath which handles files OR folders correctly.
-      window.marko.onTrayOpenPath?.((path) => {
+      window.milu.onTrayOpenPath?.((path) => {
         void openFileFromPath(path, { focus: true });
       }) ?? (() => {}),
       uiBus.on('open-palette', () => setModal({ kind: 'palette', replace: false })),
@@ -95,24 +95,24 @@ export function App() {
       uiBus.on('open-new-file', () => setModal({ kind: 'newFile' })),
       uiBus.on('open-path', () => setModal({ kind: 'path', replace: false })),
       uiBus.on('open-shortcuts', () => openShortcutsTab()),
-      window.marko.onMenu('menu:new', () => setModal({ kind: 'newFile' })),
-      window.marko.onMenu('menu:open-file', () => void openFileViaDialog()),
-      window.marko.onMenu('menu:open-folder', () => void openFolderViaDialog()),
-      window.marko.onMenu('menu:save', () => void saveActive()),
-      window.marko.onMenu('menu:save-as', () => void saveActiveAs()),
-      window.marko.onMenu('menu:close-tab', () => closeActiveTab()),
-      window.marko.onMenu('menu:prev-tab', () => workspace.cycleTab(-1)),
-      window.marko.onMenu('menu:next-tab', () => workspace.cycleTab(1)),
+      window.milu.onMenu('menu:new', () => setModal({ kind: 'newFile' })),
+      window.milu.onMenu('menu:open-file', () => void openFileViaDialog()),
+      window.milu.onMenu('menu:open-folder', () => void openFolderViaDialog()),
+      window.milu.onMenu('menu:save', () => void saveActive()),
+      window.milu.onMenu('menu:save-as', () => void saveActiveAs()),
+      window.milu.onMenu('menu:close-tab', () => closeActiveTab()),
+      window.milu.onMenu('menu:prev-tab', () => workspace.cycleTab(-1)),
+      window.milu.onMenu('menu:next-tab', () => workspace.cycleTab(1)),
       // ⌘1-8 = activate Nth tab in focused leaf; ⌘9 = activate last tab.
       ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
-        window.marko.onMenu(`menu:goto-tab-${n}`, () => gotoTabInFocused(n - 1)),
+        window.milu.onMenu(`menu:goto-tab-${n}`, () => gotoTabInFocused(n - 1)),
       ),
-      window.marko.onMenu('menu:goto-tab-last', () => gotoTabInFocused(-1)),
-      window.marko.onMenu('menu:toggle-sidebar', () => workspace.toggleSidebar()),
-      window.marko.onMenu('menu:toggle-outline', () => workspace.toggleOutline()),
-      window.marko.onMenu('menu:toggle-markdown-mode', () => workspace.toggleMarkdownViewMode()),
-      window.marko.onMenu('menu:preferences', () => openSettingsTab()),
-      window.marko.onMenu('menu:find-in-files', () => {
+      window.milu.onMenu('menu:goto-tab-last', () => gotoTabInFocused(-1)),
+      window.milu.onMenu('menu:toggle-sidebar', () => workspace.toggleSidebar()),
+      window.milu.onMenu('menu:toggle-outline', () => workspace.toggleOutline()),
+      window.milu.onMenu('menu:toggle-markdown-mode', () => workspace.toggleMarkdownViewMode()),
+      window.milu.onMenu('menu:preferences', () => openSettingsTab()),
+      window.milu.onMenu('menu:find-in-files', () => {
         // Reuse an existing Search tab in the active session if one exists,
         // otherwise open a new one.
         const s = workspace.getState();
@@ -129,41 +129,41 @@ export function App() {
         }
         openSearchTab();
       }),
-      window.marko.onMenu('menu:quick-open', () => setModal({ kind: 'palette', replace: false })),
-      window.marko.onMenu('menu:quick-open-replace', () => setModal({ kind: 'palette', replace: true })),
-      window.marko.onMenu('menu:goto-path', () => setModal({ kind: 'path', replace: false })),
-      window.marko.onMenu('menu:goto-path-replace', () => setModal({ kind: 'path', replace: true })),
-      window.marko.onMenu('menu:reopen-closed-tab', () => void reopenLastClosedTab()),
-      window.marko.onMenu('menu:new-terminal', () => openTerminalTab()),
-      window.marko.onMenu('menu:focus-address', () => uiBus.emit('focus-address')),
+      window.milu.onMenu('menu:quick-open', () => setModal({ kind: 'palette', replace: false })),
+      window.milu.onMenu('menu:quick-open-replace', () => setModal({ kind: 'palette', replace: true })),
+      window.milu.onMenu('menu:goto-path', () => setModal({ kind: 'path', replace: false })),
+      window.milu.onMenu('menu:goto-path-replace', () => setModal({ kind: 'path', replace: true })),
+      window.milu.onMenu('menu:reopen-closed-tab', () => void reopenLastClosedTab()),
+      window.milu.onMenu('menu:new-terminal', () => openTerminalTab()),
+      window.milu.onMenu('menu:focus-address', () => uiBus.emit('focus-address')),
       // ⌘R: only the active web tab listens — non-web tabs no-op so the
       // keystroke can never reload the whole BrowserWindow by accident.
-      window.marko.onMenu('menu:reload-page', () => uiBus.emit('reload-page')),
+      window.milu.onMenu('menu:reload-page', () => uiBus.emit('reload-page')),
       // ⌘F — find-on-page in the active web tab. Non-web tabs no-op.
-      window.marko.onMenu('menu:find-on-page', () => uiBus.emit('find-on-page')),
-      window.marko.onMenu('menu:process-viewer', () => openProcessTab()),
-      window.marko.onMenu('menu:open-clipboard', () => openClipboardTab()),
-      window.marko.onMenu('menu:show-shortcuts', () => openShortcutsTab()),
-      window.marko.onMenu('menu:split-right', () => workspace.splitFocused('horizontal')),
-      window.marko.onMenu('menu:split-down', () => workspace.splitFocused('vertical')),
-      window.marko.onMenu('menu:close-pane', () => workspace.closePane(workspace.getFocusedLeaf().id)),
-      window.marko.onMenu('menu:cycle-layout', () => workspace.cycleLayout()),
-      window.marko.onMenu('menu:toggle-pane-zoom', () => workspace.toggleMaximizePane()),
-      window.marko.onMenu('menu:new-session', () => workspace.newSession()),
-      window.marko.onMenu('menu:close-session', () => {
+      window.milu.onMenu('menu:find-on-page', () => uiBus.emit('find-on-page')),
+      window.milu.onMenu('menu:process-viewer', () => openProcessTab()),
+      window.milu.onMenu('menu:open-clipboard', () => openClipboardTab()),
+      window.milu.onMenu('menu:show-shortcuts', () => openShortcutsTab()),
+      window.milu.onMenu('menu:split-right', () => workspace.splitFocused('horizontal')),
+      window.milu.onMenu('menu:split-down', () => workspace.splitFocused('vertical')),
+      window.milu.onMenu('menu:close-pane', () => workspace.closePane(workspace.getFocusedLeaf().id)),
+      window.milu.onMenu('menu:cycle-layout', () => workspace.cycleLayout()),
+      window.milu.onMenu('menu:toggle-pane-zoom', () => workspace.toggleMaximizePane()),
+      window.milu.onMenu('menu:new-session', () => workspace.newSession()),
+      window.milu.onMenu('menu:close-session', () => {
         const id = workspace.getState().activeSessionId;
         workspace.closeSession(id);
       }),
-      window.marko.onMenu('menu:next-session', () => workspace.cycleSession(1)),
-      window.marko.onMenu('menu:prev-session', () => workspace.cycleSession(-1)),
-      window.marko.onMenu('menu:reset-workspace', () => {
+      window.milu.onMenu('menu:next-session', () => workspace.cycleSession(1)),
+      window.milu.onMenu('menu:prev-session', () => workspace.cycleSession(-1)),
+      window.milu.onMenu('menu:reset-workspace', () => {
         const ok = window.confirm(
           'Reset workspace?\n\nThis closes all open tabs and removes every session. ' +
             'Your saved files, settings, and recent-files list are NOT touched.',
         );
         if (ok) void resetWorkspaceAndReload();
       }),
-      window.marko.onMenu('menu:focus-pane-next', () => {
+      window.milu.onMenu('menu:focus-pane-next', () => {
         const s = workspace.getState();
         const session = getActiveSession(s);
         const leaves = getAllLeaves(session.root);
@@ -172,7 +172,7 @@ export function App() {
         const next = (idx + 1) % leaves.length;
         workspace.setFocusedPane(leaves[next].id);
       }),
-      window.marko.onMenu('menu:focus-pane-prev', () => {
+      window.milu.onMenu('menu:focus-pane-prev', () => {
         const s = workspace.getState();
         const session = getActiveSession(s);
         const leaves = getAllLeaves(session.root);

@@ -4,9 +4,9 @@ import { contextBridge, ipcRenderer } from 'electron';
  *  on the BrowserWindow's `additionalArguments`. Reading via
  *  process.argv keeps the preload free of Node module imports
  *  (those throw under the launcher's sandboxed preload context,
- *  which would block contextBridge entirely → window.marko
+ *  which would block contextBridge entirely → window.milu
  *  undefined → renderer crash). */
-const SETTINGS_ARG_PREFIX = '--marko-initial-settings=';
+const SETTINGS_ARG_PREFIX = '--milu-initial-settings=';
 const settingsArg = process.argv.find((a) => a.startsWith(SETTINGS_ARG_PREFIX));
 const initialSettings = settingsArg
   ? settingsArg.slice(SETTINGS_ARG_PREFIX.length) || null
@@ -70,13 +70,13 @@ const api = {
   setWindowFullscreen: (fs: boolean): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('window:set-fullscreen', fs),
   /** Initial settings blob — read synchronously by preload from
-   *  ~/.marko/settings.json so settings.ts can hydrate without
+   *  ~/.milu/settings.json so settings.ts can hydrate without
    *  becoming async. `null` on first run / unreadable file. */
   initialSettings,
   settingsWrite: (json: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('settings:write', json),
-  configDir: (): Promise<string> => ipcRenderer.invoke('marko:config-dir'),
-  notesPath: (): Promise<string> => ipcRenderer.invoke('marko:notes-path'),
+  configDir: (): Promise<string> => ipcRenderer.invoke('milu:config-dir'),
+  notesPath: (): Promise<string> => ipcRenderer.invoke('milu:notes-path'),
   createFile: (filePath: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('file:create', filePath),
   createDir: (dirPath: string): Promise<{ ok: boolean; error?: string }> =>
@@ -103,7 +103,7 @@ const api = {
     ipcRenderer.invoke('ps:kill', pid, signal),
   systemStats: (): Promise<SystemStats> => ipcRenderer.invoke('system:stats'),
 
-  // ---------- Persisted workspace state (~/.marko/state.json) ----------
+  // ---------- Persisted workspace state (~/.milu/state.json) ----------
   stateRead: (): Promise<string | null> => ipcRenderer.invoke('state:read'),
   stateWrite: (json: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('state:write', json),
@@ -176,6 +176,46 @@ const api = {
   ) => {
     const ch = `ai:chat:done:${reqId}`;
     const listener = (_e: unknown, r: { ok: boolean; error?: string }) => handler(r);
+    ipcRenderer.on(ch, listener);
+    return () => ipcRenderer.removeListener(ch, listener);
+  },
+
+  // ---------- ACP agents ----------
+  acpAgents: () => ipcRenderer.invoke('acp:agents'),
+  acpAgentSave: (a: unknown) => ipcRenderer.invoke('acp:agent-save', a),
+  acpAgentDelete: (id: string) => ipcRenderer.invoke('acp:agent-delete', id),
+  acpStart: (reqId: string, agentId: string, cwd: string) =>
+    ipcRenderer.invoke('acp:start', reqId, agentId, cwd),
+  acpPrompt: (reqId: string, text: string) =>
+    ipcRenderer.invoke('acp:prompt', reqId, text),
+  acpCancel: (reqId: string) => ipcRenderer.invoke('acp:cancel', reqId),
+  acpDispose: (reqId: string) => ipcRenderer.invoke('acp:dispose', reqId),
+  acpResolvePermission: (reqId: string, permId: string, response: unknown) =>
+    ipcRenderer.invoke('acp:permission-resolve', reqId, permId, response),
+  /** Cursor-style review of agent file writes. Returns a snapshot of
+   *  every pending review for one session so the renderer can hand
+   *  them to the inline-diff editor. */
+  acpReviewList: (reqId: string) => ipcRenderer.invoke('acp-review:list', reqId),
+  acpReviewGet: (id: string) => ipcRenderer.invoke('acp-review:get', id),
+  acpReviewSetHunk: (
+    id: string,
+    hunkIdx: number,
+    decision: 'pending' | 'accepted' | 'rejected',
+  ) => ipcRenderer.invoke('acp-review:set-hunk', id, hunkIdx, decision),
+  acpReviewResolve: (id: string, mode: 'accept-all' | 'reject-all' | 'partial') =>
+    ipcRenderer.invoke('acp-review:resolve', id, mode),
+  acpReviewAbandon: (id: string) =>
+    ipcRenderer.invoke('acp-review:abandon', id),
+  /** Subscribe to all events for one session (initialized, update,
+   *  permission-request, file-written, stderr, exit, error). The
+   *  envelope is `{ event, payload }`. */
+  onAcpEvent: (
+    reqId: string,
+    handler: (e: { event: string; payload?: unknown }) => void,
+  ) => {
+    const ch = `acp:event:${reqId}`;
+    const listener = (_e: unknown, env: { event: string; payload?: unknown }) =>
+      handler(env);
     ipcRenderer.on(ch, listener);
     return () => ipcRenderer.removeListener(ch, listener);
   },
@@ -281,7 +321,7 @@ const api = {
   },
 
   // Plain new-tab links inside a <webview> are forwarded here from
-  // main so the renderer can open them as Marko web tabs.
+  // main so the renderer can open them as Milu web tabs.
   onWebviewOpenUrl: (handler: (url: string) => void) => {
     const listener = (_e: unknown, url: string) => handler(url);
     ipcRenderer.on('webview:open-url', listener);
@@ -343,7 +383,7 @@ const api = {
     ipcRenderer.invoke('launcher:set-hotkey', accelerator),
 };
 
-contextBridge.exposeInMainWorld('marko', api);
+contextBridge.exposeInMainWorld('milu', api);
 
 // Launcher-window-only API. Both windows load the same preload (Electron
 // doesn't support per-window preload paths cleanly with vite-plugin-electron),
@@ -358,7 +398,7 @@ const launcherApi = {
     return () => ipcRenderer.removeListener('launcher:show', listener);
   },
 };
-contextBridge.exposeInMainWorld('markoLauncher', launcherApi);
+contextBridge.exposeInMainWorld('miluLauncher', launcherApi);
 
-export type MarkoApi = typeof api;
-export type MarkoLauncherApi = typeof launcherApi;
+export type MiluApi = typeof api;
+export type MiluLauncherApi = typeof launcherApi;

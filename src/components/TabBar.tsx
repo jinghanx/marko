@@ -448,10 +448,30 @@ function KindIcon({ tab }: { tab: Tab }) {
       return <MusicGlyph />;
     case 'later':
       return <BookmarkTabGlyph />;
+    case 'agent':
+      return <AgentGlyph />;
     case 'code':
     default:
       return <CodeGlyph />;
   }
+}
+
+function AgentGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden fill="none">
+      {/* Chat bubble with a sparkle inside — reads as "AI agent". */}
+      <path
+        d="M2.5 3 a1 1 0 0 1 1 -1 h9 a1 1 0 0 1 1 1 v6.5 a1 1 0 0 1 -1 1 h-5.5 l-2.5 2.5 v-2.5 h-1 a1 1 0 0 1 -1 -1 z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 4.5 l0.6 1.4 l1.4 0.6 l-1.4 0.6 l-0.6 1.4 l-0.6 -1.4 l-1.4 -0.6 l1.4 -0.6 z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 function BookmarkTabGlyph() {
@@ -911,7 +931,7 @@ function TabContextMenu({
           </button>
           <button
             className="ctx-menu-item"
-            onClick={wrap(() => void window.marko.revealInFinder(tab.filePath!))}
+            onClick={wrap(() => void window.milu.revealInFinder(tab.filePath!))}
           >
             Reveal in Finder
           </button>

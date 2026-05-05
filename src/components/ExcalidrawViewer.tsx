@@ -47,7 +47,7 @@ export function ExcalidrawViewer({ tabId, initialValue, filePath }: Props) {
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-color-scheme: dark)').matches);
   // Pull the actual canvas-background color from the active theme so the
-  // Excalidraw pasteboard matches Marko's pane bg. We subscribe to
+  // Excalidraw pasteboard matches Milu's pane bg. We subscribe to
   // useActiveTheme so the color updates the moment the user switches themes.
   const activeTheme = useActiveTheme();
   const canvasBg = activeTheme.bg;
@@ -93,7 +93,7 @@ export function ExcalidrawViewer({ tabId, initialValue, filePath }: Props) {
     [tabId],
   );
 
-  // Merge Marko's bg into the appState so the canvas matches the pane on
+  // Merge Milu's bg into the appState so the canvas matches the pane on
   // first paint. Per-scene saved colors win if the file already has one.
   const initialData = {
     elements: initialScene?.elements ?? [],

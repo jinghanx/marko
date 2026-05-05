@@ -29,7 +29,7 @@ function bucketize(items: LaterItem[]): { id: string; label: string; items: Late
 
 /** "Save for later" tab — list of pages, articles, videos the user
  *  saved via the bookmark button on a web tab. Items are stored in
- *  `~/.marko/later.json` (see `lib/laterStore.ts`); this view just
+ *  `~/.milu/later.json` (see `lib/laterStore.ts`); this view just
  *  reads and renders them, listening for the change event so saves
  *  from a web tab show up immediately without a manual refresh. */
 export function LaterView() {

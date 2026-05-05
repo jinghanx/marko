@@ -1,14 +1,14 @@
-# Marko
+# Milu
 
 > One window for everything you do at a desk.
 
-Marko is a macOS workspace app that bundles a markdown editor, a Finder-style folder browser, a code editor, an embedded browser, a real terminal, an AI chat, a full Git client, and a long tail of "exotic" tabs (PDF, CSV, JSON, diff, whiteboard, HTTP client, find-in-files, audio/video, …) into a single keyboard-driven window with recursive split panes and tmux-style sessions.
+Milu is a macOS workspace app that bundles a markdown editor, a Finder-style folder browser, a code editor, an embedded browser, a real terminal, an AI chat, a full Git client, and a long tail of "exotic" tabs (PDF, CSV, JSON, diff, whiteboard, HTTP client, find-in-files, audio/video, …) into a single keyboard-driven window with recursive split panes and tmux-style sessions.
 
-![Marko app icon](build/icon.png)
+![Milu app icon](build/icon.png)
 
 ## Why
 
-The tools above usually live in fifteen separate apps. Switching between them — Cmd+Tab, find the window, click around — costs flow. Marko collapses them into one window where every surface opens with the same shortcut: **⌘T**, type a hint, hit Enter.
+The tools above usually live in fifteen separate apps. Switching between them — Cmd+Tab, find the window, click around — costs flow. Milu collapses them into one window where every surface opens with the same shortcut: **⌘T**, type a hint, hit Enter.
 
 - `⌘T git` → full Git client (status, diff, hunk-stage, line-stage, branches, stashes, tags, history, cherry-pick, fetch/pull/push)
 - `⌘T chat` → streaming AI chat (OpenAI / OpenRouter / Anthropic / Ollama / LM Studio / any OpenAI-compatible endpoint)
@@ -21,15 +21,15 @@ Splits and sessions live alongside everything: `⌘\` splits right, `⌘=` split
 
 ## Global launcher (⌘⌥Space)
 
-A Spotlight/Raycast-style mini-window you can wake from anywhere — even when Marko isn't focused, even when its window is closed.
+A Spotlight/Raycast-style mini-window you can wake from anywhere — even when Milu isn't focused, even when its window is closed.
 
-- **All ⌘T commands** — every Marko command (open terminal, git, chat, search, http, settings, clipboard, downloads, documents, …) with proper per-kind icons.
+- **All ⌘T commands** — every Milu command (open terminal, git, chat, search, http, settings, clipboard, downloads, documents, …) with proper per-kind icons.
 - **macOS app launcher** — type `chrome` / `slack` / `figma` and press ↵ to launch. Apps in `/Applications`, `~/Applications`, and the system app folders are all indexed.
 - **Web search** — anything that doesn't match a command or app falls back to "Search the web for X" using your configured engine (Google · DuckDuckGo · Kagi · Bing · Brave · Custom URL).
 - **Inline calculator** — type `1234 * 5678` or `(15 + 5) * 4 / 2`; press ↵ to copy the result to the clipboard. No round-trip to the main app.
 - **Keyboard-first** — ↑↓ to navigate, ↵ to run, Tab to extend the input to the highlighted command, Esc to dismiss.
 
-Internal commands wake Marko's main window when needed; external apps and the calculator finish without touching it. Esc dismisses the launcher and returns focus to whatever app you were using before.
+Internal commands wake Milu's main window when needed; external apps and the calculator finish without touching it. Esc dismisses the launcher and returns focus to whatever app you were using before.
 
 ## What you get
 
@@ -60,7 +60,7 @@ Internal commands wake Marko's main window when needed; external apps and the ca
 
 - **Recursive split panes** — split horizontally (`⌘\`), vertically (`⌘=`), nest as deep as you want; each pane has its own tab strip
 - **Sessions** — tmux-style, each session has its own pane tree + workspace root; `⌘⌥N` to open, `⌘⇧9` / `⌘⇧0` to switch
-- **Persistence** — sessions, panes, open tabs, scratch buffers, AI chats, Git/HTTP request configs all survive restart (snapshot to `~/.marko/state.json`); per-chat archive at `~/.marko/chats/`
+- **Persistence** — sessions, panes, open tabs, scratch buffers, AI chats, Git/HTTP request configs all survive restart (snapshot to `~/.milu/state.json`); per-chat archive at `~/.milu/chats/`
 - **Sidebar file tree** — keyboard navigation, lazy loading, F2 rename, ⌘⌫ trash, drag-drop create
 - **Workspace bookmarks** — pin folders you switch between often
 - **`⌘P` quick-open** — fzf-powered file palette with **Recents** section pinned at top
@@ -75,7 +75,7 @@ Internal commands wake Marko's main window when needed; external apps and the ca
 - Hidden-inset titlebar with traffic lights, draggable region, theme-aware native shadow
 - Native menus with full keyboard accelerators
 - Quick Look on Space, Reveal in Finder, Open in Default App
-- Custom file scheme (`marko-file://`) for streaming media into the renderer with no IPC base64 overhead
+- Custom file scheme (`milu-file://`) for streaming media into the renderer with no IPC base64 overhead
 - Encrypted API key storage via Electron `safeStorage` → macOS Keychain
 - MX-mouse-style X1/X2 (back/forward) buttons hooked up to folder-view history
 
@@ -130,7 +130,7 @@ A full cheatsheet is shown on the welcome screen and via `⌘⇧/`. Highlights:
 npm install
 
 # In dev, the bundled Electron's app menu shows "Electron" by default —
-# this script patches the dev bundle to show "Marko" (one-time, harmless).
+# this script patches the dev bundle to show "Milu" (one-time, harmless).
 npm run rename:dev-electron
 
 npm run dev  # starts Vite + Electron with HMR
@@ -155,8 +155,8 @@ electron/
   main.ts          # window, menus, IPC handlers — file IO, dir walk, PTY,
                    # image load, system stats, Git (simple-git), search (rg),
                    # HTTP client, AI chat streaming, safeStorage for keys,
-                   # chat archive, marko-file:// protocol
-  preload.ts       # contextBridge — exposes typed window.marko API
+                   # chat archive, milu-file:// protocol
+  preload.ts       # contextBridge — exposes typed window.milu API
 
 src/
   App.tsx          # layout shell, menu/uiBus wiring, modal mux, error boundary
@@ -182,7 +182,7 @@ src/
     Outline.tsx          # heading list / minimap / folder preview
     CodeMinimap.tsx
     ImageViewer.tsx
-    MediaViewer.tsx      # streams via marko-file:// protocol
+    MediaViewer.tsx      # streams via milu-file:// protocol
     PdfViewer.tsx        # Chromium PDF embed
     CsvViewer.tsx        # rendered / raw / split
     JsonViewer.tsx       # tree / raw / split
@@ -210,7 +210,7 @@ src/
     editorTheme.ts
     fileType.ts          # extension → kind detection + language matching
     actions.ts           # open / save / close orchestration
-    persistence.ts       # snapshot → ~/.marko/state.json
+    persistence.ts       # snapshot → ~/.milu/state.json
     fileClipboard.ts
     diffHunks.ts         # parse + reassemble unified diffs (Git tab)
     dragReorder.ts       # shared HTML5 drag-reorder hook (tabs & sessions)

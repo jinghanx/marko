@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Fzf, type FzfResultItem } from 'fzf';
-import type { ProcInfo, SystemStats } from '../types/marko';
+import type { ProcInfo, SystemStats } from '../types/milu';
 
 type SortKey = 'cpu' | 'mem' | 'pid' | 'rss' | 'time' | 'command';
 
@@ -25,8 +25,8 @@ export function ProcessViewer() {
     const refresh = async () => {
       try {
         const [list, sys] = await Promise.all([
-          window.marko.listProcesses(),
-          window.marko.systemStats(),
+          window.milu.listProcesses(),
+          window.milu.systemStats(),
         ]);
         if (!cancelled) {
           setProcs(list);
@@ -139,11 +139,11 @@ export function ProcessViewer() {
     if (!proc) return;
     const ok = window.confirm(`Send SIGTERM to ${proc.command} (PID ${proc.pid})?`);
     if (!ok) return;
-    const result = await window.marko.killProcess(proc.pid, 'SIGTERM');
+    const result = await window.milu.killProcess(proc.pid, 'SIGTERM');
     if (!result.ok) setError(result.error ?? 'kill failed');
     else {
       try {
-        setProcs(await window.marko.listProcesses());
+        setProcs(await window.milu.listProcesses());
       } catch {
         // ignore
       }

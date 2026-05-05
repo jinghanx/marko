@@ -1,8 +1,8 @@
-/** Shared "Save for later" store. Items live in ~/.marko/later.json
+/** Shared "Save for later" store. Items live in ~/.milu/later.json
  *  via the laterRead / laterWrite IPCs; read-mutate-write happens
  *  here so the WebView's bookmark button and the LaterView tab share
  *  one code path. After every mutation we dispatch the
- *  `marko:later-changed` window event — anything reading the list
+ *  `milu:later-changed` window event — anything reading the list
  *  (LaterView) listens and re-fetches. */
 
 export interface LaterItem {
@@ -21,7 +21,7 @@ export interface LaterItem {
   favicon?: string;
 }
 
-const CHANGED_EVENT = 'marko:later-changed';
+const CHANGED_EVENT = 'milu:later-changed';
 
 function hostFromUrl(url: string): string {
   try {
@@ -33,7 +33,7 @@ function hostFromUrl(url: string): string {
 
 export async function readLater(): Promise<LaterItem[]> {
   try {
-    const raw = await window.marko.laterRead();
+    const raw = await window.milu.laterRead();
     if (!raw) return [];
     const parsed = JSON.parse(raw) as { items?: LaterItem[] };
     return Array.isArray(parsed.items) ? parsed.items : [];
@@ -43,7 +43,7 @@ export async function readLater(): Promise<LaterItem[]> {
 }
 
 async function writeLater(items: LaterItem[]): Promise<void> {
-  await window.marko.laterWrite(JSON.stringify({ items }));
+  await window.milu.laterWrite(JSON.stringify({ items }));
   window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
 }
 

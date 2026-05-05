@@ -1,35 +1,31 @@
+/* Milu — minimalist landing page.
+ * Single column, generous whitespace, serif body, sand-warm accent
+ * pulled from the icon. No comic fonts, no mocked screenshots, no
+ * busy gradients. The page is the story; the rest is space. */
+
 :root {
-  --bg: #fbfbf9;
-  --surface: #ffffff;
-  --surface-2: #f3f1ec;
-  --text: #1a1a18;
-  --text-muted: #6b6b66;
-  --border: #e7e4dc;
-  --border-strong: #cfcabd;
-  --accent: #2d6cdf;
-  --accent-2: #6f5be0;
-  --shadow-sm: 0 1px 2px rgba(20, 20, 18, 0.04), 0 0 0 1px rgba(20, 20, 18, 0.04);
-  --shadow-md: 0 8px 24px -8px rgba(20, 20, 18, 0.18), 0 1px 2px rgba(20, 20, 18, 0.08);
-  --shadow-lg: 0 28px 60px -20px rgba(20, 20, 18, 0.28), 0 1px 2px rgba(20, 20, 18, 0.06);
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
-  --font-display: 'Newsreader', 'New York', 'Iowan Old Style', Georgia, serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  /* Editorial paper-and-ink palette. Cool off-white background,
+   * near-black text, no warm undertones — the icon supplies all the
+   * color the page needs. Distinct from any "AI assistant" warm
+   * cream/burgundy palette by design. */
+  --bg: #fbfbfa;
+  --ink: #161618;
+  --muted: #6f7075;
+  --line: #e8e8ea;
+  --accent: #161618;
+  --serif: 'Newsreader', Georgia, 'Iowan Old Style', serif;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --zh: 'Noto Serif SC', 'Songti SC', 'Source Han Serif SC', serif;
+  --pad: 28px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1012;
-    --surface: #16181c;
-    --surface-2: #1d2026;
-    --text: #ececea;
-    --text-muted: #8d8d87;
-    --border: #2a2d33;
-    --border-strong: #3a3d44;
-    --accent: #79a6ff;
-    --accent-2: #a78bff;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-md: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 32px 80px -20px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.4);
+    --bg: #0d0d0e;
+    --ink: #ececeb;
+    --muted: #8a8b8f;
+    --line: #232325;
+    --accent: #ececeb;
   }
 }
 
@@ -42,2038 +38,476 @@ body {
   margin: 0;
   padding: 0;
   background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.55;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
 }
 
 a {
-  color: inherit;
+  color: var(--ink);
   text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  transition: border-color 120ms ease;
+}
+a:hover {
+  border-bottom-color: var(--ink);
 }
 
-img {
-  display: block;
-  max-width: 100%;
+em {
+  font-style: italic;
+  color: var(--muted);
 }
 
-button {
-  font-family: inherit;
-}
-
-::selection {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
-}
-
-/* ---------- Nav ---------- */
-
-.nav {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
-  backdrop-filter: saturate(180%) blur(14px);
-  -webkit-backdrop-filter: saturate(180%) blur(14px);
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-}
-
-.nav-inner {
-  max-width: 1120px;
+/* Page is intentionally narrow — long lines fight zen. */
+.page {
+  max-width: 580px;
   margin: 0 auto;
-  padding: 14px 28px;
+  padding: 96px var(--pad) 80px;
+}
+
+/* Header: icon, wordmark, single line tagline. The icon is the
+ * loudest thing on the page — everything else recedes. */
+.head {
+  text-align: center;
+  margin-bottom: 88px;
+}
+.head-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  display: block;
+  margin: 0 auto 24px;
+  /* Subtle lift, no harsh shadow. */
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.head-name {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 44px;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+  line-height: 1;
+}
+.head-tag {
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+  font-style: italic;
+}
+
+/* Hero "screenshot" — a CSS-rendered mock of Milu, not a real PNG.
+ * Faithful to the actual chrome (titlebar with sessions + traffic
+ * lights, tab bar, sidebar, two split panes) but rendered in the
+ * page's own neutral palette so it sits inside the zen flow rather
+ * than fighting it. Replace with a real capture later — keep the
+ * `.shot-window` aspect ratio so the layout doesn't reflow. */
+.shot {
+  margin: 0 0 88px;
+}
+.shot-window {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  line-height: 1.5;
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent),
+    0 18px 40px -12px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.shot-titlebar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  gap: 6px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--ink) 4%, var(--bg));
+  border-bottom: 1px solid var(--line);
 }
-
-.brand {
+.shot-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.shot-dot--red { background: #ff5f57; }
+.shot-dot--yellow { background: #febc2e; margin-right: 22px; }
+.shot-dot--yellow + .shot-session { margin-left: 0; }
+.shot-dot--green { background: #28c840; display: none; } /* match Milu's hidden-inset titlebar */
+.shot-session {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  font-size: 19px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
 }
-.brand img {
-  border-radius: 9px;
-  width: 40px;
-  height: 40px;
+.shot-session::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: transparent;
 }
-
-.nav-links {
-  display: inline-flex;
-  align-items: center;
-  gap: 20px;
-  font-size: 14px;
-  color: var(--text-muted);
+.shot-session--active {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
 }
-.nav-links a:not(.nav-cta):hover {
-  color: var(--text);
+.shot-session--active::before {
+  background: var(--ink);
 }
-.nav-cta {
-  background: var(--text);
-  color: var(--bg);
-  padding: 7px 14px;
-  border-radius: 999px;
-  font-weight: 600;
+.shot-session-plus {
+  margin-left: 4px;
+  color: var(--muted);
   font-size: 13px;
+  padding: 0 6px;
 }
-.nav-cta:hover {
-  filter: brightness(1.1);
+.shot-tabs {
+  display: flex;
+  gap: 0;
+  padding: 6px 10px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
 }
-
-@media (max-width: 640px) {
-  .nav-links a:not(.nav-cta) {
-    display: none;
-  }
+.shot-tab {
+  padding: 6px 12px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
 }
-
-/* ---------- Hero ---------- */
-
-.hero {
-  position: relative;
-  padding: 80px 24px 60px;
-  text-align: center;
+.shot-tab--active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.shot-body {
+  display: grid;
+  grid-template-columns: 130px 1fr 1fr;
+  min-height: 240px;
+}
+.shot-sidebar {
+  background: color-mix(in srgb, var(--ink) 3%, var(--bg));
+  border-right: 1px solid var(--line);
+  padding: 10px 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.shot-folder,
+.shot-file {
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shot-folder::before {
+  content: '▸ ';
+  color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+.shot-folder--open::before {
+  content: '▾ ';
+}
+.shot-file::before {
+  content: '· ';
+  color: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+.shot-folder--indent { padding-left: 14px; }
+.shot-file--indent { padding-left: 16px; }
+.shot-file--indent2 { padding-left: 28px; }
+.shot-file--active {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+.shot-pane {
+  padding: 18px 18px;
+  border-right: 1px solid var(--line);
   overflow: hidden;
 }
-
-.hero-bg {
-  position: absolute;
-  inset: -10% -10% 0 -10%;
-  z-index: -1;
-  background:
-    radial-gradient(900px 480px at 30% 20%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%),
-    radial-gradient(700px 420px at 75% 30%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 60%);
-  filter: blur(2px);
-  opacity: 0.9;
+.shot-pane:last-child {
+  border-right: 0;
 }
-
-.hero-inner {
-  max-width: 820px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 22px;
+/* Markdown-rendered pane — uses the page's serif so the mock
+ * feels like a real Milu render of a real markdown file. */
+.shot-pane--md {
+  font-family: var(--serif);
+  color: var(--ink);
 }
-
-.hero-icon {
-  width: 120px;
-  height: 120px;
-  border-radius: 26px;
-  box-shadow: var(--shadow-lg);
-  margin-bottom: 8px;
-  animation: float 6s ease-in-out infinite;
+.shot-h1 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
 }
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-
-.hero h1 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(40px, 6vw, 72px);
-  line-height: 1.05;
-  letter-spacing: -0.025em;
-  margin: 0;
-}
-
-.tagline {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-  font-family: var(--font-mono);
+.shot-p {
   font-size: 13px;
-  color: var(--text-muted);
-  margin: 0;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.shot-p--muted {
+  color: var(--muted);
+}
+.shot-blockquote {
+  margin-top: 14px;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  font-size: 12.5px;
+  color: var(--muted);
+  font-family: var(--zh), var(--serif);
+}
+/* Code pane — monospace; subtle syntax tinting using the same
+ * accent family so it doesn't burst out of the palette. */
+.shot-pane--code {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+.shot-line {
+  white-space: pre;
+}
+.shot-line--gutter {
+  margin-top: 6px;
+  color: var(--muted);
+}
+.shot-line-num {
+  display: inline-block;
+  width: 22px;
+  text-align: right;
+  margin-right: 8px;
+  color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+/* Subtle syntax tinting — single cool slate-blue for keywords/types
+ * so the code reads as code without dragging in any of the page's
+ * neutral palette. */
+.shot-kw { color: #4a5b88; font-weight: 600; }
+.shot-fn { color: var(--ink); font-weight: 500; }
+.shot-ty { color: #6f7480; }
+.shot-str { color: #4f7558; }
+.shot-comment { color: var(--muted); font-style: italic; }
+.shot figcaption {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Origin story — the "why is it called Milu" section. The Chinese
+ * line gets its own treatment to feel grounded; the English follows
+ * in the regular serif body voice. */
+.origin {
+  margin-bottom: 64px;
+}
+.origin-zh {
+  font-family: var(--zh);
+  text-align: center;
+  margin: 0 0 28px;
+  color: var(--ink);
   letter-spacing: 0.04em;
 }
-.tagline .dot {
-  color: var(--accent);
-}
-
-.subhead {
-  margin: 0;
-  max-width: 620px;
-  font-size: 18px;
-  line-height: 1.55;
-  color: var(--text-muted);
-}
-
-.cta-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 8px;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 22px;
-  /* Hardcoded sans so the buttons stay crisp even when their parent
-   *  block (e.g., the story column) sets a serif body font. */
-  font-family: var(--font-sans);
-  font-size: 14px;
+.origin-zh-name {
+  font-size: 32px;
   font-weight: 600;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s;
-  white-space: nowrap;
+  margin-right: 14px;
 }
-.btn-primary {
-  background: var(--text);
-  color: var(--bg);
-  box-shadow: var(--shadow-md);
+.origin-zh-aka {
+  font-size: 17px;
+  color: var(--muted);
 }
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
+.origin p {
+  margin: 0 0 18px;
 }
-.btn-ghost {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--border-strong);
-}
-.btn-ghost:hover {
-  background: var(--surface-2);
-  transform: translateY(-1px);
+.origin p:last-child {
+  margin-bottom: 0;
 }
 
-.hero-meta {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
+/* Surface section — what the app actually is. Minimal list, no
+ * column trickery, no icons. Just lines on the page. */
+.surface {
+  margin-bottom: 64px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
 }
-
-/* First-launch unwedge instructions for unsigned-app quarantine.
- * Collapsed by default so it doesn't dominate the hero; opens to a
- * tinted card with a copy-friendly command line. */
-.first-run {
-  margin-top: 14px;
-  max-width: 560px;
-  font-size: 12.5px;
-  color: var(--text-muted);
+.surface > p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-style: italic;
 }
-.first-run > summary {
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px dashed var(--border-strong, rgba(0, 0, 0, 0.18));
-  background: rgba(0, 0, 0, 0.02);
+.surface ul {
   list-style: none;
-  user-select: none;
-  transition: background 120ms ease-out, border-color 120ms ease-out;
-}
-.first-run > summary::-webkit-details-marker { display: none; }
-.first-run > summary em { font-style: italic; color: var(--text); }
-.first-run[open] > summary {
-  background: rgba(0, 0, 0, 0.05);
-  border-color: var(--border-strong, rgba(0, 0, 0, 0.24));
-}
-.first-run-body {
-  padding: 12px 14px 14px;
-  border-radius: 8px;
-  margin-top: 8px;
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-.first-run-body p {
-  margin: 0 0 8px;
-  font-size: 12.5px;
-  line-height: 1.55;
-}
-.first-run-body p.first-run-foot { margin: 8px 0 0; opacity: 0.85; }
-.first-run-body code {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.06);
-}
-.first-run-body kbd {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  background: rgba(255, 255, 255, 0.7);
-}
-.first-run-cmd {
-  margin: 6px 0 8px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #0c0d10;
-  color: #e7eef7;
-  overflow-x: auto;
-  -webkit-user-select: all;
-  user-select: all;
-}
-.first-run-cmd code {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  background: transparent;
-  color: inherit;
+  margin: 0;
   padding: 0;
 }
-@media (prefers-color-scheme: dark) {
-  .first-run > summary { background: rgba(255, 255, 255, 0.03); }
-  .first-run[open] > summary { background: rgba(255, 255, 255, 0.06); }
-  .first-run-body {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-  .first-run-body code { background: rgba(255, 255, 255, 0.08); }
-  .first-run-body kbd {
-    background: rgba(0, 0, 0, 0.4);
-    border-color: rgba(255, 255, 255, 0.18);
-  }
-}
-
-/* ---------- Comic-style story hero ----------
- *  Replaces the title/subhead with Eddie's day-in-the-life comic. Mixed
- *  typography: Bangers for big numbers, Permanent Marker / Caveat for
- *  handwritten beats, brand-coloured app pills. Slight rotations on
- *  individual elements give the page that hand-pasted comic-strip feel
- *  without going full Comic-Sans. */
-.hero--story {
-  padding: 56px 24px 32px;
-  text-align: left;
-  /* Faint halftone dot field — comic-page texture. */
-  background:
-    radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
-    radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
-    var(--bg);
-  background-size: 22px 22px, 22px 22px;
-  background-position: 0 0, 11px 11px;
-}
-.hero--story .hero-bg {
-  opacity: 0.4;
-}
-.hero--story .cta-row {
-  margin-top: 28px;
-  justify-content: flex-start;
-}
-.hero--story .hero-meta {
-  margin-top: 12px;
-  text-align: left;
-}
-
-.story {
-  max-width: 720px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  font-family: var(--font-display);
-  color: var(--text);
-  font-size: clamp(20px, 2.4vw, 26px);
-  line-height: 1.5;
-}
-
-.story-time {
-  font-family: 'Permanent Marker', cursive;
-  font-size: clamp(28px, 3.5vw, 38px);
-  color: #d97757;
-  margin: 0 0 4px;
-  transform: rotate(-2deg);
-  letter-spacing: 0.02em;
-}
-.story-coffee {
-  font-family: var(--font-display);
-  margin-left: 10px;
-  font-size: 0.9em;
-  display: inline-block;
-  transform: rotate(8deg) translateY(-2px);
-}
-
-.story-line { margin: 0; }
-.story-line--lead {
-  font-size: clamp(28px, 3.6vw, 40px);
-  font-weight: 700;
-  line-height: 1.15;
-}
-
-.story-eddie {
-  font-family: 'Bangers', 'Permanent Marker', cursive;
-  font-weight: 400;
-  font-size: 1.15em;
-  letter-spacing: 0.04em;
-  color: #2d6cdf;
-  text-shadow: 2px 2px 0 #ffd400;
-  display: inline-block;
-  transform: rotate(-1deg);
-}
-
-/* Yellow-marker highlight under a key word. */
-.story-mark {
-  font-style: normal;
-  background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%);
-  padding: 0 4px;
-  font-weight: 700;
-}
-.story-mark--yellow { background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%); }
-
-/* Single flowing paragraph that retells the day-in-the-life. Keeps
- * the comic-coloured app pills inline; loses the bulleted "Then ...
- * Then ..." TODO-list cadence the earlier draft had. One typeface
- * for the prose so it reads like a narrator, not a UI. */
-.story-paragraph {
-  margin: 6px 0 0;
-  font-family: var(--font-sans);
-  font-size: clamp(16px, 1.65vw, 19px);
-  font-weight: 500;
-  line-height: 1.7;
-  color: var(--text);
-  max-width: 720px;
-}
-.story-paragraph em {
-  font-style: italic;
-  color: var(--text);
-}
-
-/* Legacy aside / strike classes — no longer used in the rewritten
- * paragraph, but kept here so any future inline use renders without
- * surprise. */
-.story-aside {
-  font-family: 'Caveat', cursive;
-  font-size: clamp(20px, 2.4vw, 28px);
-  color: var(--text-muted);
-  font-weight: 700;
-  transform: rotate(-0.6deg);
-  margin-left: 12px;
-}
-.story-strike {
-  text-decoration: line-through;
-  text-decoration-thickness: 2px;
-  text-decoration-color: #ff4f5e;
-  color: #888;
-}
-.app {
-  display: inline-block;
-  padding: 1px 10px;
-  border-radius: 999px;
-  font-family: var(--font-sans);
-  font-size: 0.92em;
-  font-weight: 700;
-  letter-spacing: 0.005em;
-  color: #fff;
-  margin: 0 2px;
-  white-space: nowrap;
-  box-shadow: 1px 1px 0 rgba(0,0,0,0.15);
-}
-/* Each app gets its real-world brand colour. Rotations dropped — in a
- * flowing paragraph the per-pill tilts crowded the line; the colours
- * alone carry the visual rhythm. */
-.app--bear        { background: #ff4f5e; }
-.app--cursor      { background: #7c3aed; }
-.app--tower       { background: #4d8fcc; }
-.app--terminal    { background: #1a1a1a; }
-.app--chrome      { background: #ea4335; }
-.app--chatgpt     { background: #10a37f; }
-.app--postman     { background: #ff6c37; }
-.app--finder      { background: #1e90ff; }
-.app--excalidraw  { background: #6c63ff; }
-.app--claude      { background: #d97757; }
-.app--notion      { background: #2f2f2f; }
-.app--spotify     { background: #1db954; }
-
-/* Tally — three big numbers in a row, centered, comic punchline before
- *  the climax. Bangers font for the comic-book feel. */
-.story-tally {
-  display: flex;
-  gap: clamp(14px, 3vw, 36px);
-  align-items: flex-end;
-  justify-content: center;
-  flex-wrap: wrap;
-  padding: 18px 0 6px;
-  margin: 8px 0;
-  border-top: 2px dashed rgba(0,0,0,0.12);
-  border-bottom: 2px dashed rgba(0,0,0,0.12);
-}
-.story-tally-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-}
-.story-num {
-  font-family: 'Bangers', 'Impact', sans-serif;
-  font-size: clamp(54px, 7vw, 88px);
-  line-height: 1;
-  color: #ff4f5e;
-  letter-spacing: 0.02em;
-  text-shadow:
-    2px 2px 0 #ffd400,
-    4px 4px 0 rgba(0,0,0,0.08);
-  display: inline-block;
-  transform: rotate(-1.5deg);
-}
-.story-tally-item:nth-child(2) .story-num { transform: rotate(1deg); color: #2d6cdf; text-shadow: 2px 2px 0 #ffd400, 4px 4px 0 rgba(0,0,0,0.08); }
-.story-tally-item:nth-child(3) .story-num { transform: rotate(-0.6deg); color: #6c63ff; text-shadow: 2px 2px 0 #ffd400, 4px 4px 0 rgba(0,0,0,0.08); }
-.story-num--ram { font-size: clamp(40px, 5.5vw, 70px); }
-.story-num-label {
-  font-family: 'Permanent Marker', cursive;
-  font-size: clamp(11px, 1.2vw, 14px);
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  text-transform: lowercase;
-  margin-top: 2px;
-}
-
-/* Speech bubble — yellow comic balloon with a tail. */
-.story-bubble {
-  align-self: flex-start;
-  position: relative;
-  margin: 18px 0 18px 18px;
-  padding: 18px 24px;
-  background: #fff7c2;
-  border: 2px solid #1a1a1a;
-  border-radius: 22px;
-  box-shadow: 4px 4px 0 #1a1a1a;
-  max-width: 560px;
-  transform: rotate(-1deg);
-}
-.story-bubble p {
-  margin: 0;
-  font-family: 'Caveat', cursive;
-  font-weight: 700;
-  font-size: clamp(24px, 2.8vw, 34px);
-  line-height: 1.25;
-  color: #1a1a1a;
-}
-.story-bubble p em {
-  font-style: normal;
-  background: linear-gradient(transparent 55%, #ffd400 55%, #ffd400 92%, transparent 92%);
-  padding: 0 4px;
-}
-/* Speech-bubble tail — pointing toward the punchline below. */
-.story-bubble::before,
-.story-bubble::after {
-  content: '';
-  position: absolute;
-  bottom: -22px;
-  left: 38px;
-  width: 0;
-  height: 0;
-  border-left: 14px solid transparent;
-  border-right: 14px solid transparent;
-  border-top: 22px solid #1a1a1a;
-}
-.story-bubble::after {
-  bottom: -17px;
-  left: 41px;
-  border-left: 11px solid transparent;
-  border-right: 11px solid transparent;
-  border-top: 18px solid #fff7c2;
-}
-
-/* Final reveal — Marko logo + brand name in big comic letters. */
-.story-punchline {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin: 14px 0 8px;
-  padding: 8px 0;
-}
-.story-marko-icon {
-  border-radius: 18px;
-  box-shadow: 4px 4px 0 #1a1a1a, 0 8px 22px rgba(0,0,0,0.18);
-  transform: rotate(-4deg);
-  animation: float 6s ease-in-out infinite;
-}
-.story-marko-text {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.story .brand-name {
-  font-family: 'Bangers', 'Impact', sans-serif;
-  font-weight: 400;
-  font-size: clamp(56px, 8vw, 96px);
-  line-height: 1;
-  letter-spacing: 0.04em;
-  color: var(--text);
-  text-shadow:
-    3px 3px 0 #ffd400,
-    6px 6px 0 #ff4f5e,
-    9px 9px 0 rgba(0,0,0,0.12);
-  display: inline-block;
-  transform: rotate(-2deg);
-}
-.story-marko-tag {
-  font-family: 'Permanent Marker', cursive;
-  font-size: clamp(20px, 2.4vw, 30px);
-  color: var(--text);
-  transform: rotate(-1deg);
-  display: inline-block;
-}
-
-/* Dark-mode: keep the comic feel but tone down halftone & marker yellow. */
-@media (prefers-color-scheme: dark) {
-  .hero--story {
-    background:
-      radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-      radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-      var(--bg);
-    background-size: 22px 22px, 22px 22px;
-    background-position: 0 0, 11px 11px;
-  }
-  .story-bubble {
-    background: #2a2616;
-    border-color: #fff;
-    box-shadow: 4px 4px 0 #fff;
-  }
-  .story-bubble p { color: #fff7c2; }
-  .story-bubble::before { border-top-color: #fff; }
-  .story-bubble::after { border-top-color: #2a2616; }
-  .story-marko-icon { box-shadow: 4px 4px 0 #fff, 0 8px 22px rgba(0,0,0,0.4); }
-  .story-tally { border-color: rgba(255,255,255,0.12); }
-}
-
-/* Mobile: tighten everything, kill horizontal rotations that overflow. */
-@media (max-width: 640px) {
-  .story { gap: 12px; }
-  .story-paragraph { font-size: 16px; line-height: 1.65; }
-  .app { font-size: 13px; padding: 1px 8px; }
-  .story-bubble { margin-left: 0; }
-  .story-tally { gap: 14px; padding: 14px 0; }
-}
-
-/* ---------- Window mock ---------- */
-
-.window-demo {
-  padding: 30px 24px 80px;
-  display: flex;
-  justify-content: center;
-}
-.window-frame {
-  width: min(1080px, 100%);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  transform: perspective(1800px) rotateX(2.5deg);
-  transform-origin: top center;
-}
-/* Title bar — traffic lights + session pills, mirroring Marko's actual UI. */
-.window-chrome {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px 8px 14px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-  height: 44px;
-  box-sizing: border-box;
-}
-.window-chrome .dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-}
-.dot-red { background: #ff5f57; }
-.dot-yellow { background: #febc2e; }
-.dot-green { background: #28c840; }
-
-.window-sessions {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: 18px;
-}
-.window-session {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 14px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: -0.005em;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent);
-}
-.window-session--active {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
-}
-.window-session-add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  font-size: 13px;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent);
-  margin-left: 2px;
-}
-
-/* File-tab strip — rounded-rectangle bubbles, accent stripe on active. */
-.window-tabs {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: color-mix(in srgb, var(--text) 5%, var(--surface-2));
-  padding: 9px 10px 7px;
-  border-bottom: 1px solid var(--border);
-  font-size: 11.5px;
-  color: var(--text-muted);
-  overflow: hidden;
-}
-.window-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 10px;
-  white-space: nowrap;
-  background: color-mix(in srgb, var(--text) 14%, var(--surface-2));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, var(--surface-2));
-}
-.window-tab .tab-glyph {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  opacity: 0.8;
-}
-.window-tab--active {
-  position: relative;
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-  /* 2px accent stripe on top, clipped to the rounded shape via background gradient. */
-  background:
-    linear-gradient(to bottom, var(--accent) 0, var(--accent) 2px, var(--surface) 2px);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, var(--border));
-}
-.window-tab-add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  font-size: 14px;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--text) 14%, var(--surface-2));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, var(--surface-2));
-}
-.window-tab--folder { color: var(--accent); }
-.window-tab--term .tab-glyph { color: #4caf6d; }
-.window-tab--web .tab-glyph { color: #2ea043; }
-
-.window-body {
-  display: grid;
-  grid-template-columns: 180px 1fr 200px;
-  min-height: 360px;
-  background: var(--surface);
-  font-size: 13px;
-}
-.demo-sidebar {
-  background: var(--surface-2);
-  border-right: 1px solid var(--border);
-  padding: 10px 8px;
-  font-size: 12px;
-}
-.demo-side-h {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 4px 8px 8px;
-}
-.demo-side-row {
-  padding: 3px 8px;
-  border-radius: 4px;
-  color: var(--text);
-}
-.demo-side-row--active {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-}
-.demo-indent {
-  padding-left: 18px;
-  color: var(--text-muted);
-}
-
-.demo-main {
-  padding: 28px 36px;
-  font-family: var(--font-display);
-}
-.demo-h {
-  font-size: 28px;
-  margin: 0 0 4px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.demo-p {
-  color: var(--text-muted);
-  margin: 0 0 12px;
-  font-size: 15px;
-}
-.demo-list {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--text-muted);
-  padding-left: 20px;
-  margin: 12px 0 0;
-}
-.demo-list li {
-  margin: 4px 0;
-}
-
-.demo-outline {
-  background: var(--surface-2);
-  border-left: 1px solid var(--border);
-  padding: 10px 8px;
-  font-size: 12px;
-}
-.demo-outline-h {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 4px 8px 8px;
-}
-.demo-outline-row {
-  padding: 3px 8px;
-  border-radius: 4px;
-  color: var(--text);
-  font-weight: 600;
-}
-.demo-outline-sub {
-  padding-left: 18px;
-  color: var(--text-muted);
-  font-weight: 400;
-}
-
-@media (max-width: 720px) {
-  .window-body {
-    grid-template-columns: 1fr;
-  }
-  .demo-sidebar, .demo-outline {
-    display: none;
-  }
-  .window-frame {
-    transform: none;
-  }
-}
-
-/* ---------- Sections ---------- */
-
-.section-head {
-  text-align: center;
-  max-width: 720px;
-  margin: 0 auto 48px;
-}
-.section-head h2 {
-  font-family: var(--font-sans);
-  font-weight: 800;
-  font-size: clamp(30px, 4.4vw, 48px);
-  letter-spacing: -0.025em;
-  line-height: 1.05;
-  margin: 0 0 12px;
-}
-.section-head h2 em {
-  font-style: normal;
-  background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%);
-  padding: 0 4px;
-}
-.section-head p {
-  font-size: 17px;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-.features {
-  padding: 80px 24px;
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.feature {
-  padding: 24px 22px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
-}
-.feature:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  box-shadow: var(--shadow-md);
-}
-.feature-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  margin-bottom: 14px;
-}
-.feature h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.feature p {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-muted);
-  line-height: 1.55;
-}
-
-/* ---------- Showcases (text + visual mockup, alternating sides) ---------- */
-
-.showcase {
-  padding: 70px 24px;
-  max-width: 1180px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1.15fr;
-  gap: 56px;
-  align-items: center;
-}
-.showcase--reverse .showcase-text { order: 2; }
-.showcase--reverse .showcase-mock { order: 1; }
-
-@media (max-width: 880px) {
-  .showcase {
-    grid-template-columns: 1fr;
-    gap: 28px;
-    padding: 50px 20px;
-  }
-  .showcase--reverse .showcase-text,
-  .showcase--reverse .showcase-mock {
-    order: initial;
-  }
-  /* Stop the mock column from being min-content-sized — without this,
-   *  any unbreakable child (long <pre>, code blocks, mono text) pushes
-   *  the grid column past the viewport edge. */
-  .showcase-mock { min-width: 0; }
-  .mock { min-width: 0; max-width: 100%; }
-}
-
-.showcase-text { max-width: 480px; }
-/* Showcase tag — handwritten yellow sticker with hard black border and
- *  drop-shadow, lifted off the page like a piece of masking-tape. */
-.showcase-tag {
-  display: inline-block;
-  font-family: 'Permanent Marker', cursive;
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: none;
-  color: #1a1a1a;
-  background: #ffe14a;
-  padding: 3px 14px;
-  border: 2px solid #1a1a1a;
-  border-radius: 6px;
-  box-shadow: 3px 3px 0 #1a1a1a;
-  transform: rotate(-2deg);
-  margin-bottom: 22px;
-}
-.showcase--reverse .showcase-tag {
-  transform: rotate(1.5deg);
-}
-.showcase-text h2 {
-  font-family: var(--font-sans);
-  font-weight: 800;
-  font-size: clamp(28px, 3.6vw, 40px);
-  line-height: 1.05;
-  letter-spacing: -0.025em;
-  margin: 0 0 16px;
-}
-.showcase-text h2 em {
-  font-style: normal;
-  background: linear-gradient(transparent 55%, #ffe14a 55%, #ffe14a 92%, transparent 92%);
-  padding: 0 4px;
-}
-.showcase-text p {
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--text-muted);
-  margin: 0 0 14px;
-}
-.showcase-text code {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  font-weight: 700;
-  background: #1a1a1a;
-  padding: 1px 8px;
-  border-radius: 4px;
-  color: #ffe14a;
-  letter-spacing: 0.01em;
-}
-@media (prefers-color-scheme: dark) {
-  .showcase-text code {
-    background: #ffe14a;
-    color: #1a1a1a;
-  }
-}
-.showcase-list {
-  margin: 0;
-  padding-left: 0;
-  list-style: none;
-}
-.showcase-list li {
-  padding: 5px 0 5px 22px;
-  position: relative;
-  font-size: 14.5px;
-  color: var(--text-muted);
-}
-.showcase-list li::before {
-  content: '✦';
-  position: absolute;
-  left: 0;
-  color: var(--accent);
-  font-size: 11px;
-}
-.inline-kbd {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 2px 7px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  color: var(--text);
-}
-
-/* ---------- Mockups ---------- */
-
-.mock {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  font-size: 12px;
-  color: var(--text);
-  line-height: 1.4;
-}
-
-.mock-chrome {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-}
-.md-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-}
-.md-dot-red { background: #ff5f57; }
-.md-dot-yellow { background: #febc2e; }
-.md-dot-green { background: #28c840; }
-
-.mock-toolbar {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 12px;
-}
-.mock-toolbar-spacer { flex: 1; }
-.mock-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  color: var(--text);
-  white-space: nowrap;
-}
-.mock-pill--ghost { color: var(--text-muted); }
-.mock-pill--accent {
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-strong));
-  color: var(--accent);
-}
-.mock-pill--danger {
-  background: color-mix(in srgb, #d1383b 14%, var(--surface));
-  border-color: color-mix(in srgb, #d1383b 50%, var(--border-strong));
-  color: #d1383b;
-}
-.mock-pill--mono { font-family: var(--font-mono); font-size: 10.5px; }
-
-/* --- Git mockup --- */
-.mock-git-body {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: 320px;
-}
-.mock-git-files {
-  background: var(--surface-2);
-  border-right: 1px solid var(--border);
-  padding: 8px 0;
-  font-size: 11.5px;
-}
-.mock-git-section {
-  padding: 8px 12px 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.mock-git-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-}
-.mock-git-row--active {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-}
-.mock-git-row--staged { color: var(--text); }
-.mock-git-path {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mock-badge {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9.5px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  flex: 0 0 auto;
-}
-.mock-badge--add { background: color-mix(in srgb, #2ea043 28%, transparent); color: #2ea043; }
-.mock-badge--mod { background: color-mix(in srgb, #d4a300 28%, transparent); color: #b88200; }
-.mock-badge--del { background: color-mix(in srgb, #d1383b 28%, transparent); color: #d1383b; }
-
-.mock-git-diff {
+.surface li {
   padding: 6px 0;
-  background: var(--surface);
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  position: relative;
+  color: var(--ink);
 }
-.mock-git-hunk-head {
-  padding: 4px 14px;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--accent);
-  border-bottom: 1px solid var(--border);
-}
-.mock-diff-line {
-  padding: 2px 14px;
-  white-space: pre;
-  overflow: hidden;
-}
-.mock-diff-line--add { background: color-mix(in srgb, #2ea043 14%, transparent); color: #1c6b2c; }
-.mock-diff-line--rem { background: color-mix(in srgb, #d1383b 14%, transparent); color: #a52427; }
-.mock-diff-line--selected {
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface)) !important;
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-.mock-git-hunk-actions {
-  display: flex;
-  gap: 6px;
-  padding: 8px 14px 4px;
-  border-top: 1px dashed var(--border);
-  background: var(--surface);
-  margin-top: 4px;
-}
-
-@media (prefers-color-scheme: dark) {
-  .mock-diff-line--add { color: #6cd28a; }
-  .mock-diff-line--rem { color: #ff8e91; }
-}
-
-/* --- Chat mockup --- */
-.mock-chat-body {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  min-height: 360px;
-}
-.mock-chat-side {
-  background: var(--surface-2);
-  border-right: 1px solid var(--border);
-  padding: 8px;
-  font-size: 11.5px;
-}
-.mock-chat-side-new {
-  padding: 5px 10px;
-  border: 1px dashed var(--border-strong);
-  border-radius: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-  text-align: center;
-}
-.mock-chat-side-row {
-  padding: 5px 8px;
-  border-radius: 5px;
-  margin-bottom: 1px;
-}
-.mock-chat-side-row--active { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-.mock-chat-side-title {
-  font-size: 11.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mock-chat-side-meta {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  margin-top: 1px;
-}
-
-.mock-chat-main {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.mock-chat-msg { padding: 4px 0; }
-.mock-chat-role {
-  font-size: 9.5px;
+.surface li::before {
+  content: '·';
+  color: var(--muted);
+  margin-right: 12px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-.mock-chat-msg--user .mock-chat-role { color: var(--accent); }
-.mock-chat-msg--user .mock-chat-body-text {
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  border-left: 3px solid var(--accent);
-  padding: 6px 10px;
-  border-radius: 0 6px 6px 0;
-}
-.mock-chat-body-text {
-  font-family: var(--font-display);
-  font-size: 13px;
-}
-.mock-chat-body-text code {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  background: var(--surface-2);
-  padding: 1px 4px;
-  border-radius: 4px;
-}
-.mock-chat-code {
-  position: relative;
-  margin: 8px 0;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  overflow: hidden;
-}
-.mock-chat-code-lang {
-  position: absolute;
-  top: 6px;
-  left: 10px;
-  font-size: 9.5px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.08em;
-}
-.mock-chat-code-copy {
-  position: absolute;
-  top: 5px;
-  right: 6px;
-  font-size: 10px;
-  font-family: var(--font-sans);
-  padding: 1px 7px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  color: var(--text-muted);
-}
-.mock-chat-code pre {
-  margin: 0;
-  padding: 22px 12px 10px;
-  white-space: pre;
-  overflow-x: auto;
-  color: var(--text);
 }
 
-.mock-chat-attach {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
+/* CTA: one primary download button, a small meta line, and a
+ * collapsed "first launch" note. No secondary buttons, no rows of
+ * pills, no stat counts. */
+.cta {
+  margin-bottom: 80px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
 }
-.mock-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border-strong));
-  color: var(--text);
-}
-.mock-chip-add {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  border: 1px dashed var(--border-strong);
-  color: var(--text-muted);
-}
-.mock-chat-input {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 8px 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface);
-}
-.mock-chat-input-text {
-  flex: 1;
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-.mock-chat-send {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 6px;
-  background: var(--accent);
+.btn {
+  display: inline-block;
+  background: var(--ink);
   color: var(--bg);
-}
-
-/* --- Terminal mockup --- */
-.mock-term {
-  position: relative;
-  padding: 12px 16px 56px;
-  background: var(--surface);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  min-height: 280px;
-}
-.mock-term-line { padding: 2px 0; color: var(--text); }
-.mock-term-dim { color: var(--text-muted); }
-.mock-term-prompt {
-  color: var(--accent);
-  font-weight: 600;
-}
-.mock-term-link {
-  color: #2ea043;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-}
-.mock-term-link--path {
-  color: var(--accent);
-  text-decoration-style: dotted;
-}
-.mock-term-cursor {
-  color: var(--accent);
-  animation: term-blink 0.8s steps(2, jump-none) infinite;
-}
-@keyframes term-blink {
-  0%, 50% { opacity: 1; }
-  50.01%, 100% { opacity: 0; }
-}
-.mock-term-ai {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--border-strong));
-  border-radius: 9px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-}
-.mock-term-ai-icon { font-size: 13px; }
-.mock-term-ai-input {
-  flex: 1;
-  color: var(--text);
-}
-
-/* --- Find-in-files mockup --- */
-.mock-find-toolbar {
-  display: flex;
-  gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-}
-.mock-find-input {
-  flex: 1;
-  padding: 4px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--text);
-}
-.mock-find-glob {
-  width: 130px;
-  padding: 4px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--text-muted);
-}
-.mock-find-flags {
-  display: inline-flex;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  overflow: hidden;
-}
-.mock-find-flag {
-  width: 28px;
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 4px 0;
-  background: var(--surface);
-  color: var(--text-muted);
-  border-right: 1px solid var(--border);
-}
-.mock-find-flag:last-child { border-right: 0; }
-.mock-find-flag--on {
-  background: var(--accent);
-  color: var(--bg);
-}
-.mock-find-summary {
-  padding: 5px 14px;
-  font-size: 11px;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-}
-.mock-find-list { padding: 4px 0 8px; }
-.mock-find-file {
-  padding: 5px 12px;
-  background: var(--surface-2);
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-}
-.mock-find-count {
-  font-size: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0 6px;
-  color: var(--text-muted);
-}
-.mock-find-match {
-  display: flex;
-  gap: 12px;
-  padding: 3px 12px 3px 28px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-.mock-find-line {
-  width: 36px;
-  text-align: right;
-  color: var(--text-muted);
-}
-.mock-find-text { flex: 1; color: var(--text); }
-.mock-find-text em {
-  font-style: normal;
-  background: color-mix(in srgb, #d4a300 28%, transparent);
-  font-weight: 700;
-  border-radius: 2px;
-  padding: 0 2px;
-}
-
-/* --- Layout mockup (splits + sessions) --- */
-.mock-now-playing {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border-strong));
-  color: var(--text);
-  margin-left: auto;
-}
-/* Session strip — pill-shaped sessions, matching the new in-app look. */
-.mock-session-strip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-  padding: 8px 12px;
-  font-size: 11.5px;
-}
-.mock-session {
-  padding: 5px 14px;
-  border-radius: 999px;
+  font-family: var(--sans);
   font-weight: 500;
-  letter-spacing: -0.005em;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent);
-}
-.mock-session--active {
-  background: #d97757;
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 0 0 1px color-mix(in srgb, #d97757 60%, transparent);
-}
-.mock-layout {
-  display: grid;
-  grid-template-columns: 1fr 4px 1fr;
-  min-height: 280px;
-}
-.mock-layout-pane {
-  display: flex;
-  flex-direction: column;
-}
-.mock-layout-split {
-  background: var(--border);
-}
-.mock-layout-split--horizontal {
-  height: 4px;
-  background: var(--border);
-}
-.mock-layout-pane-row {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-/* File-tab bar inside each pane — bubble-shaped tabs with the same
- *  language as the in-app tabs. We only render one (active) tab per
- *  pane in this mock, so the styling shows the active state. */
-.mock-pane-tab {
-  display: inline-flex;
-  align-items: center;
-  margin: 9px 10px 7px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text);
-  background:
-    linear-gradient(to bottom, #d97757 0, #d97757 2px, var(--surface) 2px);
-  box-shadow: 0 0 0 1px color-mix(in srgb, #d97757 30%, var(--border));
-  align-self: flex-start;
-}
-.mock-pane-content { flex: 1; padding: 10px 12px; }
-.mock-pane-content--folder { background: var(--surface); }
-.mock-folder-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-.mock-folder-item {
-  text-align: center;
-  font-size: 9.5px;
-  padding: 8px 4px;
-  border-radius: 6px;
-}
-.mock-folder-item:hover { background: var(--surface-2); }
-.mock-pane-content--code {
-  background: var(--surface);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-}
-.mock-code-line { padding: 1px 0; color: var(--text); }
-.mock-code-kw { color: #c678dd; }
-.mock-code-fn { color: #61afef; }
-.mock-code-tag { color: #e06c75; }
-.mock-code-attr { color: #d19a66; }
-.mock-code-str { color: #98c379; }
-.mock-pane-content--term {
-  background: var(--surface);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-}
-
-/* ---------- Tab kinds cloud ---------- */
-
-.kinds-cloud {
-  padding: 70px 24px 90px;
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 4%, transparent), transparent);
-}
-/* Functionality table — comic-strip personality to match the rest of
- * the page: Permanent Marker header, struck-through "apps you'd
- * usually open" (the visual gag is "Marko replaces these"), yellow
- * highlighter ✓ stamp, slight off-axis shadow. */
-.kinds-table-wrap {
-  max-width: 780px;
-  margin: 36px auto 0;
-  border: 2px solid var(--text);
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--surface);
-  /* Off-axis flat shadow gives the "sticker on a notebook" look that
-   * matches the comic hero. */
-  box-shadow: 6px 6px 0 var(--text);
-  transform: rotate(-0.4deg);
-}
-.kinds-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14.5px;
-}
-.kinds-table thead th {
-  font-family: 'Permanent Marker', var(--font-sans);
-  font-weight: 400;
-  font-size: 17px;
+  font-size: 15px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 0;
+  text-decoration: none;
   letter-spacing: 0.01em;
-  color: var(--text);
-  text-align: left;
-  padding: 16px 22px 14px;
-  background: #ffe14a;
-  border-bottom: 2px solid var(--text);
+  transition: background 120ms ease, transform 80ms ease;
 }
-.kinds-table thead th.kt-check {
-  text-align: center;
-}
-.kinds-table tbody td {
-  padding: 13px 22px;
-  border-bottom: 1px dashed color-mix(in srgb, var(--text) 18%, transparent);
-  vertical-align: middle;
-  transition: background 100ms ease-out;
-}
-.kinds-table tbody tr:nth-child(even) td {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
-}
-.kinds-table tbody tr:last-child td {
+.btn:hover {
+  background: color-mix(in srgb, var(--ink) 80%, var(--muted));
   border-bottom: 0;
 }
-.kinds-table tbody tr:hover td {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+.btn:active {
+  transform: translateY(1px);
 }
-.kinds-table tbody td:first-child {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
+.cta-meta {
+  margin: 16px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+  font-family: var(--sans);
 }
-.kinds-table tbody td:nth-child(2) {
-  font-family: var(--font-sans);
-  color: var(--text-muted);
-  text-decoration: line-through;
-  text-decoration-thickness: 2px;
-  text-decoration-color: color-mix(in srgb, #ff4f5e 80%, transparent);
+.cta-meta a {
+  color: var(--muted);
+  border-bottom-color: color-mix(in srgb, var(--muted) 30%, transparent);
 }
-.kinds-table .kt-check {
-  text-align: center;
-  width: 80px;
+.cta-meta a:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
 }
-/* Yellow highlighter pill stamping each ✓ — same motif as the <em>
- * highlights in the comic hero headings. */
-.kinds-table tbody td.kt-check span {
+
+.note {
+  margin-top: 28px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--muted);
+}
+.note summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 6px 0;
+  user-select: none;
+}
+.note summary::-webkit-details-marker {
+  display: none;
+}
+.note summary::before {
+  content: '+';
   display: inline-block;
-  background: #ffe14a;
-  padding: 3px 16px 5px;
-  border-radius: 999px;
-  font-family: 'Bangers', 'Impact', var(--font-sans);
-  font-weight: 400;
-  font-size: 22px;
-  letter-spacing: 0.04em;
-  color: var(--text);
-  /* Subtle hand-drawn outline so it reads as a "stamp" against light
-   * row backgrounds. */
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 18%, transparent);
+  width: 18px;
+  color: var(--muted);
 }
-@media (max-width: 600px) {
-  .kinds-table-wrap { transform: none; box-shadow: 4px 4px 0 var(--text); }
-  .kinds-table { font-size: 13.5px; }
-  .kinds-table thead th { font-size: 15px; padding: 12px 14px; }
-  .kinds-table tbody td { padding: 11px 14px; }
-  .kinds-table .kt-check { width: 56px; }
-  .kinds-table tbody td.kt-check span {
-    font-size: 18px;
-    padding: 3px 12px 4px;
-  }
+.note[open] summary::before {
+  content: '−';
 }
-
-/* ---------- Footer ---------- */
-
-.footer {
-  padding: 40px 24px 60px;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
+.note-body {
+  padding: 6px 0 6px 18px;
 }
-.footer-inner {
-  max-width: 1120px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+.note-body p {
+  margin: 8px 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
 }
-.footer-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
+.note-body pre {
+  margin: 10px 0;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  overflow-x: auto;
+  color: var(--ink);
 }
-.footer-brand img {
-  border-radius: 5px;
+.note-body code {
+  font-family: inherit;
 }
-.footer-links {
-  display: inline-flex;
-  gap: 18px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.footer-links a:hover {
-  color: var(--text);
-}
-.footer-meta {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-}
-
-/* Launcher mock — Spotlight-style mini-window for the showcase. */
-.mock--launcher {
-  position: relative;
-  background: #1f1f22;
-  color: #f1f1f3;
-  border-radius: 14px;
-  padding: 0;
-  font-family: var(--font-sans);
-}
-.mock-launcher-input {
-  padding: 18px 22px 16px;
-  font-size: 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-.mock-launcher-cursor {
-  color: #f1f1f3;
-}
-/* Glide caret — accent bar with a soft trailing gradient to hint that
- *  it slides between positions instead of snapping. No blink: the live
- *  caret only blinks when idle, and the still mock reads as "typing". */
-.mock-launcher-caret {
-  display: inline-block;
-  width: 2px;
-  height: 18px;
-  margin-left: 1px;
-  vertical-align: middle;
-  background: #ff8800;
-  border-radius: 1px;
-  box-shadow:
-    -10px 0 14px -6px rgba(255, 136, 0, 0.55),
-    -22px 0 22px -12px rgba(255, 136, 0, 0.3);
-}
-/* Pointer dot — sits inside the active row at roughly the spot a user
- *  would have just hovered to before the keyboard took over. Suggests
- *  the in-app custom cursor (small accent dot, mix-blend difference). */
-.mock-launcher-pointer {
-  position: absolute;
-  top: 50%;
-  left: 28%;
-  width: 12px;
-  height: 12px;
-  margin: -6px 0 0 -6px;
-  border-radius: 50%;
-  background: #ff8800;
-  opacity: 0.9;
-  mix-blend-mode: difference;
-  pointer-events: none;
-  box-shadow: 0 0 14px rgba(255, 136, 0, 0.45);
-}
-.mock-launcher-section {
-  padding: 8px 18px 4px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #76787c;
-}
-.mock-launcher-section-faded {
-  padding: 0 18px 6px;
-  font-size: 11px;
-  color: #76787c;
+.note-foot {
   font-style: italic;
 }
-.mock-launcher-row {
-  display: grid;
-  grid-template-columns: 28px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
+
+/* Footer: a single line of dot-separated text, low contrast. */
+.foot {
+  margin-top: 64px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.foot a {
+  color: var(--muted);
+  border-bottom-color: color-mix(in srgb, var(--muted) 25%, transparent);
+}
+.foot a:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.foot-dot {
   margin: 0 8px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #f1f1f3;
-}
-.mock-launcher-row--active {
-  position: relative;
-  background: rgba(255, 255, 255, 0.13);
-}
-.mock-launcher-icon {
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  color: #a8abb0;
-}
-.mock-launcher-icon--chat { color: #ec6cb9; }
-.mock-launcher-avatar {
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #fff;
-  letter-spacing: 0.04em;
-}
-.mock-launcher-name {
-  font-size: 13px;
-  color: #f1f1f3;
-  font-weight: 500;
-}
-.mock-launcher-sub {
-  grid-column: 2;
-  font-size: 11px;
-  color: #a8abb0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mock-launcher-tag {
-  grid-row: 1;
-  grid-column: 3;
-  align-self: start;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #76787c;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-.mock-launcher-tag--active {
-  color: #ff8800;
-  border-color: rgba(255, 136, 0, 0.5);
-  background: rgba(255, 136, 0, 0.1);
-}
-.mock-launcher-footer {
-  display: flex;
-  gap: 18px;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 10px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: #18181b;
-  font-size: 11px;
-  color: #a8abb0;
-}
-.mock-launcher-footer kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  margin-right: 4px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: #f1f1f3;
-  background: #2c2c30;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 5px;
+  opacity: 0.6;
 }
 
+/* Mobile: tighten paddings, keep everything else as-is — the layout
+ * is already a single column at every viewport. */
 @media (max-width: 640px) {
-  .footer-inner {
-    flex-direction: column;
-    align-items: flex-start;
+  .page {
+    padding: 64px 20px 60px;
   }
-}
-
-/* ---------- Mobile polish ----------
- *  Final pass for narrow viewports. Stacks the multi-column mocks,
- *  tightens hero spacing, and prevents the giant comic numbers from
- *  blowing out the horizontal axis. Anything that doesn't survive
- *  scaling cleanly is just hidden on phones. */
-@media (max-width: 720px) {
-  /* Hero — drop the perspective tilt and dial back paddings. */
-  .window-demo { padding: 16px 12px 40px; }
-  .window-frame { transform: none; border-radius: 10px; }
-  .window-tabs { overflow-x: auto; scrollbar-width: none; }
-  .window-tabs::-webkit-scrollbar { display: none; }
-
-  /* Story hero — keep the comic feel but stop the numbers wrapping. */
-  .hero--story { padding: 36px 16px 24px; }
-  .story-paragraph { font-size: 15.5px; line-height: 1.65; }
-  .app { font-size: 13px; padding: 1px 8px; }
-  .story-bubble {
-    margin: 16px 0;
-    padding: 14px 18px;
-    transform: rotate(-0.6deg);
+  body {
+    font-size: 17px;
   }
-  .story-bubble::before,
-  .story-bubble::after { left: 24px; }
-  .story-tally {
-    flex-wrap: nowrap;
-    gap: 12px;
-    padding: 14px 0 8px;
+  .head {
+    margin-bottom: 64px;
   }
-  .story-num { font-size: clamp(40px, 14vw, 64px); }
-  .story-num--ram { font-size: clamp(28px, 10vw, 48px); }
-  .story-num-label { font-size: 10px; }
-  .story-punchline { gap: 12px; flex-wrap: wrap; }
-  .story-marko-icon { width: 56px; height: 56px; }
-  .story .brand-name { font-size: clamp(44px, 14vw, 72px); }
-
-  /* Mock chrome — hide the launcher mock's pointer dot which uses a
-   *  blend mode that reads weird at small sizes. */
-  .mock-launcher-pointer { display: none; }
-
-  /* Git mock — sidebar above diff. */
-  .mock-git-body { grid-template-columns: 1fr; min-height: 0; }
-  .mock-git-files { border-right: 0; border-bottom: 1px solid var(--border); }
-  .mock-git-diff { font-size: 11px; }
-
-  /* Chat mock — drop the history sidebar; one chat is enough at this
-   *  size and the screenshot still tells the story.
-   *  The min-width: 0 chain is essential: the long <pre> content and
-   *  long input-placeholder line forced the whole grid column wider
-   *  than the viewport. Grid/flex items default to min-content sizing
-   *  unless told otherwise, so we break that chain at every parent. */
-  .mock-chat-body {
+  .head-name {
+    font-size: 38px;
+  }
+  .origin-zh-name {
+    font-size: 28px;
+  }
+  .origin,
+  .surface,
+  .cta {
+    margin-bottom: 48px;
+  }
+  /* On narrow screens the three-column body crushes the panes —
+   * collapse to a single column showing only the markdown side
+   * (the most legible at small widths). */
+  .shot { margin-bottom: 56px; }
+  .shot-body {
     grid-template-columns: 1fr;
-    min-height: 0;
-    min-width: 0;
   }
-  .mock-chat-side { display: none; }
-  .mock-chat-main { min-width: 0; }
-  .mock-chat-msg { min-width: 0; }
-  .mock-chat-body-text { word-break: break-word; }
-  .mock-chat-code {
-    font-size: 11px;
-    min-width: 0;
-    max-width: 100%;
+  .shot-sidebar,
+  .shot-pane--code {
+    display: none;
   }
-  .mock-chat-code pre { font-size: 10.5px; }
-  .mock-chat-input {
-    min-width: 0;
-    flex-wrap: wrap;
+  .shot-pane--md {
+    border-right: 0;
   }
-  .mock-chat-input-text {
-    min-width: 0;
-    word-break: break-word;
-    font-size: 11.5px;
-  }
-
-  /* Find mock — let long match lines scroll horizontally. */
-  .mock-find-toolbar { flex-wrap: wrap; gap: 6px; }
-  .mock-find-match { overflow-x: auto; }
-
-  /* Layout/splits mock — collapse to a single-pane preview. The whole
-   *  point is that splits exist; multi-column nesting at 320px reads
-   *  as noise rather than illustration. */
-  .mock-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 4px 1fr;
-  }
-  .mock-layout-split {
-    height: 4px;
-    width: 100%;
-  }
-
-  /* Term mock — long ai-prompt line should not push the panel wider. */
-  .mock-term { font-size: 11px; }
-  .mock-term-line { white-space: pre-wrap; word-break: break-word; }
-
-  /* Functionality table on small screens. */
-  .kinds-cloud { padding: 50px 16px; }
-
-  /* Showcase tag rotations look pasted-on at desktop sizes; on mobile
-   *  the slight tilt overflows the narrow column — flatten it. */
-  .showcase-tag { transform: rotate(0); }
-}
-
-/* Phones — even tighter. Drop story line-height a touch and shrink the
- *  Marko punchline so it fits 320px. */
-@media (max-width: 420px) {
-  .hero--story { padding: 28px 14px 20px; }
-  .story { gap: 10px; font-size: 18px; }
-  .story-line--lead { font-size: clamp(24px, 8vw, 32px); }
-  .story-time { font-size: 24px; }
-  .story-tally-item { gap: 0; }
-  .story-num { font-size: clamp(36px, 13vw, 56px); }
-  .story-num--ram { font-size: clamp(24px, 9vw, 42px); }
-  .story-num-label { letter-spacing: 0.04em; }
-  .story-bubble p { font-size: 22px; }
-  .story-marko-icon { width: 48px; height: 48px; }
-  .story .brand-name { font-size: clamp(40px, 13vw, 60px); }
-  .cta-row { gap: 8px; width: 100%; }
-  .cta-row .btn { flex: 1 1 auto; justify-content: center; }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { HttpHeader, HttpResponseInfo } from '../types/marko';
+import type { HttpHeader, HttpResponseInfo } from '../types/milu';
 import { workspace } from '../state/workspace';
 
 interface Props {
@@ -53,7 +53,7 @@ export function HttpClient({ tabId, initialValue }: Props) {
     setLoading(true);
     setResponse(null);
     try {
-      const r = await window.marko.httpRequest({
+      const r = await window.milu.httpRequest({
         method: req.method,
         url: req.url.trim(),
         headers: req.headers,

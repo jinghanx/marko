@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Renames the bundled dev Electron app to "Marko" so the macOS menu bar
-# shows "Marko" instead of "Electron" during `npm run dev`.
+# Renames the bundled dev Electron app to "Milu" so the macOS menu bar
+# shows "Milu" instead of "Electron" during `npm run dev`.
 # Production builds (via `npm run package:mac`) already use the correct
 # productName from package.json — this script only matters for dev.
 #
@@ -18,7 +18,7 @@ if [[ ! -f "$PLIST" ]]; then
   exit 0
 fi
 
-plutil -replace CFBundleName -string "Marko" "$PLIST"
-plutil -replace CFBundleDisplayName -string "Marko" "$PLIST"
+plutil -replace CFBundleName -string "Milu" "$PLIST"
+plutil -replace CFBundleDisplayName -string "Milu" "$PLIST"
 
 echo "rename-dev-electron: patched $PLIST"

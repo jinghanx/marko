@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ClipboardEntry } from '../types/marko';
+import type { ClipboardEntry } from '../types/milu';
 import { workspace } from '../state/workspace';
 
 type KindFilter = 'all' | 'text' | 'image';
@@ -57,7 +57,7 @@ export function ClipboardView() {
     if (refreshLockRef.current) return;
     refreshLockRef.current = true;
     try {
-      const list = await window.marko.clipboardList();
+      const list = await window.milu.clipboardList();
       setEntries(list);
       setActiveId((prev) => {
         if (prev && list.some((e) => e.id === prev)) return prev;
@@ -70,8 +70,8 @@ export function ClipboardView() {
 
   useEffect(() => {
     void refresh();
-    void window.marko.clipboardGetPaused().then(setPaused);
-    const off = window.marko.onClipboardChanged(() => {
+    void window.milu.clipboardGetPaused().then(setPaused);
+    const off = window.milu.onClipboardChanged(() => {
       void refresh();
     });
     return off;
@@ -113,32 +113,32 @@ export function ClipboardView() {
   const active = entries.find((e) => e.id === activeId) ?? null;
 
   const onCopy = useCallback(async (id: string) => {
-    await window.marko.clipboardWrite(id);
+    await window.milu.clipboardWrite(id);
   }, []);
 
   const onTogglePin = useCallback(async (id: string, pinned: boolean) => {
-    await window.marko.clipboardPin(id, pinned);
+    await window.milu.clipboardPin(id, pinned);
   }, []);
 
   const onDelete = useCallback(async (id: string) => {
-    await window.marko.clipboardDelete(id);
+    await window.milu.clipboardDelete(id);
   }, []);
 
   const onClearAll = useCallback(async () => {
-    const ok = await window.marko.confirm({
+    const ok = await window.milu.confirm({
       message: 'Clear clipboard history?',
       detail: 'Pinned entries are preserved. This cannot be undone.',
       confirmLabel: 'Clear',
       dangerous: true,
     });
     if (!ok) return;
-    await window.marko.clipboardClear();
+    await window.milu.clipboardClear();
   }, []);
 
   const onTogglePaused = useCallback(async () => {
     const next = !paused;
     setPaused(next);
-    await window.marko.clipboardSetPaused(next);
+    await window.milu.clipboardSetPaused(next);
   }, [paused]);
 
   /** Open the active entry as its own dedicated tab — text entries become
@@ -155,11 +155,11 @@ export function ClipboardView() {
       workspace.requestEditorFocus();
     } else if (active.kind === 'image' && active.imagePath) {
       // The image tab is path-keyed via filePath; the savedContent slot is a
-      // marko-file:// URL so the ImageViewer streams from disk rather than
+      // milu-file:// URL so the ImageViewer streams from disk rather than
       // base64-decoding.
       workspace.openFileTab(
         active.imagePath,
-        `marko-file://stream${encodeURI(active.imagePath)}`,
+        `milu-file://stream${encodeURI(active.imagePath)}`,
         `Clipboard ${active.width}×${active.height}`,
         'image',
       );
@@ -237,7 +237,7 @@ export function ClipboardView() {
               <div className="clipboard-empty-title">Clipboard history is empty</div>
               <div className="clipboard-empty-sub">
                 Copy text or images anywhere and they'll show up here. Your
-                history lives in <code>~/.marko/clipboard.json</code>.
+                history lives in <code>~/.milu/clipboard.json</code>.
               </div>
             </div>
           ) : filtered.length === 0 ? (
@@ -461,7 +461,7 @@ function ClipboardDetail({
         {entry.kind === 'image' && entry.imagePath ? (
           <img
             className="clipboard-detail-image"
-            src={`marko-file://stream${encodeURI(entry.imagePath)}`}
+            src={`milu-file://stream${encodeURI(entry.imagePath)}`}
             alt="Clipboard image"
           />
         ) : (

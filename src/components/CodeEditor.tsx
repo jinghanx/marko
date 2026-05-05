@@ -174,8 +174,8 @@ export function CodeEditor({ tabId, initialValue, filePath, language }: Props) {
       };
       tryJump();
     };
-    window.addEventListener('marko:goto-line', handler);
-    return () => window.removeEventListener('marko:goto-line', handler);
+    window.addEventListener('milu:goto-line', handler);
+    return () => window.removeEventListener('milu:goto-line', handler);
   }, [filePath]);
 
   const focusToken = useWorkspace((s) => s.focusToken);

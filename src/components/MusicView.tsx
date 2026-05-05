@@ -157,11 +157,11 @@ function readPersisted(content: string): Persisted {
 }
 
 /** Library state — user-added tracks plus IDs of curated tracks the
- *  user has hidden. Persisted as ~/.marko/music-library.json via IPC
+ *  user has hidden. Persisted as ~/.milu/music-library.json via IPC
  *  so dev and packaged builds share the same library (localStorage is
  *  scoped per app userData). The same key is also kept in localStorage
  *  as a one-time migration source. */
-const LEGACY_LIBRARY_KEY = 'marko:music:library';
+const LEGACY_LIBRARY_KEY = 'milu:music:library';
 interface MusicLibrary {
   userTracks: Track[];
   hiddenIds: string[];
@@ -188,7 +188,7 @@ function normalizeLibrary(parsed: Partial<MusicLibrary>): MusicLibrary {
 }
 async function loadLibrary(): Promise<MusicLibrary> {
   try {
-    const raw = await window.marko.musicLibraryRead();
+    const raw = await window.milu.musicLibraryRead();
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<MusicLibrary>;
       return normalizeLibrary(parsed);
@@ -204,7 +204,7 @@ async function loadLibrary(): Promise<MusicLibrary> {
     if (legacy) {
       const parsed = JSON.parse(legacy) as Partial<MusicLibrary>;
       const norm = normalizeLibrary(parsed);
-      void window.marko.musicLibraryWrite(JSON.stringify(norm));
+      void window.milu.musicLibraryWrite(JSON.stringify(norm));
       localStorage.removeItem(LEGACY_LIBRARY_KEY);
       return norm;
     }
@@ -214,7 +214,7 @@ async function loadLibrary(): Promise<MusicLibrary> {
   return { userTracks: [], hiddenIds: [] };
 }
 function saveLibrary(lib: MusicLibrary) {
-  void window.marko.musicLibraryWrite(JSON.stringify(lib));
+  void window.milu.musicLibraryWrite(JSON.stringify(lib));
 }
 
 function thumbnailUrl(videoId: string): string {
@@ -252,7 +252,7 @@ interface Props {
 
 export function MusicView({ tabId, initialValue }: Props) {
   const initial = useMemo(() => readPersisted(initialValue), [initialValue]);
-  // Library lives in ~/.marko/music-library.json (via IPC) so dev
+  // Library lives in ~/.milu/music-library.json (via IPC) so dev
   // and packaged builds share the same picks, and survives tab
   // close/reopen + app restart. Tab.content only carries per-tab
   // state (current track + volume).
@@ -345,7 +345,7 @@ export function MusicView({ tabId, initialValue }: Props) {
     workspace.rebaseSavedContent(tabId, JSON.stringify(data));
   }, [tabId, currentTrackId, volume]);
 
-  // Persist the library to ~/.marko/music-library.json on every
+  // Persist the library to ~/.milu/music-library.json on every
   // change. Skip the first render — until the IPC load completes,
   // userTracks/hiddenIds are still the empty initial state and
   // would otherwise clobber the on-disk file.
@@ -877,7 +877,7 @@ function AddTrackModal({
     const t = setTimeout(() => {
       setLoading(true);
       void (async () => {
-        const r = await window.marko.youtubeMetadata(videoId);
+        const r = await window.milu.youtubeMetadata(videoId);
         if (token !== fetchTokenRef.current) return;
         setLoading(false);
         if (!r.ok) {

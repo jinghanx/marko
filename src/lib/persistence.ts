@@ -15,21 +15,21 @@ function scheduleSave() {
     saveTimer = null;
     try {
       const snap = serializeWorkspace();
-      await window.marko.stateWrite(JSON.stringify(snap));
+      await window.milu.stateWrite(JSON.stringify(snap));
     } catch {
       // Best-effort; a failed save shouldn't crash the renderer.
     }
   }, SAVE_DEBOUNCE_MS);
 }
 
-/** Hydrate workspace from ~/.marko/state.json (no-op if missing/invalid),
+/** Hydrate workspace from ~/.milu/state.json (no-op if missing/invalid),
  *  then start auto-saving on every workspace state change. Idempotent. */
 export async function startWorkspacePersistence(): Promise<void> {
   if (started) return;
   started = true;
 
   try {
-    const raw = await window.marko.stateRead();
+    const raw = await window.milu.stateRead();
     if (raw) {
       const parsed = JSON.parse(raw);
       await hydrateFromSnapshot(parsed);
@@ -45,7 +45,7 @@ export async function startWorkspacePersistence(): Promise<void> {
  *  a clean default. Triggered by the "Reset Workspace" menu item. */
 export async function resetWorkspaceAndReload(): Promise<void> {
   try {
-    await window.marko.stateReset();
+    await window.milu.stateReset();
   } catch {
     // ignore
   }

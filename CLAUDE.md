@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Marko is an Electron desktop app for macOS that combines a markdown editor (Milkdown Crepe), a code editor (CodeMirror 6), a Finder-style folder browser, an embedded webview, and a real terminal (xterm.js + node-pty) — all inside a recursive split-pane layout. It is keyboard-driven and theme-aware. The README has the full feature/shortcut list.
+Milu is an Electron desktop app for macOS that combines a markdown editor (Milkdown Crepe), a code editor (CodeMirror 6), a Finder-style folder browser, an embedded webview, and a real terminal (xterm.js + node-pty) — all inside a recursive split-pane layout. It is keyboard-driven and theme-aware. The README has the full feature/shortcut list.
 
 A separate static landing page lives in `landing/` (plain HTML/CSS, deployed to Vercel from that subdirectory).
 
@@ -13,9 +13,9 @@ A separate static landing page lives in `landing/` (plain HTML/CSS, deployed to 
 | | |
 |---|---|
 | `npm run dev` | Vite + Electron with HMR. Renderer hot-reloads instantly. Main-process and preload changes rebuild but do **not** auto-restart Electron — `⌘Q` and rerun `npm run dev` to pick up `electron/main.ts` or `electron/preload.ts` changes. |
-| `npm run rename:dev-electron` | One-time patch of `node_modules/electron/dist/Electron.app/Contents/Info.plist` so the dev menu bar reads "Marko" instead of "Electron". Re-run after any `npm install` that reinstalls Electron. |
+| `npm run rename:dev-electron` | One-time patch of `node_modules/electron/dist/Electron.app/Contents/Info.plist` so the dev menu bar reads "Milu" instead of "Electron". Re-run after any `npm install` that reinstalls Electron. |
 | `npm run build` | `tsc -p tsconfig.node.json` then `vite build`. Outputs to `dist/` (renderer) and `dist-electron/` (main + preload). |
-| `npm run package:mac` | Build + `electron-builder --mac --arm64 --x64`. Outputs `release/Marko-arm64.dmg` and `release/Marko-x64.dmg`. The version-less filenames are produced by the `mac.artifactName` template in `package.json` so the landing page can hardcode stable download URLs. |
+| `npm run package:mac` | Build + `electron-builder --mac --arm64 --x64`. Outputs `release/Milu-arm64.dmg` and `release/Milu-x64.dmg`. The version-less filenames are produced by the `mac.artifactName` template in `package.json` so the landing page can hardcode stable download URLs. |
 | `npm run package:mac:arm` / `:intel` | Single-arch builds (faster). |
 | `npx tsc --noEmit -p tsconfig.json` | Typecheck the renderer. No test framework is configured. |
 | `npx tsc --noEmit -p tsconfig.node.json` | Typecheck `electron/` + `vite.config.ts`. |
@@ -27,17 +27,17 @@ There are **no tests** and **no linter** configured.
 ### Process split
 
 - `electron/main.ts` — Electron main process. Owns: window creation, native menus + accelerators, all filesystem IO, PTY lifecycle (`node-pty`), system stats (for the process viewer), Quick Look, image loading (returns base64 data URLs), recursive directory walks for the file palette.
-- `electron/preload.ts` — Defines `window.marko`, the only renderer→main bridge. Every IPC handler in `main.ts` is mirrored here as a typed method. **When you add a new IPC handler, you must update both `preload.ts` and `src/types/marko.d.ts`** — they're not auto-generated.
+- `electron/preload.ts` — Defines `window.milu`, the only renderer→main bridge. Every IPC handler in `main.ts` is mirrored here as a typed method. **When you add a new IPC handler, you must update both `preload.ts` and `src/types/milu.d.ts`** — they're not auto-generated.
 - `src/` — React renderer.
 
-The renderer never touches `node:fs` or other Node modules; it goes through `window.marko`. This is enforced by `contextIsolation: true` and `nodeIntegration: false` in main.
+The renderer never touches `node:fs` or other Node modules; it goes through `window.milu`. This is enforced by `contextIsolation: true` and `nodeIntegration: false` in main.
 
 ### Renderer state model
 
 Two singleton stores under `src/state/`, both exposed as plain `useSyncExternalStore` hooks (no Redux/Zustand/Jotai):
 
 - `state/workspace.ts` — the binary **pane tree** (`PaneTree = LeafNode | SplitNode`), the flat `tabs[]` array, `focusedLeafId`, `rootDir`, plus signal fields (`focusToken`, `revealPath` + `revealToken`, `folderSelection`). Tabs live once in `tabs[]`; leaves hold IDs into it, so the same file open in two panes shares one buffer. The recursive tree means split panes can nest in any direction. **Important**: tab IDs are not unique to a leaf — call `closeTabInLeaf(leafId, tabId)` (not `closeTab`) when the operation must stay scoped to one pane (the tab-bar close button is one such case).
-- `state/settings.ts` — persisted preferences in `localStorage` (key `marko:settings`). On every update, applies CSS variables to `document.documentElement` (`applyToDom`) and active color theme via `applyThemeToDom`. Initial load is synchronous.
+- `state/settings.ts` — persisted preferences in `localStorage` (key `milu:settings`). On every update, applies CSS variables to `document.documentElement` (`applyToDom`) and active color theme via `applyThemeToDom`. Initial load is synchronous.
 
 ### Pane / tab rendering
 
@@ -70,12 +70,12 @@ CodeMirror's `defaultHighlightStyle` is bypassed by adding `syntaxHighlighting(c
 
 ## Ports of call when extending
 
-- New keyboard shortcut: `electron/main.ts` (menu accelerator) → `App.tsx` (`window.marko.onMenu(...)` listener) → call workspace/uiBus action.
+- New keyboard shortcut: `electron/main.ts` (menu accelerator) → `App.tsx` (`window.milu.onMenu(...)` listener) → call workspace/uiBus action.
 - New file type: `lib/fileType.ts` (detect kind) → `lib/actions.ts` (`openFileFromPath` dispatch) → `state/workspace.ts` (`TabKind`) → `EditorPane.tsx` (render the right component).
-- New IPC: handler in `electron/main.ts` → expose in `electron/preload.ts` → declare in `src/types/marko.d.ts` → call from a renderer module.
+- New IPC: handler in `electron/main.ts` → expose in `electron/preload.ts` → declare in `src/types/milu.d.ts` → call from a renderer module.
 - New color theme: append to `LIGHT_THEMES` or `DARK_THEMES` in `src/lib/themes.ts`; everything else (settings dropdown, terminal palette, syntax tokens) picks it up automatically.
 
 ## Things to know about the conversation context
 
 - Code-signing for the .dmg is **disabled** (`mac.identity: null` in `package.json`'s `build` block). Users hit a Gatekeeper warning on first launch. Don't enable signing without an Apple Developer cert in env.
-- The GitHub repo is `jinghanx/marko` (public). Releases pattern: `gh release create vX.Y.Z release/Marko-arm64.dmg release/Marko-x64.dmg`. The landing page links to `releases/latest/download/Marko-{arm64,x64}.dmg` — version-less by design (see `mac.artifactName` in package.json), so the landing page never needs to be edited at release time.
+- The GitHub repo is `jinghanx/milu` (public). Releases pattern: `gh release create vX.Y.Z release/Milu-arm64.dmg release/Milu-x64.dmg`. The landing page links to `releases/latest/download/Milu-{arm64,x64}.dmg` — version-less by design (see `mac.artifactName` in package.json), so the landing page never needs to be edited at release time.

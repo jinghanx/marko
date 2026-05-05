@@ -3,654 +3,188 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Marko — editor · finder · browser · terminal · git · AI · whiteboard</title>
-    <meta name="description" content="A keyboard-driven macOS workspace: markdown, code, Finder-style folders, embedded browser, terminal, full Git client, streaming AI chat, find-in-files, HTTP client, whiteboard, PDF, CSV, JSON, diff — recursive split panes, tmux-style sessions, all in one window." />
-    <meta property="og:title" content="Marko — one window for everything" />
-    <meta property="og:description" content="Editor, finder, browser, terminal, Git, AI chat, whiteboard, and a long tail of dev tabs in a single keyboard-driven macOS app." />
-    <meta property="og:image" content="/icon.png?v=2" />
-    <meta name="theme-color" content="#2d6cdf" />
-    <link rel="icon" href="/icon.png?v=2" />
-    <link rel="apple-touch-icon" href="/icon.png?v=2" />
-    <link rel="stylesheet" href="/style.css?v=0.3.0-mobile2" />
+    <title>Milu — one window for everything</title>
+    <meta
+      name="description"
+      content="A keyboard-driven macOS workspace: editor, finder, browser, terminal, git, AI. One window for everything you keep open."
+    />
+    <meta property="og:title" content="Milu" />
+    <meta property="og:description" content="One window for everything you keep open." />
+    <meta property="og:image" content="/icon.png?v=3" />
+    <meta name="theme-color" content="#bf8b5a" />
+    <link rel="icon" href="/icon.png?v=3" />
+    <link rel="apple-touch-icon" href="/icon.png?v=3" />
+    <link rel="stylesheet" href="/style.css?v=zen-1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=Bangers&family=Permanent+Marker&family=Caveat:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;600&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
-    <nav class="nav">
-      <div class="nav-inner">
-        <a class="brand" href="/">
-          <img src="/icon.png?v=2" alt="" width="40" height="40" />
-          <span>Marko</span>
+    <main class="page">
+      <header class="head">
+        <img class="head-icon" src="/icon.png?v=3" alt="Milu" width="64" height="64" />
+        <h1 class="head-name">Milu</h1>
+        <p class="head-tag">One window for everything you keep open.</p>
+      </header>
+
+      <figure class="shot">
+        <div class="shot-window" aria-hidden="true">
+          <div class="shot-titlebar">
+            <span class="shot-dot shot-dot--red"></span>
+            <span class="shot-dot shot-dot--yellow"></span>
+            <span class="shot-dot shot-dot--green"></span>
+            <span class="shot-session shot-session--active">notes</span>
+            <span class="shot-session">milu</span>
+            <span class="shot-session-plus">+</span>
+          </div>
+          <div class="shot-tabs">
+            <span class="shot-tab shot-tab--active">README.md</span>
+            <span class="shot-tab">main.ts</span>
+            <span class="shot-tab">git</span>
+            <span class="shot-tab">claude code</span>
+          </div>
+          <div class="shot-body">
+            <aside class="shot-sidebar">
+              <div class="shot-folder shot-folder--open">milu</div>
+              <div class="shot-file shot-file--indent">README.md</div>
+              <div class="shot-file shot-file--indent">package.json</div>
+              <div class="shot-folder shot-folder--indent shot-folder--open">src</div>
+              <div class="shot-file shot-file--indent2">App.tsx</div>
+              <div class="shot-file shot-file--indent2 shot-file--active">main.ts</div>
+              <div class="shot-file shot-file--indent2">workspace.ts</div>
+              <div class="shot-folder shot-folder--indent">electron</div>
+              <div class="shot-folder shot-folder--indent">build</div>
+            </aside>
+            <div class="shot-pane shot-pane--md">
+              <div class="shot-h1">Milu</div>
+              <div class="shot-p">An editor for everything you keep open.</div>
+              <div class="shot-p shot-p--muted">
+                Markdown, code, folders, browser, terminal, git, AI&nbsp;agents — one window.
+              </div>
+              <div class="shot-blockquote">
+                <em>麋鹿</em> · sì&nbsp;bù&nbsp;xiàng — looks like everything, resembles nothing.
+              </div>
+            </div>
+            <div class="shot-pane shot-pane--code">
+              <div class="shot-line"><span class="shot-kw">export</span> <span class="shot-kw">function</span> <span class="shot-fn">openFile</span>(path: <span class="shot-ty">string</span>) {</div>
+              <div class="shot-line">  <span class="shot-kw">const</span> kind = detectKind(path);</div>
+              <div class="shot-line">  <span class="shot-kw">if</span> (kind === <span class="shot-str">'image'</span>) {</div>
+              <div class="shot-line">    <span class="shot-kw">return</span> openImageTab(path);</div>
+              <div class="shot-line">  }</div>
+              <div class="shot-line">  <span class="shot-kw">return</span> openCodeTab(path, kind);</div>
+              <div class="shot-line">}</div>
+              <div class="shot-line"></div>
+              <div class="shot-line shot-line--gutter">
+                <span class="shot-line-num">12</span>
+                <span class="shot-comment">// Milu's only opinion: every file goes in a tab.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption>One window. Recursive split panes. Every file kind in a tab.</figcaption>
+      </figure>
+
+      <section class="origin">
+        <p class="origin-zh">
+          <span class="origin-zh-name">麋鹿</span>
+          <span class="origin-zh-aka">又叫四不像</span>
+        </p>
+        <p>
+          The <em>Père David's deer</em>. In Chinese it's also called
+          <em>sì&nbsp;bù&nbsp;xiàng</em> — <em>"not&nbsp;like&nbsp;any"</em> — because it
+          has the antlers of a deer, the face of a horse, the hooves of a cow, and
+          the tail of a donkey. It looks like everything, and resembles nothing.
+        </p>
+        <p>
+          That's the idea. Milu is a markdown editor, a code editor, a folder
+          browser, a terminal, a real browser, a git client, an AI&nbsp;agent host.
+          It looks like all of them, and isn't quite any of them.
+        </p>
+      </section>
+
+      <section class="surface">
+        <p>One window. Recursive split panes. tmux-style sessions.</p>
+        <ul>
+          <li>Markdown, code, CSV, JSON, diff, PDF</li>
+          <li>Folders, embedded browser, terminal</li>
+          <li>Git client with inline diffs &amp; AI&nbsp;review</li>
+          <li>ACP-native — host Claude&nbsp;Code, Gemini&nbsp;CLI</li>
+        </ul>
+      </section>
+
+      <section class="cta" id="download">
+        <a
+          id="primary-download"
+          class="btn"
+          href="https://github.com/jinghanx/milu/releases/latest/download/Milu-arm64.dmg"
+          data-arm64-href="https://github.com/jinghanx/milu/releases/latest/download/Milu-arm64.dmg"
+          data-x64-href="https://github.com/jinghanx/milu/releases/latest/download/Milu-x64.dmg"
+        >
+          <span id="primary-download-label">Download for Apple Silicon</span>
         </a>
-        <div class="nav-links">
-          <a href="#features">Features</a>
-          <a href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">GitHub</a>
-          <a
-            id="nav-download"
-            class="nav-cta"
-            href="https://github.com/jinghanx/marko/releases/latest/download/Marko-arm64.dmg"
-            data-arm64-href="https://github.com/jinghanx/marko/releases/latest/download/Marko-arm64.dmg"
-            data-x64-href="https://github.com/jinghanx/marko/releases/latest/download/Marko-x64.dmg"
-          >Download</a>
-        </div>
-      </div>
-    </nav>
-
-    <header class="hero hero--story">
-      <div class="hero-bg" aria-hidden="true"></div>
-      <div class="story">
-        <p class="story-time">6:47 AM<span class="story-coffee">☕</span></p>
-
-        <p class="story-line story-line--lead">
-          <span class="story-eddie">Eddie</span> opens his laptop.
+        <p class="cta-meta">
+          macOS&nbsp;12+ ·
+          <a id="alt-arch-link" href="https://github.com/jinghanx/milu/releases/latest/download/Milu-x64.dmg">Intel build</a>
+          ·
+          <a href="https://github.com/jinghanx/milu" target="_blank" rel="noopener">GitHub</a>
         </p>
 
-        <p class="story-paragraph">
-          He has <em class="story-mark story-mark--yellow">one</em> pull request to review —
-          should be an easy day. He opens
-          <span class="app app--bear">Bear</span> for the spec,
-          <span class="app app--cursor">Cursor</span> for the code,
-          <span class="app app--tower">Tower</span> for the diff,
-          <span class="app app--terminal">Terminal</span> when Tower hides things,
-          <span class="app app--chrome">Chrome</span> for Stack&nbsp;Overflow,
-          <span class="app app--chatgpt">ChatGPT</span> because the top answer is from 2014,
-          <span class="app app--postman">Postman</span> to hit the API,
-          <span class="app app--finder">Finder</span> to dig up a test fixture,
-          <span class="app app--excalidraw">Excalidraw</span> to sketch the bug,
-          <span class="app app--claude">Claude&nbsp;Code</span> for an AI that's actually read his source,
-          <span class="app app--notion">Notion</span> because someone said <em>"write it up,"</em>
-          and finally <span class="app app--spotify">Spotify</span> for focus music.
-          Somehow it's <strong>1 PM</strong>, his coffee is cold, the PR is still not reviewed,
-          and his MacBook's fan sounds like an aircraft taking off.
-        </p>
-
-        <div class="story-tally">
-          <div class="story-tally-item">
-            <span class="story-num">47</span>
-            <span class="story-num-label">browser tabs</span>
-          </div>
-          <div class="story-tally-item">
-            <span class="story-num">14</span>
-            <span class="story-num-label">open apps</span>
-          </div>
-          <div class="story-tally-item">
-            <span class="story-num story-num--ram">0.6 GB</span>
-            <span class="story-num-label">RAM available</span>
-          </div>
-        </div>
-
-        <div class="story-bubble">
-          <p>"Why is this not just <em>one window?</em>"</p>
-        </div>
-
-        <p class="story-punchline">
-          <img src="/icon.png?v=2" alt="" class="story-marko-icon" width="80" height="80" />
-          <span class="story-marko-text">
-            <span class="brand-name">Marko</span>
-            <span class="story-marko-tag">heard him.</span>
-          </span>
-        </p>
-
-        <div class="cta-row" id="download">
-          <a
-            id="primary-download"
-            class="btn btn-primary"
-            href="https://github.com/jinghanx/marko/releases/latest/download/Marko-arm64.dmg"
-            data-arm64-href="https://github.com/jinghanx/marko/releases/latest/download/Marko-arm64.dmg"
-            data-x64-href="https://github.com/jinghanx/marko/releases/latest/download/Marko-x64.dmg"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 1v9m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span id="primary-download-label">Download for Apple Silicon</span>
-          </a>
-          <a class="btn btn-ghost" href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.4 3.6 1 .1-.8.4-1.4.8-1.7-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11 11 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" fill="currentColor"/>
-            </svg>
-            View on GitHub
-          </a>
-        </div>
-        <p class="hero-meta" id="dl-meta">
-          macOS 12+ · <a id="alt-arch-link" href="https://github.com/jinghanx/marko/releases/latest/download/Marko-x64.dmg">Intel build</a> · Free &amp; open source
-        </p>
-
-        <!--
-          Marko isn't notarized (Apple wants $99/year), so macOS will
-          flag it as "damaged" on first launch and refuse to open.
-          The xattr command below removes the quarantine attribute
-          Safari/Chrome stamp on every download — same trick most
-          unsigned open-source Mac apps recommend.
-        -->
-        <details class="first-run">
-          <summary>
-            First launch on macOS shows <em>"Marko is damaged"</em>? Run this once →
-          </summary>
-          <div class="first-run-body">
+        <details class="note">
+          <summary>First launch shows <em>"Milu is damaged"</em>?</summary>
+          <div class="note-body">
             <p>
-              Marko isn't notarized with Apple ($99/year), so macOS quarantines the
-              download and refuses to open it. Open <strong>Terminal</strong>
-              (<kbd>⌘Space</kbd> → "Terminal") and paste:
+              Milu isn't notarized with Apple, so macOS quarantines the download.
+              In Terminal, run:
             </p>
-            <pre class="first-run-cmd"><code>xattr -dr com.apple.quarantine /Applications/Marko.app</code></pre>
-            <p class="first-run-foot">
-              Adjust the path if you dragged Marko somewhere other than
-              <code>/Applications</code>. You'll need to run this again every time
-              you download a new version — every fresh download gets re-quarantined.
+            <pre><code>xattr -dr com.apple.quarantine /Applications/Milu.app</code></pre>
+            <p class="note-foot">
+              Re-run this after every new download — fresh downloads get
+              re-quarantined.
             </p>
           </div>
         </details>
-        <script>
-          (async function () {
-            const btn = document.getElementById('primary-download');
-            const label = document.getElementById('primary-download-label');
-            const alt = document.getElementById('alt-arch-link');
-            const navBtn = document.getElementById('nav-download');
-            if (!btn || !label || !alt) return;
-            let arch = 'arm';
-            try {
-              const ua = navigator.userAgentData;
-              if (ua && ua.getHighEntropyValues) {
-                const v = await ua.getHighEntropyValues(['architecture', 'bitness']);
-                if (v.architecture === 'x86' && v.bitness === '64') arch = 'x64';
-              }
-            } catch {}
-            if (arch === 'x64') {
-              btn.href = btn.dataset.x64Href;
-              label.textContent = 'Download for Intel';
-              alt.href = btn.dataset.arm64Href;
-              alt.textContent = 'Apple Silicon build';
-              if (navBtn) navBtn.href = navBtn.dataset.x64Href;
-            }
-          })();
-        </script>
-      </div>
-    </header>
+      </section>
 
-    <!-- Hero window: markdown editor -->
-    <section class="window-demo">
-      <div class="window-frame">
-        <div class="window-chrome">
-          <span class="dot dot-red"></span>
-          <span class="dot dot-yellow"></span>
-          <span class="dot dot-green"></span>
-          <div class="window-sessions">
-            <span class="window-session window-session--active">marko</span>
-            <span class="window-session">scratch</span>
-            <span class="window-session">notes</span>
-            <span class="window-session-add">+</span>
-          </div>
-        </div>
-        <div class="window-tabs">
-          <span class="window-tab window-tab--folder"><span class="tab-glyph">📁</span>marko</span>
-          <span class="window-tab window-tab--md window-tab--active"><span class="tab-glyph">📝</span>README.md</span>
-          <span class="window-tab window-tab--code"><span class="tab-glyph">⟨⟩</span>App.tsx</span>
-          <span class="window-tab window-tab--term"><span class="tab-glyph">▍</span>zsh</span>
-          <span class="window-tab"><span class="tab-glyph">⎇</span>git</span>
-          <span class="window-tab"><span class="tab-glyph">✨</span>chat</span>
-          <span class="window-tab-add">+</span>
-        </div>
-        <div class="window-body">
-          <aside class="demo-sidebar">
-            <div class="demo-side-h">marko</div>
-            <div class="demo-side-row demo-side-row--active">README.md</div>
-            <div class="demo-side-row">package.json</div>
-            <div class="demo-side-row">src/</div>
-            <div class="demo-side-row demo-indent">App.tsx</div>
-            <div class="demo-side-row demo-indent">main.tsx</div>
-            <div class="demo-side-row">build/</div>
-          </aside>
-          <main class="demo-main">
-            <h2 class="demo-h">Marko</h2>
-            <p class="demo-p"><em>An app that doesn't know what it is.</em></p>
-            <p class="demo-p">Keyboard-driven. Vaguely overstuffed. On purpose.</p>
-            <ul class="demo-list">
-              <li>WYSIWYG markdown — yes, even the tables</li>
-              <li>Finder-style folders that fit in a tab</li>
-              <li>Code editor with vim and emacs keymaps (because both camps asked)</li>
-              <li>Browser and terminal in the same window as this</li>
-            </ul>
-          </main>
-          <aside class="demo-outline">
-            <div class="demo-outline-h">Outline</div>
-            <div class="demo-outline-row">Marko</div>
-            <div class="demo-outline-row demo-outline-sub">Why</div>
-            <div class="demo-outline-row demo-outline-sub">Features</div>
-            <div class="demo-outline-row demo-outline-sub">Stack</div>
-          </aside>
-        </div>
-      </div>
-    </section>
+      <footer class="foot">
+        <span>Milu</span>
+        <span class="foot-dot">·</span>
+        <a href="https://github.com/jinghanx/milu" target="_blank" rel="noopener">github</a>
+        <span class="foot-dot">·</span>
+        <a href="https://github.com/jinghanx/milu/releases" target="_blank" rel="noopener">releases</a>
+        <span class="foot-dot">·</span>
+        <span>MIT</span>
+      </footer>
+    </main>
 
-    <!-- Showcase: Global launcher -->
-    <section class="showcase" id="features">
-      <div class="showcase-text">
-        <span class="showcase-tag">Launcher</span>
-        <h2>Spotlight, but for <em>our</em> app.</h2>
-        <p>
-          Yes, Raycast exists. Yes, Alfred exists. Built one anyway — wakes with <kbd>⌘⌥Space</kbd>, opens
-          any app in <code>/Applications</code>, runs Marko commands, computes math, falls back to web search.
-          Took a weekend. Felt great.
-        </p>
-        <ul class="showcase-list">
-          <li>Type a command name to wake the right Marko tab — <code>chat</code>, <code>git</code>, <code>find</code>, <code>http</code>, <code>terminal</code>…</li>
-          <li>Type an app name to open it. Chrome, Slack, Figma. The dock, but smaller and with vibes.</li>
-          <li>Type math, hit <kbd>↵</kbd>, the result is on your clipboard. Calculator.app stays minimized.</li>
-          <li>A hand-rendered text caret that <em>glides</em> between positions, plus a custom pointer dot. Completely unnecessary. We love it.</li>
-        </ul>
-      </div>
-      <div class="showcase-mock">
-        <div class="mock mock--launcher">
-          <div class="mock-launcher-input">
-            <span class="mock-launcher-cursor">chro</span><span class="mock-launcher-caret" aria-hidden="true"></span>
-          </div>
-          <div class="mock-launcher-section">Calculator</div>
-          <div class="mock-launcher-section-faded">— no math input —</div>
-          <div class="mock-launcher-section">Commands</div>
-          <div class="mock-launcher-row">
-            <span class="mock-launcher-icon mock-launcher-icon--chat">●</span>
-            <span class="mock-launcher-name">chat</span>
-            <span class="mock-launcher-sub">Open AI Chat</span>
-            <span class="mock-launcher-tag">AI</span>
-          </div>
-          <div class="mock-launcher-section">Applications</div>
-          <div class="mock-launcher-row mock-launcher-row--active">
-            <span class="mock-launcher-avatar" style="background: hsl(216 60% 45%)">GC</span>
-            <span class="mock-launcher-name">Google Chrome</span>
-            <span class="mock-launcher-sub">/Applications/Google Chrome.app</span>
-            <span class="mock-launcher-tag mock-launcher-tag--active">App</span>
-            <!-- Custom pointer dot — anchored inside the active row to
-                 suggest the in-app red-dot cursor (mix-blend difference). -->
-            <span class="mock-launcher-pointer" aria-hidden="true"></span>
-          </div>
-          <div class="mock-launcher-row">
-            <span class="mock-launcher-avatar" style="background: hsl(28 60% 45%)">CH</span>
-            <span class="mock-launcher-name">Chromium</span>
-            <span class="mock-launcher-sub">/Applications/Chromium.app</span>
-            <span class="mock-launcher-tag">App</span>
-          </div>
-          <div class="mock-launcher-section">Search</div>
-          <div class="mock-launcher-row">
-            <span class="mock-launcher-icon">🔍</span>
-            <span class="mock-launcher-name">Search the web for "chro"</span>
-            <span class="mock-launcher-sub">google.com</span>
-            <span class="mock-launcher-tag">Search</span>
-          </div>
-          <div class="mock-launcher-footer">
-            <span><kbd>↵</kbd> run</span>
-            <span><kbd>↑↓</kbd> select</span>
-            <span><kbd>Tab</kbd> extend</span>
-            <span><kbd>esc</kbd> hide</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Showcase: Git client -->
-    <section class="showcase showcase--reverse">
-      <div class="showcase-text">
-        <span class="showcase-tag">Git</span>
-        <h2>A Git client. Not Tower. Not Fork. <em>Right there.</em></h2>
-        <p>
-          We rebuilt SourceTree. In our app. <strong>Hunk-level</strong> and <strong>line-level</strong> stage,
-          unstage, discard. Branches, stashes, tags. Commit history with cherry-pick. Fetch, pull, push.
-          The world did not need this. We made it anyway. It's actually pretty good.
-        </p>
-        <ul class="showcase-list">
-          <li>Click a single line in a hunk to stage just that line. Yes, just that line.</li>
-          <li>"Delete every branch except current and main" in one click. The healthiest button you'll press today.</li>
-          <li>Cherry-pick from history view. Merge / rebase from branches. No terminal incantations required.</li>
-        </ul>
-      </div>
-      <div class="showcase-mock">
-        <div class="mock mock--git">
-          <div class="mock-chrome">
-            <span class="md-dot md-dot-red"></span>
-            <span class="md-dot md-dot-yellow"></span>
-            <span class="md-dot md-dot-green"></span>
-            <span class="mock-toolbar">
-              <span class="mock-pill mock-pill--accent">⎇ feature/git-rebase</span>
-              <span class="mock-pill mock-pill--ghost">Fetch</span>
-              <span class="mock-pill mock-pill--ghost">Pull</span>
-              <span class="mock-pill mock-pill--ghost">Push</span>
-            </span>
-          </div>
-          <div class="mock-git-body">
-            <aside class="mock-git-files">
-              <div class="mock-git-section">Staged · 2</div>
-              <div class="mock-git-row mock-git-row--staged">
-                <span class="mock-badge mock-badge--add">A</span>
-                <span class="mock-git-path">README.md</span>
-              </div>
-              <div class="mock-git-row mock-git-row--staged">
-                <span class="mock-badge mock-badge--mod">M</span>
-                <span class="mock-git-path">src/state/workspace.ts</span>
-              </div>
-              <div class="mock-git-section">Changes · 3</div>
-              <div class="mock-git-row mock-git-row--active">
-                <span class="mock-badge mock-badge--mod">M</span>
-                <span class="mock-git-path">src/components/GitView.tsx</span>
-              </div>
-              <div class="mock-git-row">
-                <span class="mock-badge mock-badge--mod">M</span>
-                <span class="mock-git-path">src/styles/global.css</span>
-              </div>
-              <div class="mock-git-row">
-                <span class="mock-badge mock-badge--del">D</span>
-                <span class="mock-git-path">old-helper.ts</span>
-              </div>
-            </aside>
-            <div class="mock-git-diff">
-              <div class="mock-git-hunk-head">@@ -42,6 +42,12 @@ export function GitView()</div>
-              <div class="mock-diff-line"> &nbsp; const refresh = useCallback(async () =&gt; {</div>
-              <div class="mock-diff-line"> &nbsp; &nbsp; if (!rootDir) return;</div>
-              <div class="mock-diff-line mock-diff-line--add">+ &nbsp;const [s, b] = await Promise.all([</div>
-              <div class="mock-diff-line mock-diff-line--add">+ &nbsp; &nbsp;window.marko.gitStatus(rootDir),</div>
-              <div class="mock-diff-line mock-diff-line--add mock-diff-line--selected">+ &nbsp; &nbsp;window.marko.gitBranches(rootDir),</div>
-              <div class="mock-diff-line mock-diff-line--add">+ &nbsp;]);</div>
-              <div class="mock-diff-line mock-diff-line--rem">- &nbsp;const s = await window.marko.gitStatus(rootDir);</div>
-              <div class="mock-diff-line"> &nbsp; setStatus(s);</div>
-              <div class="mock-git-hunk-actions">
-                <span class="mock-pill mock-pill--accent">Stage 1 line</span>
-                <span class="mock-pill mock-pill--danger">Discard</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Showcase: AI chat -->
-    <section class="showcase">
-      <div class="showcase-text">
-        <span class="showcase-tag">AI Chat</span>
-        <h2>A chat tab. <em>It's not Cursor.</em></h2>
-        <p>
-          OpenAI, OpenRouter, Anthropic, Ollama, LM Studio — anything OpenAI-compatible. Bring your own key
-          (Keychain-encrypted). Drag a file in for context. The model gets your actual code.
-          Will not write your PR for you. Will help you procrastinate writing it.
-        </p>
-        <ul class="showcase-list">
-          <li>Markdown replies. Copy buttons on every code block. The bare minimum, executed.</li>
-          <li>History sidebar that actually persists — open it tomorrow, it's still there</li>
-          <li>Per-chat system prompt · live token estimate · export to markdown when you inevitably want to keep one</li>
-        </ul>
-      </div>
-      <div class="showcase-mock">
-        <div class="mock mock--chat">
-          <div class="mock-chrome">
-            <span class="md-dot md-dot-red"></span>
-            <span class="md-dot md-dot-yellow"></span>
-            <span class="md-dot md-dot-green"></span>
-            <span class="mock-toolbar">
-              <span class="mock-pill mock-pill--ghost">OpenRouter</span>
-              <span class="mock-pill mock-pill--ghost mock-pill--mono">claude-3.5-sonnet</span>
-              <span class="mock-toolbar-spacer"></span>
-              <span class="mock-pill mock-pill--mono">~1.2kt</span>
-              <span class="mock-pill mock-pill--accent">History</span>
-            </span>
-          </div>
-          <div class="mock-chat-body">
-            <aside class="mock-chat-side">
-              <div class="mock-chat-side-new">+ New chat</div>
-              <div class="mock-chat-side-row mock-chat-side-row--active">
-                <div class="mock-chat-side-title">Refactor GitView's refresh hook</div>
-                <div class="mock-chat-side-meta">2m · 8 msgs</div>
-              </div>
-              <div class="mock-chat-side-row">
-                <div class="mock-chat-side-title">CodeMirror cross-pane sync</div>
-                <div class="mock-chat-side-meta">1h · 12 msgs</div>
-              </div>
-              <div class="mock-chat-side-row">
-                <div class="mock-chat-side-title">Excalidraw bg color follows theme</div>
-                <div class="mock-chat-side-meta">3h · 4 msgs</div>
-              </div>
-              <div class="mock-chat-side-row">
-                <div class="mock-chat-side-title">Why does my useEffect loop?</div>
-                <div class="mock-chat-side-meta">1d · 6 msgs</div>
-              </div>
-            </aside>
-            <div class="mock-chat-main">
-              <div class="mock-chat-msg mock-chat-msg--user">
-                <div class="mock-chat-role">YOU</div>
-                <div class="mock-chat-body-text">Refactor this hook so the two requests run in parallel.</div>
-              </div>
-              <div class="mock-chat-msg mock-chat-msg--assistant">
-                <div class="mock-chat-role">ASSISTANT</div>
-                <div class="mock-chat-body-text">Use <code>Promise.all</code>:</div>
-                <div class="mock-chat-code">
-                  <span class="mock-chat-code-lang">ts</span>
-                  <span class="mock-chat-code-copy">Copy</span>
-                  <pre>const [s, b] = await Promise.all([
-  window.marko.gitStatus(rootDir),
-  window.marko.gitBranches(rootDir),
-]);</pre>
-                </div>
-                <div class="mock-chat-body-text">Both calls fire at once instead of sequentially.</div>
-              </div>
-              <div class="mock-chat-attach">
-                <span class="mock-chip">📎 GitView.tsx</span>
-                <span class="mock-chip">📎 workspace.ts</span>
-                <span class="mock-chip-add">+ File…</span>
-              </div>
-              <div class="mock-chat-input">
-                <span class="mock-chat-input-text">Now memoize the result so re-renders don't refetch…</span>
-                <span class="mock-chat-send">Send</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Showcase: Terminal with AI -->
-    <section class="showcase showcase--reverse">
-      <div class="showcase-text">
-        <span class="showcase-tag">Terminal</span>
-        <h2>A real terminal. Now also <em>haunted</em> by an LLM.</h2>
-        <p>
-          xterm.js + node-pty + your actual <code>$SHELL</code>, with all your aliases and prompts intact.
-          Press <kbd class="inline-kbd">⌘I</kbd>, describe what you want, watch the AI type into your prompt.
-          You hit Enter. Nothing runs without you. We're not monsters.
-        </p>
-        <ul class="showcase-list">
-          <li>Click a file path in output to open it in a side pane at the right line. Magic.</li>
-          <li>⌘F to search scrollback · ⌘K to clear · ⌘-click URLs. Standard issue.</li>
-          <li>The ANSI palette is derived from your theme, so the terminal stops looking like it's from a different app</li>
-        </ul>
-      </div>
-      <div class="showcase-mock">
-        <div class="mock mock--term">
-          <div class="mock-chrome">
-            <span class="md-dot md-dot-red"></span>
-            <span class="md-dot md-dot-yellow"></span>
-            <span class="md-dot md-dot-green"></span>
-            <span class="mock-toolbar">
-              <span class="mock-pill mock-pill--mono mock-pill--ghost">~/projects/marko · zsh</span>
-            </span>
-          </div>
-          <div class="mock-term">
-            <div class="mock-term-line"><span class="mock-term-prompt">~/projects/marko</span> $ npm run dev</div>
-            <div class="mock-term-line mock-term-dim">  vite v8.0.5 dev server running at:</div>
-            <div class="mock-term-line mock-term-dim">  &gt; Local: <span class="mock-term-link">http://localhost:5173</span></div>
-            <div class="mock-term-line mock-term-dim">  &gt; ready in 612 ms</div>
-            <div class="mock-term-line"><span class="mock-term-prompt">~/projects/marko</span> $ <span class="mock-term-link mock-term-link--path">src/components/GitView.tsx:42</span></div>
-            <div class="mock-term-line"><span class="mock-term-prompt">~/projects/marko</span> $ <span class="mock-term-cursor">▍</span></div>
-            <div class="mock-term-ai">
-              <span class="mock-term-ai-icon">✨</span>
-              <span class="mock-term-ai-input">find all .ts files modified in the last week</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Showcase: Find in files -->
-    <section class="showcase">
-      <div class="showcase-text">
-        <span class="showcase-tag">Find in files</span>
-        <h2>It's just <em>ripgrep.</em> With a UI.</h2>
-        <p>
-          <kbd class="inline-kbd">⌘⇧F</kbd>, then a query, glob, and the usual regex/word/case toggles.
-          Results stream in grouped by file. Click a match to open the file at that line.
-          Calling it "novel" would be a stretch. Calling it "fast" would not.
-        </p>
-      </div>
-      <div class="showcase-mock">
-        <div class="mock mock--find">
-          <div class="mock-chrome">
-            <span class="md-dot md-dot-red"></span>
-            <span class="md-dot md-dot-yellow"></span>
-            <span class="md-dot md-dot-green"></span>
-          </div>
-          <div class="mock-find-toolbar">
-            <span class="mock-find-input">workspace.openFileTab</span>
-            <span class="mock-find-glob">*.{ts,tsx}</span>
-            <span class="mock-find-flags">
-              <span class="mock-find-flag">Aa</span>
-              <span class="mock-find-flag">\b</span>
-              <span class="mock-find-flag mock-find-flag--on">.*</span>
-            </span>
-          </div>
-          <div class="mock-find-summary">7 matches in 4 files</div>
-          <div class="mock-find-list">
-            <div class="mock-find-file">▼ src/lib/actions.ts <span class="mock-find-count">3</span></div>
-            <div class="mock-find-match"><span class="mock-find-line">119</span><span class="mock-find-text">    <em>workspace.openFileTab</em>(filePath, dataUrl, title, 'image');</span></div>
-            <div class="mock-find-match"><span class="mock-find-line">128</span><span class="mock-find-text">    <em>workspace.openFileTab</em>(filePath, '', title, 'media');</span></div>
-            <div class="mock-find-match"><span class="mock-find-line">137</span><span class="mock-find-text">    <em>workspace.openFileTab</em>(filePath, c, title, kind);</span></div>
-            <div class="mock-find-file">▼ src/components/PathInput.tsx <span class="mock-find-count">2</span></div>
-            <div class="mock-find-match"><span class="mock-find-line">186</span><span class="mock-find-text">      const open = stat.isDirectory ? () =&gt; <em>workspace.openFileTab</em></span></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Showcase: splits + sessions -->
-    <section class="showcase showcase--reverse">
-      <div class="showcase-text">
-        <span class="showcase-tag">Layout</span>
-        <h2>Splits nested as deep as you'll <em>regret.</em></h2>
-        <p>
-          Split horizontally (<kbd class="inline-kbd">⌘\</kbd>), split vertically (<kbd class="inline-kbd">⌘=</kbd>),
-          recurse until the panes are postage stamps. Tmux-style workspaces give each project its own pane tree
-          and root folder. Everything survives restart — workspaces, panes, tabs, the URL the browser tab was just on.
-          We probably went too far. You'll like it.
-        </p>
-        <ul class="showcase-list">
-          <li>Drag tabs to reorder. Drag them between panes. Drag them into the chat as context. Just drag everything.</li>
-          <li>"Now Playing" pill in the titlebar finds audio/video from any tab in any workspace, so you can pause it</li>
-          <li>Same file open in two panes? Edits appear in both. We didn't have to. We did anyway.</li>
-        </ul>
-      </div>
-      <div class="showcase-mock">
-        <div class="mock mock--layout">
-          <div class="mock-chrome">
-            <span class="md-dot md-dot-red"></span>
-            <span class="md-dot md-dot-yellow"></span>
-            <span class="md-dot md-dot-green"></span>
-            <span class="mock-toolbar">
-              <span class="mock-now-playing">▮▮▮ chill-beats.mp3</span>
-            </span>
-          </div>
-          <div class="mock-session-strip">
-            <span class="mock-session mock-session--active">Workspace 1</span>
-            <span class="mock-session">Workspace 2</span>
-            <span class="mock-session">Notes</span>
-          </div>
-          <div class="mock-layout">
-            <div class="mock-layout-pane">
-              <div class="mock-pane-tab">📁 src/components</div>
-              <div class="mock-pane-content mock-pane-content--folder">
-                <div class="mock-folder-grid">
-                  <div class="mock-folder-item">📄<br/>App.tsx</div>
-                  <div class="mock-folder-item">📄<br/>ChatView</div>
-                  <div class="mock-folder-item">📄<br/>GitView</div>
-                  <div class="mock-folder-item">📄<br/>Terminal</div>
-                </div>
-              </div>
-            </div>
-            <div class="mock-layout-split"></div>
-            <div class="mock-layout-pane">
-              <div class="mock-layout-pane-row">
-                <div class="mock-pane-tab">⟨⟩ ChatView.tsx</div>
-                <div class="mock-pane-content mock-pane-content--code">
-                  <div class="mock-code-line"><span class="mock-code-kw">export</span> <span class="mock-code-kw">function</span> <span class="mock-code-fn">ChatView</span>() {</div>
-                  <div class="mock-code-line">  <span class="mock-code-kw">const</span> [messages, setMessages] = <span class="mock-code-fn">useState</span>([]);</div>
-                  <div class="mock-code-line">  <span class="mock-code-kw">return</span> (</div>
-                  <div class="mock-code-line">    <span class="mock-code-tag">&lt;div</span> <span class="mock-code-attr">className</span>=<span class="mock-code-str">"chat-view"</span><span class="mock-code-tag">&gt;</span></div>
-                </div>
-              </div>
-              <div class="mock-layout-split mock-layout-split--horizontal"></div>
-              <div class="mock-layout-pane-row">
-                <div class="mock-pane-tab">▍ zsh</div>
-                <div class="mock-pane-content mock-pane-content--term">
-                  <div class="mock-term-line">$ npm run typecheck</div>
-                  <div class="mock-term-line mock-term-dim">  no errors found</div>
-                  <div class="mock-term-line">$ <span class="mock-term-cursor">▍</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Functionality table -->
-    <section class="kinds-cloud">
-      <header class="section-head">
-        <h2><em>One keystroke.</em> Whichever tab you needed.</h2>
-        <p>Hit <kbd class="inline-kbd">⌘T</kbd>, type a hint, the right tool opens.</p>
-      </header>
-      <div class="kinds-table-wrap">
-        <table class="kinds-table">
-          <thead>
-            <tr>
-              <th>Functionality</th>
-              <th>What you'd usually open</th>
-              <th class="kt-check">Marko</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>Markdown editor</td><td>Typora · Obsidian · Bear</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Code editor</td><td>VS Code · Sublime · Cursor</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Folder browser</td><td>Finder</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Web browser</td><td>Safari · Chrome · Arc</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Terminal</td><td>Terminal · iTerm2 · Warp</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Image viewer</td><td>Preview</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Video / audio player</td><td>QuickTime · VLC</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>PDF viewer</td><td>Preview · Acrobat</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>CSV / TSV viewer</td><td>Numbers · TablePlus</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>JSON viewer</td><td>VS Code · jq</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Diff viewer</td><td>Kaleidoscope · FileMerge</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Process / activity</td><td>Activity Monitor</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Git client</td><td>Tower · GitHub Desktop · Sourcetree</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Find in files</td><td>ripgrep · BBEdit · VS Code search</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>HTTP client</td><td>Postman · Insomnia · Bruno</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Whiteboard</td><td>Excalidraw · Apple Freeform</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>AI chat</td><td>ChatGPT · Claude</td><td class="kt-check"><span>✓</span></td></tr>
-            <tr><td>Focus music</td><td>Spotify · YouTube Music</td><td class="kt-check"><span>✓</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <footer class="footer">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <img src="/icon.png?v=2" alt="" width="20" height="20" />
-          <span>Marko</span>
-        </div>
-        <div class="footer-links">
-          <a href="https://github.com/jinghanx/marko" target="_blank" rel="noopener">GitHub</a>
-          <a href="https://github.com/jinghanx/marko/releases" target="_blank" rel="noopener">Releases</a>
-          <a href="https://github.com/jinghanx/marko/issues" target="_blank" rel="noopener">Issues</a>
-        </div>
-        <div class="footer-meta">MIT · Built with Electron + React</div>
-      </div>
-    </footer>
+    <script>
+      // Pick the right binary for the visitor's chip — Apple Silicon
+      // by default, fall back to the Intel build only when the
+      // userAgentData hints x86_64. We can't detect rarer cases, so
+      // the explicit "Intel build" link below the CTA is always
+      // there as a manual override.
+      (async function () {
+        const btn = document.getElementById('primary-download');
+        const label = document.getElementById('primary-download-label');
+        const alt = document.getElementById('alt-arch-link');
+        if (!btn || !label || !alt) return;
+        let arch = 'arm';
+        try {
+          const ua = navigator.userAgentData;
+          if (ua && ua.getHighEntropyValues) {
+            const v = await ua.getHighEntropyValues(['architecture', 'bitness']);
+            if (v.architecture === 'x86' && v.bitness === '64') arch = 'x64';
+          }
+        } catch {}
+        if (arch === 'x64') {
+          btn.href = btn.dataset.x64Href;
+          label.textContent = 'Download for Intel';
+          alt.href = btn.dataset.arm64Href;
+          alt.textContent = 'Apple Silicon build';
+        }
+      })();
+    </script>
   </body>
 </html>

@@ -31,7 +31,7 @@ export function WelcomeScreen() {
   return (
     <div className="welcome">
       <div className="welcome-inner">
-        <pre className="welcome-logo" aria-label="MARKO">
+        <pre className="welcome-logo" aria-label="MILU">
           {LOGO}
         </pre>
         <div className="welcome-tagline">{TAGLINE}</div>

@@ -2,7 +2,7 @@
  * Color themes inspired by Ghostty's curated theme catalog.
  * Each theme defines the app palette (sidebar, tabs, editor) and a 16-color
  * ANSI palette for the embedded terminal. Pick a light theme + a dark theme;
- * Marko picks between them based on the App Theme setting (system/light/dark).
+ * Milu picks between them based on the App Theme setting (system/light/dark).
  */
 
 export interface Theme {

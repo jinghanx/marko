@@ -70,11 +70,11 @@ function ResultRow({
   let subtitle: string;
   let tag: string;
   if (result.kind === 'command') {
-    // The 'marko' icon kind is launcher-only (no matching TabKind), so
+    // The 'milu' icon kind is launcher-only (no matching TabKind), so
     // it gets a custom branded "M" tile instead of going through
     // TabKindGlyph. Everything else delegates to the shared glyph.
-    if (result.cmd.iconKind === 'marko') {
-      glyph = <span className="launcher-row-marko">M</span>;
+    if (result.cmd.iconKind === 'milu') {
+      glyph = <span className="launcher-row-milu">M</span>;
     } else {
       glyph = (
         <span className={`launcher-row-tabicon launcher-row-tabicon--${result.cmd.iconKind}`}>
@@ -111,7 +111,7 @@ function ResultRow({
       </span>
     );
     title = `Search the web for "${result.query}"`;
-    subtitle = 'opens in a Marko web tab';
+    subtitle = 'opens in a Milu web tab';
     tag = 'Search';
   } else {
     glyph = '🧮';
@@ -141,7 +141,7 @@ function ResultRow({
  *  newly-recorded usage shows up without restart. */
 function readCommandUsage(): Record<string, number> {
   try {
-    const raw = localStorage.getItem('marko:settings');
+    const raw = localStorage.getItem('milu:settings');
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return (parsed?.commandUsage as Record<string, number> | undefined) ?? {};
@@ -159,14 +159,14 @@ export function Launcher() {
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
   // Reset state every time the launcher is shown — and re-fetch apps so a
-  // newly-installed application appears without restarting Marko.
+  // newly-installed application appears without restarting Milu.
   useEffect(() => {
     const refresh = () => {
-      window.marko.listApps().then(setApps).catch(() => {});
+      window.milu.listApps().then(setApps).catch(() => {});
       setCommandUsage(readCommandUsage());
     };
     refresh();
-    const off = window.markoLauncher.onShow(() => {
+    const off = window.miluLauncher.onShow(() => {
       setQuery('');
       setActiveIdx(0);
       refresh();
@@ -190,7 +190,7 @@ export function Launcher() {
     // Commands: prefer keyword startsWith, then label substring.
     // Empty query: bubble recently-used commands to the top so the
     // user's frequent picks (chat / git / terminal) sit where they're
-    // muscle-memory'd. Show Marko stays first regardless — it's the
+    // muscle-memory'd. Show Milu stays first regardless — it's the
     // launcher's home action.
     const cmdMatches = q
       ? LAUNCHER_COMMANDS.filter(
@@ -199,8 +199,8 @@ export function Launcher() {
             c.label.toLowerCase().includes(q),
         )
       : [...LAUNCHER_COMMANDS].sort((a, b) => {
-          if (a.action.type === 'show-marko') return -1;
-          if (b.action.type === 'show-marko') return 1;
+          if (a.action.type === 'show-milu') return -1;
+          if (b.action.type === 'show-milu') return 1;
           const ua = commandUsage[a.keywords[0]] ?? 0;
           const ub = commandUsage[b.keywords[0]] ?? 0;
           return ub - ua;
@@ -252,7 +252,7 @@ export function Launcher() {
   // observed to crash main on certain bundles. Letter avatars below.
 
   const dispatch = useCallback((action: LauncherAction) => {
-    void window.markoLauncher.dispatch(action);
+    void window.miluLauncher.dispatch(action);
   }, []);
 
   const runResult = useCallback(
@@ -267,7 +267,7 @@ export function Launcher() {
         // Calculator: copy the result to clipboard and hide the launcher.
         // Doesn't wake main — purely a launcher-resident feature.
         void navigator.clipboard.writeText(formatCalcResult(r.result));
-        void window.markoLauncher.hide();
+        void window.miluLauncher.hide();
       }
     },
     [dispatch],
@@ -276,7 +276,7 @@ export function Launcher() {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();
-      void window.markoLauncher.hide();
+      void window.miluLauncher.hide();
     } else if (e.key === 'ArrowDown') {
       if (results.length === 0) return;
       e.preventDefault();

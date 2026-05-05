@@ -4,7 +4,7 @@
  *  window's renderer, so no functions or DOM references. */
 
 export type LauncherAction =
-  | { type: 'show-marko' }
+  | { type: 'show-milu' }
   | { type: 'open-terminal' }
   | { type: 'open-chat' }
   | { type: 'open-search' }
@@ -18,6 +18,7 @@ export type LauncherAction =
   | { type: 'open-shortcuts' }
   | { type: 'open-music' }
   | { type: 'open-later' }
+  | { type: 'open-agent'; agentId: string; agentName: string }
   | { type: 'open-folder'; path: string }
   | { type: 'open-home-folder'; sub: string }
   | { type: 'open-app'; appPath: string }
@@ -27,7 +28,7 @@ export type LauncherAction =
  *  command. Defined as a string union here (not imported from
  *  state/workspace) so this module stays decoupled from the renderer. */
 export type LauncherIconKind =
-  | 'marko'
+  | 'milu'
   | 'terminal'
   | 'chat'
   | 'search'
@@ -56,16 +57,16 @@ export interface LauncherCommand {
 }
 
 export const LAUNCHER_COMMANDS: LauncherCommand[] = [
-  // Show Marko itself first — the empty-query default. Pressing Enter
+  // Show Milu itself first — the empty-query default. Pressing Enter
   // immediately brings the main window forward without doing anything
   // else; the dispatch already calls mainWindow.show() for internal
   // actions, so this only needs a no-op renderer handler.
   {
-    keywords: ['marko', 'show', 'window', 'main', 'home', 'app'],
-    label: 'Show Marko',
-    category: 'Marko',
-    iconKind: 'marko',
-    action: { type: 'show-marko' },
+    keywords: ['milu', 'show', 'window', 'main', 'home', 'app'],
+    label: 'Show Milu',
+    category: 'Milu',
+    iconKind: 'milu',
+    action: { type: 'show-milu' },
   },
   {
     keywords: ['terminal', 'term', 'shell', 'tty'],
@@ -80,6 +81,13 @@ export const LAUNCHER_COMMANDS: LauncherCommand[] = [
     category: 'AI',
     iconKind: 'chat',
     action: { type: 'open-chat' },
+  },
+  {
+    keywords: ['agent', 'claude', 'code', 'acp', 'coding'],
+    label: 'Open Claude Code (agent)',
+    category: 'AI',
+    iconKind: 'chat',
+    action: { type: 'open-agent', agentId: 'claude-code', agentName: 'Claude Code' },
   },
   {
     keywords: ['search', 'find', 'grep', 'rg'],
@@ -153,7 +161,7 @@ export const LAUNCHER_COMMANDS: LauncherCommand[] = [
   },
   {
     keywords: ['notes', 'note', 'scratchpad'],
-    label: 'Open Notes (~/.marko/notes.txt)',
+    label: 'Open Notes (~/.milu/notes.txt)',
     category: 'Notes',
     iconKind: 'markdown',
     action: { type: 'open-notes' },

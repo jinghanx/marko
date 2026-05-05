@@ -8,7 +8,7 @@ import type {
   GhPr,
   GhIssue,
   GhRun,
-} from '../types/marko';
+} from '../types/milu';
 import {
   parseUnifiedDiff,
   buildHunkPatch,
@@ -77,7 +77,7 @@ export function GitView() {
   const [tagMenu, setTagMenu] = useState<string | null>(null);
   const [view, setView] = useState<'status' | 'history'>('status');
   const [tags, setTags] = useState<string[]>([]);
-  const [log, setLog] = useState<import('../types/marko').GitLogEntry[]>([]);
+  const [log, setLog] = useState<import('../types/milu').GitLogEntry[]>([]);
   const [logLoading, setLogLoading] = useState(false);
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [commitDiff, setCommitDiff] = useState<string | null>(null);
@@ -116,10 +116,10 @@ export function GitView() {
     }
     try {
       const [s, b, st, tg] = await Promise.all([
-        window.marko.gitStatus(rootDir),
-        window.marko.gitBranches(rootDir),
-        window.marko.gitStashList(rootDir),
-        window.marko.gitTags(rootDir),
+        window.milu.gitStatus(rootDir),
+        window.milu.gitBranches(rootDir),
+        window.milu.gitStashList(rootDir),
+        window.milu.gitTags(rootDir),
       ]);
       setStatus(s);
       if (b.ok && b.data) setBranches(b.data);
@@ -135,7 +135,7 @@ export function GitView() {
     if (!rootDir) return;
     setLogLoading(true);
     try {
-      const r = await window.marko.gitLog(rootDir, { limit: 200 });
+      const r = await window.milu.gitLog(rootDir, { limit: 200 });
       if (r.ok && r.commits) setLog(r.commits);
       else if (r.error) setError(r.error);
     } finally {
@@ -154,7 +154,7 @@ export function GitView() {
       return;
     }
     setCommitDiffLoading(true);
-    window.marko
+    window.milu
       .gitShow(rootDir, selectedCommit)
       .then((r) => {
         if (r.ok) setCommitDiff(r.diff ?? '');
@@ -185,11 +185,11 @@ export function GitView() {
       return;
     }
     let cancelled = false;
-    void window.marko.gitGithubRemote(rootDir).then((r) => {
+    void window.milu.gitGithubRemote(rootDir).then((r) => {
       if (cancelled) return;
       setGithubInfo(r.ok && r.owner && r.repo && r.web ? { owner: r.owner, repo: r.repo, web: r.web } : null);
     });
-    void window.marko.gitChangelogTop(rootDir).then((r) => {
+    void window.milu.gitChangelogTop(rootDir).then((r) => {
       if (cancelled) return;
       setChangelog(r.ok && r.heading && r.filename ? { heading: r.heading, body: r.body ?? '', filename: r.filename } : null);
     });
@@ -200,7 +200,7 @@ export function GitView() {
 
   useEffect(() => {
     let cancelled = false;
-    void window.marko.ghCheck().then((r) => {
+    void window.milu.ghCheck().then((r) => {
       if (cancelled) return;
       setGhStatus({ available: r.available, authed: r.authed });
     });
@@ -221,14 +221,14 @@ export function GitView() {
       return;
     }
     let cancelled = false;
-    void window.marko.ghPrList(rootDir).then((r) => {
+    void window.milu.ghPrList(rootDir).then((r) => {
       if (!cancelled && r.ok) setPrs(r.prs ?? []);
     });
-    void window.marko.ghIssueList(rootDir).then((r) => {
+    void window.milu.ghIssueList(rootDir).then((r) => {
       if (!cancelled && r.ok) setIssues(r.issues ?? []);
     });
     if (currentBranch) {
-      void window.marko.ghRunLatest(rootDir, currentBranch).then((r) => {
+      void window.milu.ghRunLatest(rootDir, currentBranch).then((r) => {
         if (!cancelled && r.ok) setLatestRun(r.run ?? null);
       });
     }
@@ -238,7 +238,7 @@ export function GitView() {
   }, [rootDir, githubInfo, ghStatus?.authed, currentBranch]);
 
   const openExt = useCallback((url: string) => {
-    void window.marko.shellOpenExternal(url);
+    void window.milu.shellOpenExternal(url);
   }, []);
 
   // Load diff when the selected file changes.
@@ -259,14 +259,14 @@ export function GitView() {
     // output for new files, so hunk staging via `git apply --cached` works.
     type DiffResult = { ok: boolean; diff?: string; error?: string };
     const loader: Promise<DiffResult> = selected.isUntracked
-      ? window.marko
+      ? window.milu
           .readFile(`${rootDir}/${selected.path}`)
           .then((content): DiffResult => ({
             ok: true,
             diff: buildUntrackedDiff(selected.path, content),
           }))
           .catch((e: Error): DiffResult => ({ ok: false, error: e.message }))
-      : window.marko.gitDiff(rootDir, selected.path, selected.staged);
+      : window.milu.gitDiff(rootDir, selected.path, selected.staged);
 
     Promise.resolve(loader)
       .then((r) => {
@@ -299,15 +299,15 @@ export function GitView() {
   );
 
   const stage = (paths: string[]) =>
-    rootDir && runAction('stage', () => window.marko.gitStage(rootDir, paths));
+    rootDir && runAction('stage', () => window.milu.gitStage(rootDir, paths));
   const unstage = (paths: string[]) =>
-    rootDir && runAction('unstage', () => window.marko.gitUnstage(rootDir, paths));
+    rootDir && runAction('unstage', () => window.milu.gitUnstage(rootDir, paths));
   const discard = (paths: string[]) => {
     if (!rootDir) return;
     if (!window.confirm(`Discard changes to ${paths.length} file(s)? This can't be undone.`)) {
       return;
     }
-    return runAction('discard', () => window.marko.gitDiscard(rootDir, paths));
+    return runAction('discard', () => window.milu.gitDiscard(rootDir, paths));
   };
 
   /** Untracked files aren't in HEAD, so `git checkout --` can't restore them.
@@ -315,7 +315,7 @@ export function GitView() {
    *  fs IPC. Repo paths are relative; resolve against rootDir for trash. */
   const trashUntracked = async (paths: string[]) => {
     if (!rootDir || paths.length === 0) return;
-    const ok = await window.marko.confirm({
+    const ok = await window.milu.confirm({
       message: `Move ${paths.length} untracked file${paths.length === 1 ? '' : 's'} to Trash?`,
       detail: paths.map((p) => `• ${p}`).join('\n'),
       confirmLabel: 'Move to Trash',
@@ -327,7 +327,7 @@ export function GitView() {
     try {
       for (const p of paths) {
         const abs = `${rootDir}/${p}`;
-        const r = await window.marko.trash(abs);
+        const r = await window.milu.trash(abs);
         if (!r.ok) {
           setError(`trash failed for ${p}: ${r.error}`);
           break;
@@ -346,7 +346,7 @@ export function GitView() {
       setError('Empty commit message');
       return;
     }
-    await runAction('commit', () => window.marko.gitCommit(rootDir, msg));
+    await runAction('commit', () => window.milu.gitCommit(rootDir, msg));
     setCommitMsg('');
   };
 
@@ -371,46 +371,46 @@ export function GitView() {
         : op === 'unstage'
           ? { cached: true, reverse: true }
           : { reverse: true };
-    await runAction(op, () => window.marko.gitApplyPatch(rootDir, patch, opts));
+    await runAction(op, () => window.milu.gitApplyPatch(rootDir, patch, opts));
   };
 
   // Branch / remote / stash actions.
   const checkout = (branch: string) =>
-    rootDir && runAction('checkout', () => window.marko.gitCheckout(rootDir, branch));
+    rootDir && runAction('checkout', () => window.milu.gitCheckout(rootDir, branch));
   const rebase = (target: string) => {
     if (!rootDir) return;
     if (!window.confirm(`Rebase ${branches?.current ?? 'HEAD'} onto ${target}?`)) return;
-    return runAction('rebase', () => window.marko.gitRebase(rootDir, target));
+    return runAction('rebase', () => window.milu.gitRebase(rootDir, target));
   };
   const merge = (target: string) => {
     if (!rootDir) return;
     if (!window.confirm(`Merge ${target} into ${branches?.current ?? 'HEAD'}?`)) return;
-    return runAction('merge', () => window.marko.gitMerge(rootDir, target));
+    return runAction('merge', () => window.milu.gitMerge(rootDir, target));
   };
-  const fetch = () => rootDir && runAction('fetch', () => window.marko.gitFetch(rootDir));
-  const pull = () => rootDir && runAction('pull', () => window.marko.gitPull(rootDir));
-  const push = () => rootDir && runAction('push', () => window.marko.gitPush(rootDir));
+  const fetch = () => rootDir && runAction('fetch', () => window.milu.gitFetch(rootDir));
+  const pull = () => rootDir && runAction('pull', () => window.milu.gitPull(rootDir));
+  const push = () => rootDir && runAction('push', () => window.milu.gitPush(rootDir));
   const stashSave = async () => {
     if (!rootDir) return;
     const msg = window.prompt('Stash message (optional):', '');
     if (msg === null) return;
-    return runAction('stash', () => window.marko.gitStashSave(rootDir, msg));
+    return runAction('stash', () => window.milu.gitStashSave(rootDir, msg));
   };
   const stashApply = (ref: string) =>
-    rootDir && runAction('stash apply', () => window.marko.gitStashApply(rootDir, ref));
+    rootDir && runAction('stash apply', () => window.milu.gitStashApply(rootDir, ref));
   const stashPop = (ref: string) =>
-    rootDir && runAction('stash pop', () => window.marko.gitStashPop(rootDir, ref));
+    rootDir && runAction('stash pop', () => window.milu.gitStashPop(rootDir, ref));
   const stashDrop = (ref: string) => {
     if (!rootDir) return;
     if (!window.confirm(`Drop ${ref}?`)) return;
-    return runAction('stash drop', () => window.marko.gitStashDrop(rootDir, ref));
+    return runAction('stash drop', () => window.milu.gitStashDrop(rootDir, ref));
   };
 
   const stashClearAll = async () => {
     if (!rootDir) return;
     const n = stashes.length;
     if (n === 0) return;
-    const ok = await window.marko.confirm({
+    const ok = await window.milu.confirm({
       message: `Drop all ${n} stash${n === 1 ? '' : 'es'}?`,
       detail:
         stashes.map((s) => `• ${s.message}`).join('\n') + "\n\nThis can't be undone.",
@@ -418,7 +418,7 @@ export function GitView() {
       dangerous: true,
     });
     if (!ok) return;
-    return runAction('stash clear', () => window.marko.gitStashClear(rootDir));
+    return runAction('stash clear', () => window.milu.gitStashClear(rootDir));
   };
 
   /** "Drop other branches" — keeps the current branch plus a small set of
@@ -436,7 +436,7 @@ export function GitView() {
       return;
     }
     const kept = [cur, ...branches.local.filter((b) => PROTECTED_BRANCHES.has(b) && b !== cur)];
-    const ok = await window.marko.confirm({
+    const ok = await window.milu.confirm({
       message: `Force-delete ${targets.length} branch${targets.length === 1 ? '' : 'es'}?`,
       detail:
         'Will delete:\n' +
@@ -452,7 +452,7 @@ export function GitView() {
     setError(null);
     try {
       for (const b of targets) {
-        const r = await window.marko.gitDeleteBranch(rootDir, b);
+        const r = await window.milu.gitDeleteBranch(rootDir, b);
         if (!r.ok) {
           setError(`Failed to delete ${b}: ${r.error}`);
           break;
@@ -467,7 +467,7 @@ export function GitView() {
   const cherryPick = (hash: string) => {
     if (!rootDir) return;
     if (!window.confirm(`Cherry-pick ${hash.slice(0, 7)} onto ${branches?.current ?? 'HEAD'}?`)) return;
-    return runAction('cherry-pick', () => window.marko.gitCherryPick(rootDir, hash)).then(() =>
+    return runAction('cherry-pick', () => window.milu.gitCherryPick(rootDir, hash)).then(() =>
       refreshLog(),
     );
   };
@@ -477,13 +477,13 @@ export function GitView() {
     const name = window.prompt('Tag name:');
     if (!name) return;
     const message = window.prompt('Tag message (empty for lightweight):', '') ?? '';
-    return runAction('tag', () => window.marko.gitCreateTag(rootDir, name, message));
+    return runAction('tag', () => window.milu.gitCreateTag(rootDir, name, message));
   };
 
   const deleteTag = (name: string) => {
     if (!rootDir) return;
     if (!window.confirm(`Delete tag "${name}"?`)) return;
-    return runAction('delete tag', () => window.marko.gitDeleteTag(rootDir, name));
+    return runAction('delete tag', () => window.milu.gitDeleteTag(rootDir, name));
   };
 
   /** Stage / discard / unstage the user-selected lines within a hunk. */
@@ -506,7 +506,7 @@ export function GitView() {
         : op === 'unstage'
           ? { cached: true, reverse: true }
           : { reverse: true };
-    await runAction(`${op} lines`, () => window.marko.gitApplyPatch(rootDir, patch, opts));
+    await runAction(`${op} lines`, () => window.milu.gitApplyPatch(rootDir, patch, opts));
     setHunkSelection(new Map());
   };
 
@@ -695,7 +695,7 @@ export function GitView() {
             setBusy(true);
             setError(null);
             try {
-              const r = await window.marko.gitInit(rootDir);
+              const r = await window.milu.gitInit(rootDir);
               if (!r.ok) {
                 setError(r.error ?? 'Failed to initialize repository');
                 return;
@@ -1236,7 +1236,7 @@ function GitFileContextMenu({
           {rootDir && (
             <button
               className="ctx-menu-item"
-              onClick={wrap(() => void window.marko.revealInFinder(`${rootDir}/${allPaths[0]}`))}
+              onClick={wrap(() => void window.milu.revealInFinder(`${rootDir}/${allPaths[0]}`))}
             >
               Reveal in Finder
             </button>
@@ -1453,7 +1453,7 @@ function DiffWithHunks({
   const fetchLines = useCallback(
     async (start: number, end: number): Promise<{ lines: string[]; total: number } | null> => {
       if (!repoDir || start > end) return null;
-      const r = await window.marko.gitFileLines(repoDir, source, relPath, start, end);
+      const r = await window.milu.gitFileLines(repoDir, source, relPath, start, end);
       if (!r.ok || !r.lines) return null;
       return { lines: r.lines, total: r.total ?? 0 };
     },
@@ -1931,7 +1931,7 @@ function HistoryView({
   diffLoading,
   onCherryPick,
 }: {
-  commits: import('../types/marko').GitLogEntry[];
+  commits: import('../types/milu').GitLogEntry[];
   loading: boolean;
   selectedHash: string | null;
   onSelect: (h: string) => void;

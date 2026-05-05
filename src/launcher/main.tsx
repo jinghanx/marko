@@ -3,14 +3,14 @@ import { createRoot } from 'react-dom/client';
 import { Launcher } from './Launcher';
 import './launcher.css';
 
-/** Read the user's chosen theme from the shared `marko:settings`
+/** Read the user's chosen theme from the shared `milu:settings`
  *  localStorage blob. The main window writes this; the launcher
  *  reads it. 'system' is resolved against matchMedia so the launcher
  *  follows the OS only when the user explicitly opted into that. */
 type ThemeMode = 'system' | 'light' | 'dark';
 function readThemeMode(): ThemeMode {
   try {
-    const raw = localStorage.getItem('marko:settings');
+    const raw = localStorage.getItem('milu:settings');
     if (!raw) return 'system';
     const parsed = JSON.parse(raw) as { theme?: ThemeMode };
     return parsed.theme === 'light' || parsed.theme === 'dark' ? parsed.theme : 'system';
@@ -36,7 +36,7 @@ applyTheme();
 // fire in the originating window, but that's fine; the launcher only
 // listens for changes from main).
 window.addEventListener('storage', (e) => {
-  if (e.key === 'marko:settings') applyTheme();
+  if (e.key === 'milu:settings') applyTheme();
 });
 
 // Also re-apply on system theme change while in 'system' mode.

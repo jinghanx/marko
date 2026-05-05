@@ -9,7 +9,7 @@ import { openFileFromPath, openFolderInEditor, openUrlInTab } from '../lib/actio
 import '@xterm/xterm/css/xterm.css';
 
 const AI_SYSTEM_PROMPT = [
-  'You are a shell command generator running inside Marko, a macOS terminal.',
+  'You are a shell command generator running inside Milu, a macOS terminal.',
   'The user describes what they want in natural language; you reply with ONLY the single shell command that does it.',
   'Strict rules:',
   '- Output exactly one command — no explanation, no markdown, no code fences, no leading "$" or ">".',
@@ -123,7 +123,7 @@ function destroyTerminalSession(tabId: string) {
   try { sess.ptyDataDispose(); } catch { /* ignore */ }
   try { sess.ptyExitDispose(); } catch { /* ignore */ }
   try { sess.term.dispose(); } catch { /* ignore */ }
-  void window.marko.ptyKill(sess.ptyId);
+  void window.milu.ptyKill(sess.ptyId);
   terminalSessions.delete(tabId);
 }
 function getOrCreateTerminalSession(
@@ -152,7 +152,7 @@ function getOrCreateTerminalSession(
 
   const ptyId = `pty-${tabId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const inputDisposable = term.onData((data) => {
-    void window.marko.ptyWrite(ptyId, data);
+    void window.milu.ptyWrite(ptyId, data);
   });
   const sess: TermSession = {
     term,
@@ -166,15 +166,15 @@ function getOrCreateTerminalSession(
     ptyDataDispose: () => {},
     ptyExitDispose: () => {},
   };
-  void window.marko
+  void window.milu
     .ptySpawn(ptyId, { cwd: opts.rootDir ?? undefined, cols: term.cols, rows: term.rows })
     .then((r) => {
       if (!r.ok) {
         term.writeln(`\x1b[31mFailed to start shell: ${r.error}\x1b[0m`);
         return;
       }
-      sess.ptyDataDispose = window.marko.onPtyData(ptyId, (data) => term.write(data));
-      sess.ptyExitDispose = window.marko.onPtyExit(ptyId, () => {
+      sess.ptyDataDispose = window.milu.onPtyData(ptyId, (data) => term.write(data));
+      sess.ptyExitDispose = window.milu.onPtyExit(ptyId, () => {
         term.writeln('\r\n\x1b[2m[shell exited]\x1b[0m');
       });
       // rc files often `cd $HOME` on shell startup, undoing the spawn
@@ -182,7 +182,7 @@ function getOrCreateTerminalSession(
       if (opts.rootDir) {
         const escaped = opts.rootDir.replace(/'/g, `'\\''`);
         setTimeout(() => {
-          void window.marko.ptyWrite(ptyId, ` cd '${escaped}' && clear\r`);
+          void window.milu.ptyWrite(ptyId, ` cd '${escaped}' && clear\r`);
         }, 120);
       }
     });
@@ -331,7 +331,7 @@ export function Terminal({ tabId }: Props) {
               const abs = pathOnly.startsWith('/')
                 ? pathOnly
                 : `${rootDir ?? ''}/${pathOnly}`;
-              void window.marko.stat(abs).then((stat) => {
+              void window.milu.stat(abs).then((stat) => {
                 if (!stat.exists) return;
                 // Files and folders both open as tabs in the side pane so
                 // the terminal stays put. Folder gets a folder-view tab,
@@ -345,7 +345,7 @@ export function Terminal({ tabId }: Props) {
                       // Defer slightly so the editor has time to mount.
                       setTimeout(() => {
                         window.dispatchEvent(
-                          new CustomEvent('marko:goto-line', {
+                          new CustomEvent('milu:goto-line', {
                             detail: { path: abs, line: linePart },
                           }),
                         );
@@ -519,7 +519,7 @@ export function Terminal({ tabId }: Props) {
       if (paths.length === 0) return;
       e.preventDefault();
       const out = paths.map(shellQuote).join(' ') + ' ';
-      void window.marko.ptyWrite(ptyId, out);
+      void window.milu.ptyWrite(ptyId, out);
     };
     host.addEventListener('dragover', onDragOver);
     host.addEventListener('drop', onDrop);
@@ -527,7 +527,7 @@ export function Terminal({ tabId }: Props) {
     const ro = new ResizeObserver(() => {
       try {
         fit.fit();
-        void window.marko.ptyResize(ptyId, term.cols, term.rows);
+        void window.milu.ptyResize(ptyId, term.cols, term.rows);
       } catch {
         // ignore measurement glitches during teardown
       }
@@ -608,7 +608,7 @@ export function Terminal({ tabId }: Props) {
 
   const closeAi = () => {
     if (aiBusy && aiReqRef.current) {
-      void window.marko.aiChatCancel(aiReqRef.current);
+      void window.milu.aiChatCancel(aiReqRef.current);
     }
     setAiOpen(false);
     setAiPrompt('');
@@ -623,11 +623,11 @@ export function Terminal({ tabId }: Props) {
    *  shell commands than typical local models. Falls back to local if no
    *  cloud keys are configured. */
   const pickAiProvider = async (): Promise<{ id: string; model: string } | null> => {
-    const providers = await window.marko.aiProviders();
+    const providers = await window.milu.aiProviders();
     // First pass: cloud providers that have a key.
     for (const p of providers) {
       if (!p.needsKey) continue;
-      const has = await window.marko.aiHasKey(p.id);
+      const has = await window.milu.aiHasKey(p.id);
       if (has) return { id: p.id, model: p.defaultModel };
     }
     // Second pass: any local provider.
@@ -655,10 +655,10 @@ export function Terminal({ tabId }: Props) {
     const reqId = `term-ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     aiReqRef.current = reqId;
     let collected = '';
-    const offChunk = window.marko.onAiChatChunk(reqId, (chunk) => {
+    const offChunk = window.milu.onAiChatChunk(reqId, (chunk) => {
       collected += chunk;
     });
-    const offDone = window.marko.onAiChatDone(reqId, (r) => {
+    const offDone = window.milu.onAiChatDone(reqId, (r) => {
       offChunk();
       offDone();
       aiReqRef.current = null;
@@ -674,12 +674,12 @@ export function Terminal({ tabId }: Props) {
       }
       // Type the command into the PTY (no trailing newline so the user can
       // review and edit before hitting Enter).
-      void window.marko.ptyWrite(ptyId, cmd);
+      void window.milu.ptyWrite(ptyId, cmd);
       setAiOpen(false);
       setAiPrompt('');
       term.focus();
     });
-    const start = await window.marko.aiChatStart(reqId, {
+    const start = await window.milu.aiChatStart(reqId, {
       providerId: provider.id,
       model: provider.model,
       messages: [{ role: 'user', content: prompt }],

@@ -117,21 +117,21 @@ export const DEFAULT_SETTINGS: Settings = {
   launcherHotkey: 'Alt+Space',
 };
 
-const LEGACY_STORAGE_KEY = 'marko:settings';
+const LEGACY_STORAGE_KEY = 'milu:settings';
 
 function load(): Settings {
   try {
-    // Primary: file-backed blob from ~/.marko/settings.json (synchronously
+    // Primary: file-backed blob from ~/.milu/settings.json (synchronously
     // read by preload at boot). Shared across dev and packaged builds.
     let raw =
-      typeof window !== 'undefined' ? window.marko?.initialSettings ?? null : null;
+      typeof window !== 'undefined' ? window.milu?.initialSettings ?? null : null;
     // Fallback: one-time migration from the old localStorage key. After
     // the next save, the file becomes the source of truth and the old
     // key gets cleared.
     if (!raw && typeof localStorage !== 'undefined') {
       raw = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (raw && typeof window !== 'undefined' && window.marko?.settingsWrite) {
-        void window.marko.settingsWrite(raw);
+      if (raw && typeof window !== 'undefined' && window.milu?.settingsWrite) {
+        void window.milu.settingsWrite(raw);
         try {
           localStorage.removeItem(LEGACY_STORAGE_KEY);
         } catch {
@@ -155,11 +155,11 @@ function load(): Settings {
 }
 
 function persist(settings: Settings) {
-  // Write to ~/.marko/settings.json via main. Fire-and-forget — the
+  // Write to ~/.milu/settings.json via main. Fire-and-forget — the
   // tmp+rename in main makes it safe against partial writes.
   try {
-    if (typeof window !== 'undefined' && window.marko?.settingsWrite) {
-      void window.marko.settingsWrite(JSON.stringify(settings));
+    if (typeof window !== 'undefined' && window.milu?.settingsWrite) {
+      void window.milu.settingsWrite(JSON.stringify(settings));
     }
   } catch {
     /* main might not be ready, or non-Electron context */
@@ -169,8 +169,8 @@ function persist(settings: Settings) {
   // snapshot. Guarded by typeof since the launcher window also imports
   // this module but doesn't need to push (main is fed by main window).
   try {
-    if (typeof window !== 'undefined' && window.marko?.trayPushState) {
-      window.marko.trayPushState({
+    if (typeof window !== 'undefined' && window.milu?.trayPushState) {
+      window.milu.trayPushState({
         recentFiles: settings.recentFiles,
         bookmarks: settings.workspaceBookmarks.map((b) => ({ name: b.name, path: b.path })),
       });
@@ -185,10 +185,10 @@ const listeners = new Set<() => void>();
 // Push initial tray state once at boot so the tray menu shows recent
 // files / bookmarks even if the user hasn't changed any settings yet.
 // Wrapped in try because the launcher window also imports this module
-// and may not have the marko bridge.
+// and may not have the milu bridge.
 try {
-  if (typeof window !== 'undefined' && window.marko?.trayPushState) {
-    window.marko.trayPushState({
+  if (typeof window !== 'undefined' && window.milu?.trayPushState) {
+    window.milu.trayPushState({
       recentFiles: state.recentFiles,
       bookmarks: state.workspaceBookmarks.map((b) => ({ name: b.name, path: b.path })),
     });
@@ -236,9 +236,9 @@ watchSystemTheme(() => ({ appTheme: state.theme, editorTheme: state.editorTheme 
  *  so main can override its own default with the persisted value. */
 function pushLauncherHotkey() {
   try {
-    void window.marko.launcherSetHotkey?.(state.launcherHotkey);
+    void window.milu.launcherSetHotkey?.(state.launcherHotkey);
   } catch {
-    // window.marko may not be ready in some early-render edge cases.
+    // window.milu may not be ready in some early-render edge cases.
   }
 }
 pushLauncherHotkey();

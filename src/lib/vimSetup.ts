@@ -25,11 +25,11 @@ export function installVimOverrides() {
     cm.scrollIntoView({ line: newLine, ch: cur.ch });
   };
 
-  Vim.defineAction('markoHalfPageDown', (cm: any) => halfPage(cm, true));
-  Vim.defineAction('markoHalfPageUp', (cm: any) => halfPage(cm, false));
+  Vim.defineAction('miluHalfPageDown', (cm: any) => halfPage(cm, true));
+  Vim.defineAction('miluHalfPageUp', (cm: any) => halfPage(cm, false));
 
   for (const ctx of ['normal', 'visual']) {
-    Vim.mapCommand('<C-d>', 'action', 'markoHalfPageDown', {}, { context: ctx });
-    Vim.mapCommand('<C-u>', 'action', 'markoHalfPageUp', {}, { context: ctx });
+    Vim.mapCommand('<C-d>', 'action', 'miluHalfPageDown', {}, { context: ctx });
+    Vim.mapCommand('<C-u>', 'action', 'miluHalfPageUp', {}, { context: ctx });
   }
 }

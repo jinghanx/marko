@@ -18,7 +18,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Log so it's visible in the dev console too.
     // eslint-disable-next-line no-console
-    console.error('Marko render error:', error, info.componentStack);
+    console.error('Milu render error:', error, info.componentStack);
   }
 
   render() {

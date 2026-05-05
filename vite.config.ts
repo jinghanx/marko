@@ -36,6 +36,8 @@ export default defineConfig({
                 'electron',
                 'simple-git',
                 'better-sqlite3',
+                '@agentclientprotocol/sdk',
+                'diff',
                 ...builtinModules,
                 ...builtinModules.map((m) => `node:${m}`),
               ],

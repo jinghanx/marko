@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import type { AiProvider, AiChatMessage } from '../types/marko';
+import type { AiProvider, AiChatMessage } from '../types/milu';
 import { workspace, useWorkspace, getActiveSession, getAllLeaves } from '../state/workspace';
-import type { ChatHistoryEntry } from '../types/marko';
+import type { ChatHistoryEntry } from '../types/milu';
 
 interface Props {
   tabId: string;
@@ -11,7 +11,7 @@ interface Props {
 }
 
 interface ChatState {
-  /** Stable id used for the on-disk archive (~/.marko/chats/<id>.json).
+  /** Stable id used for the on-disk archive (~/.milu/chats/<id>.json).
    *  Assigned when the user sends the first message. */
   chatId?: string;
   providerId: string;
@@ -46,7 +46,7 @@ function serializeChat(s: ChatState): string {
   return JSON.stringify(s);
 }
 
-const DEFAULT_SYSTEM = 'You are a helpful coding assistant inside Marko, a desktop editor.';
+const DEFAULT_SYSTEM = 'You are a helpful coding assistant inside Milu, a desktop editor.';
 
 /** Render assistant markdown to safe HTML. We wrap each fenced code block in
  *  a div with a copy button (the click handler is attached via delegation
@@ -71,7 +71,7 @@ function renderMarkdown(text: string): string {
 }
 
 /** Streaming AI chat tab. The conversation lives in `tab.content` as JSON, so
- *  it round-trips through Marko's persistence. Streaming runs in the main
+ *  it round-trips through Milu's persistence. Streaming runs in the main
  *  process — we just subscribe to chunk events here. */
 export function ChatView({ tabId, initialValue }: Props) {
   // Subscribe to live tab.content so cross-pane sync works (same chat tab open
@@ -90,7 +90,7 @@ export function ChatView({ tabId, initialValue }: Props) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   /** Picker shown when the user has multiple open file tabs. */
   const [openTabPicker, setOpenTabPicker] = useState<Array<{ id: string; label: string; path: string }> | null>(null);
-  // History sidebar — list of archived chats from ~/.marko/chats/.
+  // History sidebar — list of archived chats from ~/.milu/chats/.
   const [showHistory, setShowHistory] = useState(true);
   const [history, setHistory] = useState<ChatHistoryEntry[]>([]);
   const [historyFilter, setHistoryFilter] = useState('');
@@ -104,7 +104,7 @@ export function ChatView({ tabId, initialValue }: Props) {
 
   // Load providers once.
   useEffect(() => {
-    void window.marko.aiProviders().then((list) => {
+    void window.milu.aiProviders().then((list) => {
       setProviders(list);
       if (!providerId && list.length > 0) {
         setProviderId(list[0].id);
@@ -123,7 +123,7 @@ export function ChatView({ tabId, initialValue }: Props) {
       setKeyMissing(false);
       return;
     }
-    void window.marko.aiHasKey(providerId).then((has) => setKeyMissing(!has));
+    void window.milu.aiHasKey(providerId).then((has) => setKeyMissing(!has));
   }, [providerId, providers]);
 
   // Persist the conversation back to tab.content whenever it changes locally.
@@ -151,7 +151,7 @@ export function ChatView({ tabId, initialValue }: Props) {
       const preview = (lastUser?.content ?? '').replace(/\s+/g, ' ').slice(0, 120);
       const tabRecord = workspace.getState().tabs.find((t) => t.id === tabId);
       const title = tabRecord?.title ?? 'Chat';
-      void window.marko.chatHistorySave(chatIdRef.current, {
+      void window.milu.chatHistorySave(chatIdRef.current, {
         id: chatIdRef.current,
         title,
         providerId,
@@ -219,7 +219,7 @@ export function ChatView({ tabId, initialValue }: Props) {
   };
 
   const attachOpenFile = async () => {
-    const result = await window.marko.openFileDialog();
+    const result = await window.milu.openFileDialog();
     if (!result) return;
     const name = result.filePath.split('/').pop() ?? 'file';
     addAttachment({
@@ -313,7 +313,7 @@ export function ChatView({ tabId, initialValue }: Props) {
     reqIdRef.current = reqId;
     let assistantContent = '';
 
-    const offChunk = window.marko.onAiChatChunk(reqId, (chunk) => {
+    const offChunk = window.milu.onAiChatChunk(reqId, (chunk) => {
       assistantContent += chunk;
       setMessages((cur) => {
         const copy = [...cur];
@@ -324,7 +324,7 @@ export function ChatView({ tabId, initialValue }: Props) {
         return copy;
       });
     });
-    const offDone = window.marko.onAiChatDone(reqId, (result) => {
+    const offDone = window.milu.onAiChatDone(reqId, (result) => {
       offChunk();
       offDone();
       setStreaming(false);
@@ -340,7 +340,7 @@ export function ChatView({ tabId, initialValue }: Props) {
       }
     });
 
-    const startResult = await window.marko.aiChatStart(reqId, {
+    const startResult = await window.milu.aiChatStart(reqId, {
       providerId,
       model,
       messages: next,
@@ -363,7 +363,7 @@ export function ChatView({ tabId, initialValue }: Props) {
   const cancel = () => {
     const reqId = reqIdRef.current;
     if (!reqId) return;
-    void window.marko.aiChatCancel(reqId);
+    void window.milu.aiChatCancel(reqId);
   };
 
   const reset = () => {
@@ -375,7 +375,7 @@ export function ChatView({ tabId, initialValue }: Props) {
   // Reload sidebar list whenever it's open and the message count changes (so
   // the current chat moves to the top after a turn).
   const loadHistory = async () => {
-    const list = await window.marko.chatHistoryList();
+    const list = await window.milu.chatHistoryList();
     setHistory(list);
   };
   useEffect(() => {
@@ -408,7 +408,7 @@ export function ChatView({ tabId, initialValue }: Props) {
    *  the same archive entry (chatId is restored). */
   const loadArchivedChat = async (entry: ChatHistoryEntry) => {
     if (streaming) cancel();
-    const raw = await window.marko.chatHistoryLoad(entry.id);
+    const raw = await window.milu.chatHistoryLoad(entry.id);
     if (!raw) return;
     try {
       const obj = JSON.parse(raw);
@@ -431,14 +431,14 @@ export function ChatView({ tabId, initialValue }: Props) {
   };
 
   const deleteArchivedChat = async (entry: ChatHistoryEntry) => {
-    const ok = await window.marko.confirm({
+    const ok = await window.milu.confirm({
       message: `Delete chat "${entry.title}"?`,
       detail: 'This removes the archived conversation from disk.',
       confirmLabel: 'Delete',
       dangerous: true,
     });
     if (!ok) return;
-    await window.marko.chatHistoryDelete(entry.id);
+    await window.milu.chatHistoryDelete(entry.id);
     if (chatIdRef.current === entry.id) {
       // We deleted the chat we were just viewing — clear it.
       newChat();
@@ -479,9 +479,9 @@ export function ChatView({ tabId, initialValue }: Props) {
       lines.push(m.content, '');
     }
     const content = lines.join('\n');
-    const filePath = await window.marko.saveAsDialog('chat.md');
+    const filePath = await window.milu.saveAsDialog('chat.md');
     if (!filePath) return;
-    await window.marko.writeFile(filePath, content);
+    await window.milu.writeFile(filePath, content);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -493,12 +493,12 @@ export function ChatView({ tabId, initialValue }: Props) {
   };
 
   /** Accept files dropped from Finder (native) or from the in-app folder
-   *  view (`application/x-marko-files` MIME). Each file becomes an
+   *  view (`application/x-milu-files` MIME). Each file becomes an
    *  attachment chip. */
   const onDragOver = (e: React.DragEvent) => {
     if (
       e.dataTransfer.types.includes('Files') ||
-      e.dataTransfer.types.includes('application/x-marko-files')
+      e.dataTransfer.types.includes('application/x-milu-files')
     ) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
@@ -508,10 +508,10 @@ export function ChatView({ tabId, initialValue }: Props) {
     e.preventDefault();
     const paths: string[] = [];
     // In-app: paths come as a JSON array under our custom MIME.
-    const markoData = e.dataTransfer.getData('application/x-marko-files');
-    if (markoData) {
+    const miluData = e.dataTransfer.getData('application/x-milu-files');
+    if (miluData) {
       try {
-        const arr = JSON.parse(markoData) as string[];
+        const arr = JSON.parse(miluData) as string[];
         if (Array.isArray(arr)) paths.push(...arr);
       } catch {
         // ignore
@@ -524,7 +524,7 @@ export function ChatView({ tabId, initialValue }: Props) {
     }
     for (const p of paths) {
       try {
-        const content = await window.marko.readFile(p);
+        const content = await window.milu.readFile(p);
         const name = p.split('/').pop() ?? p;
         addAttachment({
           id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,

@@ -23,8 +23,12 @@ import { ProcessViewer } from './ProcessViewer';
 import { GitView } from './GitView';
 import { MusicView } from './MusicView';
 import { LaterView } from './LaterView';
+import { AgentView } from './AgentView';
+import { DiffReviewView } from './DiffReviewView';
 import { MarkdownSplitView } from './MarkdownSplitView';
 import { WelcomeScreen } from './WelcomeScreen';
+import { acpReviews } from '../state/acpReviews';
+import { useSyncExternalStore } from 'react';
 
 interface EditorPaneProps {
   paneId: string;
@@ -44,6 +48,14 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
   }, [leaf, allTabs]);
   const activeTabId = leaf?.activeTabId ?? null;
 
+  // Subscribe to the pending-review store once and look each tab up
+  // by its filePath inline. Per-tab `useAcpReview` hooks would
+  // violate the rules-of-hooks for reordered tabs.
+  const reviewMap = useSyncExternalStore(
+    acpReviews.subscribe,
+    () => acpReviews.getState().byPath,
+  );
+
   if (tabs.length === 0) {
     return (
       <div className="editor-pane editor-pane--empty">
@@ -54,13 +66,30 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
 
   return (
     <div className="editor-pane">
-      {tabs.map((tab) => (
+      {tabs.map((tab) => {
+        // If an agent has proposed a write to this tab's file and the
+        // user hasn't decided yet, the editor view is replaced with
+        // the inline diff-review UI. Only kicks in for kinds that map
+        // to a real text file (skip web/terminal/folder/etc.).
+        const review =
+          tab.filePath &&
+          (tab.kind === 'markdown' ||
+            tab.kind === 'code' ||
+            tab.kind === 'json' ||
+            tab.kind === 'csv' ||
+            tab.kind === 'diff')
+            ? reviewMap.get(tab.filePath)
+            : undefined;
+        return (
         <div
           key={tab.id}
           className="editor-host"
           style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
         >
-          {tab.kind === 'markdown' && (
+          {review && tab.filePath && (
+            <DiffReviewView reviewId={review.id} filePath={tab.filePath} />
+          )}
+          {!review && tab.kind === 'markdown' && (
             <>
               <MarkdownModeToggle
                 tabId={tab.id}
@@ -88,7 +117,7 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
               )}
             </>
           )}
-          {tab.kind === 'code' && (
+          {!review && tab.kind === 'code' && (
             <CodeEditor
               tabId={tab.id}
               initialValue={tab.content}
@@ -105,21 +134,21 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
           {tab.kind === 'pdf' && tab.filePath && (
             <PdfViewer filePath={tab.filePath} title={tab.title} />
           )}
-          {tab.kind === 'csv' && (
+          {!review && tab.kind === 'csv' && (
             <CsvViewer
               tabId={tab.id}
               filePath={tab.filePath}
               initialValue={tab.content}
             />
           )}
-          {tab.kind === 'json' && (
+          {!review && tab.kind === 'json' && (
             <JsonViewer
               tabId={tab.id}
               filePath={tab.filePath}
               initialValue={tab.content}
             />
           )}
-          {tab.kind === 'diff' && tab.diffLeft && tab.diffRight && (
+          {!review && tab.kind === 'diff' && tab.diffLeft && tab.diffRight && (
             <DiffViewer leftPath={tab.diffLeft} rightPath={tab.diffRight} />
           )}
           {tab.kind === 'excalidraw' && (
@@ -153,6 +182,9 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
           {tab.kind === 'git' && <GitView />}
           {tab.kind === 'music' && <MusicView tabId={tab.id} initialValue={tab.content} />}
           {tab.kind === 'later' && <LaterView />}
+          {tab.kind === 'agent' && (
+            <AgentView tabId={tab.id} initialValue={tab.content} />
+          )}
           {tab.kind === 'binary' && (
             <div className="binary-hint">
               <div className="binary-icon">⌬</div>
@@ -164,7 +196,8 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

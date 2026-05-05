@@ -5,13 +5,13 @@ interface Props {
   title: string;
 }
 
-/** PDF tab. Streams from disk through the privileged `marko-file://` protocol
+/** PDF tab. Streams from disk through the privileged `milu-file://` protocol
  *  into Chromium's built-in PDF viewer (enabled via `plugins: true` in
  *  webPreferences). No external library — the embed gets the full native
  *  toolbar (zoom, page nav, search, print, download). */
 export function PdfViewer({ filePath, title }: Props) {
   const src = useMemo(
-    () => `marko-file://stream${encodeURI(filePath)}`,
+    () => `milu-file://stream${encodeURI(filePath)}`,
     [filePath],
   );
   return (

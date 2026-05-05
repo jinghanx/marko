@@ -1028,7 +1028,7 @@ button {
 .pathinput-tabicon--clipboard { color: #d97757; }
 .pathinput-tabicon--settings { color: var(--text-muted); }
 .pathinput-tabicon--music { color: #b56eff; }
-.pathinput-marko {
+.pathinput-milu {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1323,7 +1323,7 @@ button {
 /* Active when an element inside the page is in HTML fullscreen.
  * The position-sync loop reads this slot's bounding rect — taking
  * over the whole viewport here makes the webview fill the screen
- * with the video. Highest z-index so any leftover Marko chrome
+ * with the video. Highest z-index so any leftover Milu chrome
  * (titlebar, sidebar, splitters) is covered. */
 .webview-frame-host--fs {
   position: fixed;
@@ -4757,6 +4757,510 @@ button {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+}
+
+/* Inline-diff review (Cursor-style) — shown in place of the regular
+ * editor when an agent has proposed a write the user hasn't decided
+ * on yet. Reuses the .git-diff-line color tokens for the hunk body
+ * so added/removed lines look identical to the git tab. */
+.diff-review {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  overflow: hidden;
+}
+.diff-review--loading {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.diff-review-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.diff-review-counts {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text);
+}
+.diff-review-count--accept { color: #2ea44f; font-weight: 600; }
+.diff-review-count--reject { color: #d1383b; font-weight: 600; }
+.diff-review-count--pending { color: #c97e1f; font-weight: 600; }
+.diff-review-actions {
+  display: flex;
+  gap: 6px;
+}
+.diff-review-btn {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+.diff-review-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.diff-review-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.diff-review-btn--primary {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+.diff-review-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, var(--text));
+}
+.diff-review-error {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  background: color-mix(in srgb, #d1383b 10%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, #d1383b 30%, var(--border));
+  color: #d1383b;
+  font-size: 11.5px;
+}
+.diff-review-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0;
+  font-variant-ligatures: none;
+}
+.diff-review-hunk {
+  border-bottom: 1px solid var(--border);
+}
+/* Decision tint — a thin left border on the hunk so accepted /
+ * rejected hunks read at a glance without changing the diff colors. */
+.diff-review-hunk--accepted {
+  background: color-mix(in srgb, #2ea44f 4%, transparent);
+  box-shadow: inset 3px 0 0 #2ea44f;
+}
+.diff-review-hunk--rejected {
+  background: color-mix(in srgb, #d1383b 4%, transparent);
+  box-shadow: inset 3px 0 0 #d1383b;
+}
+.diff-review-hunk-bar {
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, #2d6cdf 8%, transparent);
+}
+.diff-review-hunk-header {
+  flex: 1 1 auto;
+  /* Override .git-diff-line's default block-level rendering so the
+   * actions sit on the same line as the @@ header. */
+  display: inline-block;
+  padding-left: 14px;
+}
+.diff-review-hunk-actions {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+  flex: 0 0 auto;
+}
+.diff-review-hunk-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid color-mix(in srgb, #d1383b 35%, var(--border));
+  border-radius: 999px;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.diff-review-hunk-btn:hover {
+  background: color-mix(in srgb, #d1383b 14%, transparent);
+  color: #d1383b;
+  border-color: #d1383b;
+}
+.diff-review-hunk-btn--active {
+  background: color-mix(in srgb, #d1383b 18%, transparent);
+  color: #d1383b;
+  border-color: #d1383b;
+}
+.diff-review-hunk-btn--accept {
+  border-color: color-mix(in srgb, #2ea44f 35%, var(--border));
+}
+.diff-review-hunk-btn--accept:hover {
+  background: color-mix(in srgb, #2ea44f 14%, transparent);
+  color: #2ea44f;
+  border-color: #2ea44f;
+}
+.diff-review-hunk-btn--accept.diff-review-hunk-btn--active {
+  background: color-mix(in srgb, #2ea44f 18%, transparent);
+  color: #2ea44f;
+  border-color: #2ea44f;
+}
+
+/* ACP agent tab — chat-style transcript + tool-call rows + cancel-able
+ * prompt bar. Visual language deliberately echoes .chat-view but with
+ * a subtle accent so users know they're talking to an external agent
+ * (Claude Code) rather than to Milu's built-in AI chat. */
+.agent-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  position: relative;
+}
+.agent-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-muted);
+}
+.agent-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.agent-status--ready { color: #2ea44f; }
+.agent-status--prompting { color: #c97e1f; }
+.agent-status--cancelling { color: #c97e1f; }
+.agent-status--errored { color: #d1383b; }
+.agent-status--exited { color: var(--text-muted); }
+.agent-error-inline {
+  font-size: 11px;
+  color: #d1383b;
+  font-family: var(--font-mono);
+  margin-left: 8px;
+  max-width: 60%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Pending-edits strip — Cursor's cross-file review overview. Lives
+ * between the agent toolbar and the transcript so it's the first
+ * thing the user sees when the agent has work waiting on them. */
+.agent-reviews {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-muted));
+  padding: 6px 14px 8px;
+}
+.agent-reviews-label {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.agent-reviews-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.agent-reviews-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+.agent-reviews-row:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  border-color: var(--accent);
+}
+.agent-reviews-file {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.agent-reviews-counts {
+  display: inline-flex;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.agent-reviews-count--accept { color: #2ea44f; }
+.agent-reviews-count--reject { color: #d1383b; }
+.agent-reviews-count--pending { color: #c97e1f; }
+
+.agent-transcript {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agent-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 24px;
+}
+.agent-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.agent-msg-role {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.agent-msg--user .agent-msg-role { color: var(--accent); }
+.agent-msg-text {
+  white-space: pre-wrap;
+  color: var(--text);
+}
+.agent-msg-md {
+  color: var(--text);
+}
+.agent-msg-md p { margin: 0 0 8px; }
+.agent-msg-md p:last-child { margin-bottom: 0; }
+.agent-msg-md pre {
+  margin: 6px 0;
+  padding: 10px 12px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.agent-msg-md code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.agent-msg-md pre code { background: transparent; padding: 0; }
+.agent-msg--system {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.agent-msg--error {
+  color: #d1383b;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.agent-tool {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border-left: 2px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+.agent-tool--in_progress { border-left-color: #c97e1f; }
+.agent-tool--completed { border-left-color: #2ea44f; }
+.agent-tool--failed { border-left-color: #d1383b; }
+.agent-tool--cancelled { border-left-color: var(--text-muted); }
+.agent-tool-status { width: 14px; text-align: center; color: var(--text-muted); }
+.agent-tool--completed .agent-tool-status { color: #2ea44f; }
+.agent-tool--failed .agent-tool-status { color: #d1383b; }
+.agent-tool--in_progress .agent-tool-status { color: #c97e1f; }
+.agent-tool-title { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-tool-kind { color: var(--text-muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+.agent-tool-loc { color: var(--text-muted); font-size: 11px; }
+
+.agent-input {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-muted);
+}
+/* Wrapper hosts the textarea + a hidden text-measurement mirror +
+ * the custom-rendered glide caret. Position relative so absolute
+ * children land in the textarea's coordinate space. */
+.agent-textarea-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+.agent-textarea {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  /* Hide the native caret — the visible one is .agent-caret, lerped
+   * by useGlideCaretArea each frame. */
+  caret-color: transparent;
+}
+.agent-textarea:focus {
+  border-color: var(--accent);
+}
+.agent-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Hidden block-level mirror: same typography + content-box width as
+ * the textarea so soft-wrap positions match. visibility: hidden
+ * preserves layout for measurement; position: absolute keeps it from
+ * affecting the visible layout. JS writes font / size / padding /
+ * borders / width each measurement so the mirror tracks the live
+ * computed style (incl. font-size changes from settings). */
+.agent-textarea-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+/* Glide caret — positioned relative to the textarea's border-box.
+ * useGlideCaretArea writes transform: translate(x, y) each frame.
+ * Hidden when the textarea isn't focused, mirroring how Milu's
+ * other glide carets behave. */
+.agent-caret {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 1.5em;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: none;
+  will-change: transform;
+  transform: translate(0, 0);
+  opacity: 0;
+  transition: opacity 80ms ease;
+}
+.agent-textarea-wrap:focus-within .agent-caret {
+  opacity: 1;
+}
+.agent-caret.glide-caret--idle {
+  animation: agent-caret-blink 1.05s steps(2, jump-none) infinite;
+}
+@keyframes agent-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+.agent-btn {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+}
+.agent-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.agent-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.agent-btn--primary {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+.agent-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, var(--text));
+}
+.agent-btn--secondary {
+  background: transparent;
+}
+
+/* Permission overlay — modal style, blocks the transcript while the
+ * user decides. Keyboard: Escape (clicking the backdrop) sends a
+ * cancelled outcome, which the agent treats the same as a reject. */
+.agent-permission-overlay {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, #000 40%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.agent-permission-modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  width: min(440px, calc(100% - 32px));
+  box-shadow: 0 12px 36px color-mix(in srgb, var(--text) 28%, transparent);
+}
+.agent-permission-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.agent-permission-tool {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.agent-permission-kind {
+  margin-left: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.agent-permission-locations {
+  margin: 6px 0 12px;
+  padding: 8px 12px;
+  list-style: none;
+  background: var(--bg-muted);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.agent-permission-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.agent-error {
+  padding: 24px;
+  color: #d1383b;
+  font-family: var(--font-mono);
 }
 .chat-toolbar {
   flex: 0 0 auto;

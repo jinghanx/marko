@@ -3,7 +3,7 @@ import { openFileFromPath } from '../lib/actions';
 import { detectKind } from '../lib/fileType';
 import { workspace } from '../state/workspace';
 import { fileClipboard } from '../lib/fileClipboard';
-import type { DirEntry } from '../types/marko';
+import type { DirEntry } from '../types/milu';
 import {
   settings,
   useSettings,
@@ -40,7 +40,7 @@ interface ItemProps {
 
 /** Custom MIME used for in-app drags. We piggyback `text/plain` for compat
  *  with native drop targets (Finder, terminals) but only consume our own. */
-const MARKO_FILES_MIME = 'application/x-marko-files';
+const MILU_FILES_MIME = 'application/x-milu-files';
 
 const PREVIEWABLE_IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']);
 
@@ -64,7 +64,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
     let cancelled = false;
     setEntries(null);
     setError(null);
-    window.marko
+    window.milu
       .listDir(currentPath)
       .then((list) => {
         if (!cancelled) setEntries(list);
@@ -186,7 +186,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
 
   const refreshCurrent = async () => {
     try {
-      const list = await window.marko.listDir(currentPath);
+      const list = await window.milu.listDir(currentPath);
       setEntries(list);
     } catch {
       // ignore
@@ -208,7 +208,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
     const newName = window.prompt('New name:', entry.name);
     if (!newName || newName === entry.name) return;
     const newPath = `${dir}/${newName}`;
-    void window.marko.rename(entry.path, newPath).then((r) => {
+    void window.milu.rename(entry.path, newPath).then((r) => {
       if (r.ok) void refreshCurrent();
       else window.alert(r.error ?? 'rename failed');
     });
@@ -216,7 +216,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
 
   const doTrash = (entry: DirEntry) => {
     if (!window.confirm(`Move "${entry.name}" to Trash?`)) return;
-    void window.marko.trash(entry.path).then((r) => {
+    void window.milu.trash(entry.path).then((r) => {
       if (r.ok) void refreshCurrent();
       else window.alert(r.error ?? 'trash failed');
     });
@@ -225,7 +225,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
   /** "Compare With…" — picks a second file via the open dialog and opens
    *  a diff tab against the chosen entry. */
   const doCompare = async (entry: DirEntry) => {
-    const result = await window.marko.openFileDialog();
+    const result = await window.milu.openFileDialog();
     if (!result) return;
     if (result.filePath === entry.path) return;
     workspace.openDiffTab(entry.path, result.filePath);
@@ -235,7 +235,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
     const name = window.prompt('New folder name:', 'New Folder');
     if (!name) return;
     const dest = await uniqueDest(currentPath, name);
-    const r = await window.marko.createDir(dest);
+    const r = await window.milu.createDir(dest);
     if (!r.ok) {
       window.alert(r.error ?? 'create folder failed');
       return;
@@ -254,8 +254,8 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
       // Don't drop a folder into itself or a descendant.
       if (destDir === src || destDir.startsWith(src + '/')) continue;
       const r = copy
-        ? await window.marko.copy(src, dest)
-        : await window.marko.rename(src, dest);
+        ? await window.milu.copy(src, dest)
+        : await window.milu.rename(src, dest);
       if (!r.ok) {
         window.alert(`${copy ? 'copy' : 'move'} failed: ${r.error}`);
         break;
@@ -277,7 +277,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
     }
     dragPayloadRef.current = paths;
     try {
-      e.dataTransfer.setData(MARKO_FILES_MIME, JSON.stringify(paths));
+      e.dataTransfer.setData(MILU_FILES_MIME, JSON.stringify(paths));
       // Plain text fallback so native targets still see something useful.
       e.dataTransfer.setData('text/plain', paths.join('\n'));
     } catch {
@@ -334,7 +334,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
     const name = window.prompt('New file name:', 'untitled.md');
     if (!name) return;
     const dest = await uniqueDest(currentPath, name);
-    const r = await window.marko.createFile(dest);
+    const r = await window.milu.createFile(dest);
     if (!r.ok) {
       window.alert(r.error ?? 'create file failed');
       return;
@@ -476,7 +476,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
     const cur = lastClicked ? flatItems.find((i) => i.path === lastClicked) ?? null : null;
     if (e.key === ' ') {
       e.preventDefault();
-      if (cur) void window.marko.quickLook(cur.path);
+      if (cur) void window.milu.quickLook(cur.path);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (cur) openItem(cur);
@@ -512,7 +512,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
     if (selected.size === 0) return;
     const paths = [...selected];
     for (const p of paths) {
-      const r = await window.marko.trash(p);
+      const r = await window.milu.trash(p);
       if (!r.ok) {
         window.alert(`trash failed: ${r.error}`);
         break;
@@ -533,9 +533,9 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
       if (src === dest || dest.startsWith(src + '/')) continue;
       let result: { ok: boolean; error?: string };
       if (cb.mode === 'cut') {
-        result = await window.marko.rename(src, dest);
+        result = await window.milu.rename(src, dest);
       } else {
-        result = await window.marko.copy(src, dest);
+        result = await window.milu.copy(src, dest);
       }
       if (!result.ok) {
         window.alert(`${cb.mode} failed: ${result.error}`);
@@ -750,8 +750,8 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
           entry={menu.entry}
           onClose={() => setMenu(null)}
           onOpen={() => openItem(menu.entry)}
-          onOpenDefault={() => void window.marko.openDefault(menu.entry.path)}
-          onQuickLook={() => void window.marko.quickLook(menu.entry.path)}
+          onOpenDefault={() => void window.milu.openDefault(menu.entry.path)}
+          onQuickLook={() => void window.milu.quickLook(menu.entry.path)}
           onOpenAsWorkspace={() => workspace.setRootDir(menu.entry.path)}
           onBookmark={() => {
             const cur = settings.get();
@@ -765,7 +765,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
           }}
           onCopyPath={() => void navigator.clipboard.writeText(menu.entry.path)}
           onCopyName={() => void navigator.clipboard.writeText(menu.entry.name)}
-          onReveal={() => void window.marko.revealInFinder(menu.entry.path)}
+          onReveal={() => void window.milu.revealInFinder(menu.entry.path)}
           onRename={() => doRename(menu.entry)}
           onCompare={() => void doCompare(menu.entry)}
           onTrash={() => doTrash(menu.entry)}
@@ -780,7 +780,7 @@ export function FolderView({ folderPath: initialPath, tabId }: Props) {
           onNewFile={() => void doNewFile()}
           onNewFolder={() => void doNewFolder()}
           onPaste={() => void doPaste()}
-          onReveal={() => void window.marko.revealInFinder(currentPath)}
+          onReveal={() => void window.milu.revealInFinder(currentPath)}
           onRefresh={() => void refreshCurrent()}
           onOpenAsWorkspace={() => workspace.setRootDir(currentPath)}
         />
@@ -795,10 +795,10 @@ async function uniqueDest(parent: string, name: string): Promise<string> {
   const stem = dot > 0 ? name.slice(0, dot) : name;
   const ext = dot > 0 ? name.slice(dot) : '';
   let candidate = `${parent}/${name}`;
-  if (!(await window.marko.exists(candidate))) return candidate;
+  if (!(await window.milu.exists(candidate))) return candidate;
   for (let i = 2; i < 1000; i++) {
     candidate = `${parent}/${stem} (${i})${ext}`;
-    if (!(await window.marko.exists(candidate))) return candidate;
+    if (!(await window.milu.exists(candidate))) return candidate;
   }
   return `${parent}/${stem} (copy)${ext}`;
 }
@@ -1363,7 +1363,7 @@ function ImageThumb({ path }: { path: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    window.marko.loadImage(path).then((url) => {
+    window.milu.loadImage(path).then((url) => {
       if (!cancelled) setSrc(url);
     });
     return () => {

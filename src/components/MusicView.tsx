@@ -288,6 +288,22 @@ export function MusicView({ tabId, initialValue }: Props) {
   const [volume, setVolume] = useState(initial.volume ?? 60);
   const [playing, setPlaying] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  // Expanded video mode — the player overlays the whole music tab so
+  // the iframe gets a much bigger canvas. Auto-resets when no track
+  // is loaded so re-opening the tab from idle never lands in a weird
+  // "fullscreen empty player" state. Esc also exits.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    if (!currentTrackId && expanded) setExpanded(false);
+  }, [currentTrackId, expanded]);
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expanded]);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // Web Audio anchor for macOS Now Playing. Chromium only surfaces a
@@ -699,71 +715,69 @@ export function MusicView({ tabId, initialValue }: Props) {
         )}
       </div>
 
-      <div className="music-player">
-        <div className="music-player-track">
-          {/* Live YouTube embed in the player-bar art slot. Regular
-            * <iframe> (not an Electron <webview>) because YouTube
-            * blocks embeds loaded as a top-level navigation. Audio
-            * comes from this iframe; the silent-audio anchor below
-            * is what tells macOS Now Playing to use OUR
-            * MediaSession.metadata. */}
-          <div className="music-player-art-wrap">
-            {currentTrack ? (
-              <iframe
-                ref={iframeRef}
-                key={currentTrack.videoId}
-                className="music-player-art music-player-art--live"
-                src={`https://www.youtube.com/embed/${currentTrack.videoId}?autoplay=1&enablejsapi=1&modestbranding=1&rel=0&playsinline=1`}
-                allow="autoplay; encrypted-media"
-                title="Music player"
-                onLoad={onIframeLoad}
-              />
-            ) : (
-              <div className="music-player-art music-player-art--empty" aria-hidden />
-            )}
-          </div>
-          {currentTrack ? (
-            <div className="music-player-info">
-              <div className="music-player-title" title={currentTrack.title}>
-                {currentTrack.title}
+      <div
+        className={
+          'music-player' +
+          (currentTrack ? '' : ' music-player--idle') +
+          (expanded ? ' music-player--expanded' : '')
+        }
+      >
+        {currentTrack ? (
+          <>
+            <div className="music-player-track">
+              {/* Live YouTube embed in the player-bar art slot. Regular
+                * <iframe> (not an Electron <webview>) because YouTube
+                * blocks embeds loaded as a top-level navigation. Audio
+                * comes from this iframe; the silent-audio anchor below
+                * is what tells macOS Now Playing to use OUR
+                * MediaSession.metadata. */}
+              <div className="music-player-art-wrap">
+                <iframe
+                  ref={iframeRef}
+                  key={currentTrack.videoId}
+                  className="music-player-art music-player-art--live"
+                  src={`https://www.youtube.com/embed/${currentTrack.videoId}?autoplay=1&enablejsapi=1&modestbranding=1&rel=0&playsinline=1`}
+                  allow="autoplay; encrypted-media"
+                  title="Music player"
+                  onLoad={onIframeLoad}
+                />
               </div>
-              <div className="music-player-channel">
-                <span>{currentTrack.channel}</span>
-                {currentTrack.isLive && <span className="music-live music-live--mini">● LIVE</span>}
+              <div className="music-player-info">
+                <div className="music-player-title" title={currentTrack.title}>
+                  {currentTrack.title}
+                </div>
+                <div className="music-player-channel">
+                  <span>{currentTrack.channel}</span>
+                  {currentTrack.isLive && (
+                    <span className="music-live music-live--mini">● LIVE</span>
+                  )}
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="music-player-empty">Pick something from above to start</div>
-          )}
-        </div>
 
-        <div className="music-player-controls">
-          <button
-            className="music-play-btn"
-            onClick={togglePlay}
-            disabled={!currentTrack}
-            aria-label={playing ? 'Pause' : 'Play'}
-            title={playing ? 'Pause' : 'Play'}
-          >
-            {playing ? <PauseGlyph /> : <PlayGlyph />}
-          </button>
-        </div>
+            <div className="music-player-controls">
+              <button
+                className="music-play-btn"
+                onClick={togglePlay}
+                aria-label={playing ? 'Pause' : 'Play'}
+                title={playing ? 'Pause' : 'Play'}
+              >
+                {playing ? <PauseGlyph /> : <PlayGlyph />}
+              </button>
+            </div>
 
-        <div className="music-player-volume">
-          <SpeakerGlyph muted={volume === 0} />
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={volume}
-            onChange={(e) => setVolume(Number(e.target.value))}
-            aria-label="Volume"
-            // Drives the filled portion of the slider track via the
-            // CSS gradient on .music-player-volume input.
-            style={{ '--vol-pct': `${volume}%` } as React.CSSProperties}
-          />
-          <span className="music-player-volume-readout">{volume}</span>
-        </div>
+            <button
+              className="music-player-expand"
+              onClick={() => setExpanded((v) => !v)}
+              aria-label={expanded ? 'Collapse player' : 'Expand player'}
+              title={expanded ? 'Collapse (Esc)' : 'Expand video'}
+            >
+              {expanded ? <CollapseGlyph /> : <ExpandGlyph />}
+            </button>
+          </>
+        ) : (
+          <div className="music-player-empty">Pick something to start</div>
+        )}
       </div>
 
       {addOpen && (
@@ -1004,29 +1018,25 @@ function PauseGlyph() {
   );
 }
 
-function SpeakerGlyph({ muted }: { muted: boolean }) {
+function ExpandGlyph() {
   return (
-    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden fill="none">
-      <path
-        d="M5 9 H8 L13 5 V19 L8 15 H5 Z"
-        fill="currentColor"
-      />
-      {!muted && (
-        <>
-          <path
-            d="M16 9 Q18 12 16 15"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-          <path
-            d="M18.5 7 Q21.5 12 18.5 17"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        </>
-      )}
+    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9 V4 H9" />
+      <path d="M20 9 V4 H15" />
+      <path d="M4 15 V20 H9" />
+      <path d="M20 15 V20 H15" />
     </svg>
   );
 }
+
+function CollapseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 4 V9 H4" />
+      <path d="M15 4 V9 H20" />
+      <path d="M9 20 V15 H4" />
+      <path d="M15 20 V15 H20" />
+    </svg>
+  );
+}
+

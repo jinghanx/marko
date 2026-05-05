@@ -634,6 +634,16 @@ function createWindow() {
     trafficLightPosition: { x: 14, y: 14 },
     backgroundColor: '#ffffff',
     show: false,
+    // OS-level fullscreen of the main window is disabled. Marko's
+    // activation policy flips between regular and accessory based on
+    // window visibility, and macOS treats apps that ever go accessory
+    // as "utility" for Space allocation purposes — fullscreen calls
+    // appear to succeed but the window vanishes (no Space, no return
+    // path). Disabling fullscreen entirely keeps the window present
+    // and predictable. Video fullscreen is handled in-window by the
+    // WebView component (the slot becomes position: fixed; inset: 0
+    // to cover the viewport).
+    fullscreenable: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -643,6 +653,11 @@ function createWindow() {
       // Enable Chromium's built-in PDF viewer so the PdfViewer component can
       // render PDFs in an <embed type="application/pdf">.
       plugins: true,
+      // Don't let Electron auto-fullscreen the BrowserWindow when a
+      // video inside any guest webview enters HTML fullscreen — that
+      // path uses native setFullScreen, which is the disappearance
+      // trigger (see fullscreenable: false comment above).
+      disableHtmlFullscreenWindowResize: true,
       additionalArguments: [settingsArg()],
     },
   });
@@ -764,6 +779,14 @@ app.on('web-contents-created', (_e, contents) => {
   // them at the guest's before-input-event and forward to the main
   // renderer so the menu IPC handler runs as if the keystroke had
   // hit the host window.
+  // Suppress the guest's default context menu — the WebView
+  // component renders its own Marko-aware menu (Open Link in New
+  // Tab, Save Link to Later, Search Selection, etc.) via the
+  // webview tag's `context-menu` event in the renderer.
+  contents.on('context-menu', (event) => {
+    event.preventDefault();
+  });
+
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     const cmd = input.meta || input.control;
@@ -780,6 +803,9 @@ app.on('web-contents-created', (_e, contents) => {
       // layouts/keyboards that don't shift to the parens.
       if (input.key === '9' || input.key === '(') return send('menu:prev-session');
       if (input.key === '0' || input.key === ')') return send('menu:next-session');
+      // ⌘⇧T — reopen the most recently closed Marko tab. Mirrors
+      // browser convention; webview otherwise has no semantics for it.
+      if (input.key === 't' || input.key === 'T') return send('menu:reopen-closed-tab');
     } else {
       // ⌘1-8 and ⌘9 — tab jump shortcuts also get eaten by the guest.
       if (/^[1-8]$/.test(input.key)) return send(`menu:goto-tab-${input.key}`);
@@ -787,6 +813,10 @@ app.on('web-contents-created', (_e, contents) => {
       // ⌘W — close current Marko tab. The webview otherwise has no
       // close-tab semantics, so it's safe to forward.
       if (input.key === 'w' || input.key === 'W') return send('menu:close-tab');
+      // ⌘F — find on page. The webview swallows this otherwise so the
+      // user can never open Marko's find bar once they've clicked
+      // into a page.
+      if (input.key === 'f' || input.key === 'F') return send('menu:find-on-page');
       // ⌘H — hide the app. macOS's standard hide shortcut also gets
       // eaten by the guest, so we need to call app.hide() directly
       // here rather than rely on the menu role accelerator.
@@ -874,8 +904,13 @@ function buildMenu() {
         },
         {
           label: 'Quick Open (Replace)…',
-          accelerator: 'CmdOrCtrl+Shift+P',
+          accelerator: 'CmdOrCtrl+Alt+P',
           click: () => sendToRenderer('menu:quick-open-replace'),
+        },
+        {
+          label: 'Find on Page…',
+          accelerator: 'CmdOrCtrl+F',
+          click: () => sendToRenderer('menu:find-on-page'),
         },
         {
           label: 'Find in Files…',
@@ -889,8 +924,13 @@ function buildMenu() {
         },
         {
           label: 'Go to Path (Replace)…',
-          accelerator: 'CmdOrCtrl+Shift+T',
+          accelerator: 'CmdOrCtrl+Alt+T',
           click: () => sendToRenderer('menu:goto-path-replace'),
+        },
+        {
+          label: 'Reopen Closed Tab',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: () => sendToRenderer('menu:reopen-closed-tab'),
         },
         {
           label: 'New Terminal',
@@ -982,6 +1022,11 @@ function buildMenu() {
           label: 'Cycle Pane Layout',
           accelerator: 'CmdOrCtrl+Shift+Space',
           click: () => sendToRenderer('menu:cycle-layout'),
+        },
+        {
+          label: 'Zoom Pane',
+          accelerator: 'CmdOrCtrl+Shift+Return',
+          click: () => sendToRenderer('menu:toggle-pane-zoom'),
         },
         {
           label: 'Next Pane',
@@ -1342,6 +1387,27 @@ ipcMain.handle('dir:list', async (_e, dirPath: string): Promise<DirEntry[]> => {
 });
 
 ipcMain.handle('path:basename', async (_e, p: string) => path.basename(p));
+
+/** Toggle the main window's fullscreen for HTML5 video. Called from
+ *  the WebView component when a video inside any web tab enters /
+ *  leaves HTML fullscreen. We use `setSimpleFullScreen` instead of
+ *  native `setFullScreen` because native fullscreen allocates a new
+ *  macOS Space, which fails (the window vanishes) when the app's
+ *  activation policy is `accessory` — the state Marko flips to when
+ *  its main window is hidden. Simple fullscreen just stretches the
+ *  window to cover the screen without Space allocation, so it works
+ *  under any activation policy. */
+ipcMain.handle('window:set-fullscreen', async (_e, fullscreen: boolean) => {
+  if (!mainWindow) return { ok: false };
+  try {
+    if (fullscreen) applyRegularActivationPolicy();
+    mainWindow.setSimpleFullScreen(!!fullscreen);
+    if (fullscreen) mainWindow.focus();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+});
 
 /** Fetch the YouTube watch page for a video and pull out title,
  *  channel, description, and live-status flag. The renderer can't do
@@ -2091,6 +2157,308 @@ ipcMain.handle(
   },
 );
 
+// ---------- Git: read a range of lines from the post-image ----------
+// Powers GitHub-style "expand context" buttons in the diff viewer.
+// `source` selects which version of the file to read:
+//   'work'  — current working tree (used when viewing the unstaged diff)
+//   'index' — the staged blob (used when viewing the staged diff)
+//   'HEAD'  — the last committed version (fallback for deleted files)
+// Returns 1-indexed inclusive `[startLine, endLine]` clipped to the
+// file's actual length, plus `total` so the renderer can disable
+// further-expand buttons when there's nothing more to show.
+ipcMain.handle(
+  'git:fileLines',
+  async (
+    _e,
+    repoDir: string,
+    source: 'work' | 'index' | 'HEAD',
+    relPath: string,
+    startLine: number,
+    endLine: number,
+  ): Promise<{ ok: boolean; lines?: string[]; total?: number; error?: string }> => {
+    if (!repoDir || !relPath) return { ok: false, error: 'no repoDir/path' };
+    let content: string;
+    try {
+      if (source === 'work') {
+        content = await fs.readFile(path.join(repoDir, relPath), 'utf8');
+      } else {
+        // `git show :path` → index blob. `git show HEAD:path` → HEAD blob.
+        const ref = source === 'index' ? `:${relPath}` : `HEAD:${relPath}`;
+        content = await git(repoDir).raw(['show', ref]);
+      }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+    const lines = content.split('\n');
+    // Trailing newline produces an empty last element; drop so line
+    // count is accurate.
+    if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+    const total = lines.length;
+    const lo = Math.max(1, startLine);
+    const hi = Math.min(total, endLine);
+    return {
+      ok: true,
+      lines: lo > hi ? [] : lines.slice(lo - 1, hi),
+      total,
+    };
+  },
+);
+
+// ---------- Shell: open external URL ----------
+// Renderer-callable wrapper around shell.openExternal. Restricted to
+// http/https so a stray call can't be turned into a file:// or
+// javascript: hop. Used by the git tab's "Open on GitHub" buttons.
+ipcMain.handle(
+  'shell:openExternal',
+  async (_e, url: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const u = new URL(url);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return { ok: false, error: 'Only http/https URLs are allowed.' };
+      }
+      await shell.openExternal(url);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+// ---------- GitHub remote info ----------
+// Parses `git config --get remote.origin.url` and normalizes ssh URLs
+// (`git@github.com:owner/repo.git`) into https form so the renderer
+// can build deep links. Non-GitHub remotes return ok=false.
+ipcMain.handle(
+  'git:githubRemote',
+  async (
+    _e,
+    repoDir: string,
+  ): Promise<{ ok: boolean; owner?: string; repo?: string; web?: string; error?: string }> => {
+    if (!repoDir) return { ok: false, error: 'no rootDir' };
+    try {
+      const raw = (await git(repoDir).raw(['config', '--get', 'remote.origin.url'])).trim();
+      if (!raw) return { ok: false, error: 'no origin remote' };
+      // Match the three common GitHub URL shapes:
+      //   https://github.com/owner/repo(.git)?
+      //   git@github.com:owner/repo(.git)?
+      //   ssh://git@github.com/owner/repo(.git)?
+      const m =
+        /^(?:https?:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([^/]+)\/([^/]+?)(?:\.git)?\/?$/i.exec(
+          raw,
+        );
+      if (!m) return { ok: false, error: 'not a GitHub remote' };
+      const [, owner, repo] = m;
+      return { ok: true, owner, repo, web: `https://github.com/${owner}/${repo}` };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+);
+
+// ---------- gh CLI bridge ----------
+// All gh wrappers run the binary in repoDir so it picks up the right
+// upstream automatically. They share one runner that resolves to a
+// uniform `{ ok, json?, error?, code? }` shape so renderer code can
+// treat "not installed", "not authed", and "API failure" the same way
+// (degrade gracefully — never crash the git tab).
+function runGh(
+  args: string[],
+  cwd: string,
+): Promise<{ ok: boolean; json?: unknown; error?: string; code?: number }> {
+  return new Promise((resolve) => {
+    const proc = spawn('gh', args, { cwd });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('error', (e) => {
+      // ENOENT here means `gh` isn't installed or isn't on PATH.
+      const enoent = (e as NodeJS.ErrnoException).code === 'ENOENT';
+      resolve({
+        ok: false,
+        error: enoent ? 'gh CLI not installed' : e.message,
+      });
+    });
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        return resolve({
+          ok: false,
+          code: code ?? -1,
+          error: stderr.trim() || `gh exit ${code}`,
+        });
+      }
+      try {
+        resolve({ ok: true, json: stdout.trim() ? JSON.parse(stdout) : null });
+      } catch (parseErr) {
+        resolve({ ok: false, error: (parseErr as Error).message });
+      }
+    });
+  });
+}
+
+/** One-shot capability probe: is `gh` installed and is the user
+ *  authed against github.com? Used to gate UI without forcing the
+ *  expensive PR/issue/CI calls just to discover gh isn't around. */
+ipcMain.handle(
+  'gh:check',
+  async (): Promise<{ available: boolean; authed: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      const proc = spawn('gh', ['auth', 'status', '--hostname', 'github.com']);
+      let stderr = '';
+      proc.stderr.on('data', (d) => (stderr += d.toString()));
+      proc.on('error', (e) => {
+        const enoent = (e as NodeJS.ErrnoException).code === 'ENOENT';
+        resolve({
+          available: !enoent,
+          authed: false,
+          error: enoent ? 'gh CLI not installed' : e.message,
+        });
+      });
+      proc.on('close', (code) => {
+        // gh auth status writes to stderr (status info), exit 0 = authed,
+        // non-zero = not authed. The binary exists either way.
+        resolve({ available: true, authed: code === 0, error: code === 0 ? undefined : stderr.trim() });
+      });
+    });
+  },
+);
+
+interface GhPr {
+  number: number;
+  title: string;
+  state: string;
+  isDraft: boolean;
+  headRefName: string;
+  url: string;
+  author?: { login: string };
+}
+ipcMain.handle(
+  'gh:prList',
+  async (
+    _e,
+    repoDir: string,
+  ): Promise<{ ok: boolean; prs?: GhPr[]; error?: string }> => {
+    if (!repoDir) return { ok: false, error: 'no rootDir' };
+    const r = await runGh(
+      ['pr', 'list', '--json', 'number,title,state,isDraft,headRefName,url,author', '--limit', '30'],
+      repoDir,
+    );
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, prs: (r.json ?? []) as GhPr[] };
+  },
+);
+
+interface GhIssue {
+  number: number;
+  title: string;
+  state: string;
+  url: string;
+  author?: { login: string };
+}
+ipcMain.handle(
+  'gh:issueList',
+  async (
+    _e,
+    repoDir: string,
+  ): Promise<{ ok: boolean; issues?: GhIssue[]; error?: string }> => {
+    if (!repoDir) return { ok: false, error: 'no rootDir' };
+    const r = await runGh(
+      ['issue', 'list', '--json', 'number,title,state,url,author', '--limit', '30'],
+      repoDir,
+    );
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, issues: (r.json ?? []) as GhIssue[] };
+  },
+);
+
+interface GhRun {
+  status: string; // queued | in_progress | completed
+  conclusion: string | null; // success | failure | cancelled | null while running
+  headSha: string;
+  workflowName: string;
+  url: string;
+  createdAt: string;
+}
+/** Latest workflow run on a given branch — drives the inline CI badge.
+ *  Returns the single most-recent run; the renderer maps status into
+ *  ✓ / ✗ / ⊙ glyphs. */
+ipcMain.handle(
+  'gh:runLatest',
+  async (
+    _e,
+    repoDir: string,
+    branch: string,
+  ): Promise<{ ok: boolean; run?: GhRun | null; error?: string }> => {
+    if (!repoDir || !branch) return { ok: false, error: 'no rootDir/branch' };
+    const r = await runGh(
+      [
+        'run',
+        'list',
+        '--branch',
+        branch,
+        '--limit',
+        '1',
+        '--json',
+        'status,conclusion,headSha,workflowName,url,createdAt',
+      ],
+      repoDir,
+    );
+    if (!r.ok) return { ok: false, error: r.error };
+    const arr = (r.json ?? []) as GhRun[];
+    return { ok: true, run: arr[0] ?? null };
+  },
+);
+
+// ---------- CHANGELOG preview ----------
+// Reads CHANGELOG.md (or CHANGELOG / HISTORY.md / etc.) at repoDir
+// root or one level deep (docs/, .github/) and returns the topmost
+// markdown section — everything from the first `## ` heading up to
+// (but not including) the next one. Used by the git tab's release-
+// notes card.
+const CHANGELOG_NAME_RE =
+  /^(CHANGELOG|CHANGES|HISTORY|RELEASES?|RELEASE[_-]?NOTES?|NEWS)(\.(md|markdown|mdown|mkd|txt))?$/i;
+const CHANGELOG_SUBDIRS = ['', 'docs', '.github'];
+
+ipcMain.handle(
+  'git:changelogTop',
+  async (
+    _e,
+    repoDir: string,
+  ): Promise<{ ok: boolean; heading?: string; body?: string; filename?: string; error?: string }> => {
+    if (!repoDir) return { ok: false, error: 'no rootDir' };
+    for (const sub of CHANGELOG_SUBDIRS) {
+      const dir = sub ? path.join(repoDir, sub) : repoDir;
+      let entries: import('node:fs').Dirent[];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      // Case-insensitive match against the broad name set above.
+      const hit = entries.find((e) => e.isFile() && CHANGELOG_NAME_RE.test(e.name));
+      if (!hit) continue;
+      const filename = sub ? `${sub}/${hit.name}` : hit.name;
+      try {
+        const content = await fs.readFile(path.join(dir, hit.name), 'utf8');
+        const lines = content.split('\n');
+        const startIdx = lines.findIndex((l) => /^##\s/.test(l));
+        if (startIdx === -1) {
+          // No `##` headings — return the whole file's first 50 lines.
+          return { ok: true, heading: filename, body: lines.slice(0, 50).join('\n'), filename };
+        }
+        const heading = lines[startIdx].replace(/^##\s+/, '').trim();
+        let endIdx = lines.findIndex((l, i) => i > startIdx && /^##\s/.test(l));
+        if (endIdx === -1) endIdx = lines.length;
+        const body = lines.slice(startIdx + 1, endIdx).join('\n').trim();
+        return { ok: true, heading, body, filename };
+      } catch (err) {
+        return { ok: false, error: (err as Error).message };
+      }
+    }
+    return { ok: false, error: 'no CHANGELOG' };
+  },
+);
+
 ipcMain.handle('file:create', async (_e, filePath: string): Promise<{ ok: boolean; error?: string }> => {
   try {
     await fs.writeFile(filePath, '', { flag: 'wx' });
@@ -2277,11 +2645,15 @@ ipcMain.handle('dir:walk', async (_e, rootDir: string): Promise<string[]> => {
     }
     for (const entry of entries) {
       if (WALK_IGNORE.has(entry.name)) continue;
-      if (entry.name.startsWith('.')) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
+        // Skip dot-directories (.git, .next, .cache that didn't make
+        // the explicit ignore list) — they're typically tooling output.
+        if (entry.name.startsWith('.')) continue;
         stack.push(full);
       } else if (entry.isFile()) {
+        // Hidden files (.env, .gitignore, .eslintrc, etc.) ARE indexed.
+        // Users routinely ⌘P-search for them.
         results.push(full);
         if (results.length >= WALK_FILE_LIMIT) break;
       }

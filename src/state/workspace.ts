@@ -106,7 +106,36 @@ export interface Session {
   sidebarVisible: boolean;
   /** Per-session outline visibility — same model as sidebarVisible. */
   outlineVisible: boolean;
+  /** When set, the renderer shows only this leaf and hides every other
+   *  pane in this session — a temporary "zoom" of the focused pane.
+   *  The pane tree itself is untouched, so toggling off restores the
+   *  exact split layout. Cleared automatically when the leaf no longer
+   *  exists (handled at render time, not on every mutation). */
+  maximizedLeafId: string | null;
+  /** Per-session LIFO stack of recently-closed tabs for ⌘⇧T (reopen).
+   *  Newest first, capped at MAX_CLOSED_TABS. Scoping per-session
+   *  matches user expectation: closing tabs in workspace A and then
+   *  switching to workspace B should NOT let ⌘⇧T resurrect A's tabs
+   *  inside B. Optional for back-compat with old snapshots — read
+   *  through `getClosedTabs()` which substitutes [] when undefined. */
+  closedTabs?: ClosedTab[];
 }
+
+/** Snapshot of a tab captured at close time so it can be reopened
+ *  later (⌘⇧T). Only the fields needed by the standard openers are
+ *  kept — content/dirty/etc. are intentionally dropped. */
+export interface ClosedTab {
+  kind: TabKind;
+  filePath: string | null;
+  title: string;
+  diffLeft?: string;
+  diffRight?: string;
+  viewMode?: 'rendered' | 'raw' | 'split' | 'tree';
+  language?: string;
+  ext?: string;
+}
+
+const MAX_CLOSED_TABS = 20;
 
 interface WorkspaceState {
   tabs: Tab[];
@@ -147,6 +176,8 @@ function makeFreshSession(name = 'Workspace', rootDir: string | null = null): Se
     rootDir,
     sidebarVisible: true,
     outlineVisible: false,
+    maximizedLeafId: null,
+    closedTabs: [],
   };
 }
 
@@ -390,15 +421,64 @@ function patchSession(
   return prev.sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s));
 }
 
-// Garbage-collect tabs that are not referenced by any session's leaves.
-function gcTabs(s: WorkspaceState): Tab[] {
+// Garbage-collect tabs that are not referenced by any session's leaves
+// and report which ones got removed so the caller can attribute them
+// to the right session's closed-tabs stack (per-workspace history).
+function gcTabs(s: WorkspaceState): { tabs: Tab[]; removed: Tab[] } {
   const referenced = new Set<string>();
   for (const session of s.sessions) {
     for (const leaf of getAllLeaves(session.root)) {
       for (const id of leaf.tabIds) referenced.add(id);
     }
   }
-  return s.tabs.filter((t) => referenced.has(t.id));
+  const tabs: Tab[] = [];
+  const removed: Tab[] = [];
+  for (const t of s.tabs) (referenced.has(t.id) ? tabs : removed).push(t);
+  return { tabs, removed };
+}
+
+/** Build a new closed-tabs stack: prepend records derived from `removed`
+ *  to the existing stack, drop nulls, and cap. Used by every close path
+ *  that wants to push into the active session's history. */
+function pushClosed(prevStack: ClosedTab[] | undefined, removed: Tab[]): ClosedTab[] {
+  if (removed.length === 0) return prevStack ?? [];
+  const records: ClosedTab[] = [];
+  for (const t of removed) {
+    const r = toClosedTab(t);
+    if (r) records.push(r);
+  }
+  return [...records.reverse(), ...(prevStack ?? [])].slice(0, MAX_CLOSED_TABS);
+}
+
+/** Convert a Tab into a restoration record, or null if the tab kind
+ *  is too ephemeral to be reopened from a snapshot. Web/folder/file-
+ *  backed tabs all reopen via `openFileFromPath` (or its peers) on the
+ *  filePath alone. */
+function toClosedTab(t: Tab): ClosedTab | null {
+  switch (t.kind) {
+    // Reopening these means starting fresh anyway; no benefit to
+    // pushing them onto the closed stack.
+    case 'terminal':
+    case 'process':
+    case 'search':
+    case 'http':
+    case 'chat':
+      return null;
+  }
+  // Everything else either has a filePath we can re-open (file/folder
+  // tabs, web tabs whose URL is in filePath) or is a singleton view
+  // (settings, shortcuts, clipboard, music, later) the action layer
+  // can recreate from kind alone.
+  return {
+    kind: t.kind,
+    filePath: t.filePath,
+    title: t.title,
+    diffLeft: t.diffLeft,
+    diffRight: t.diffRight,
+    viewMode: t.viewMode,
+    language: t.language,
+    ext: t.ext,
+  };
 }
 
 /** If the focused pane's active tab in the active session is a real-fs
@@ -623,8 +703,12 @@ export const workspace = {
         }
       }
 
-      const sessions = patchActiveSession(prev, { root, focusedLeafId });
-      const tabs = gcTabs({ ...prev, sessions });
+      const intermediate = patchActiveSession(prev, { root, focusedLeafId });
+      const { tabs, removed } = gcTabs({ ...prev, sessions: intermediate });
+      const sessions = patchActiveSession(
+        { ...prev, sessions: intermediate },
+        { closedTabs: pushClosed(active.closedTabs, removed) },
+      );
       return { sessions, tabs };
     });
   },
@@ -666,8 +750,12 @@ export const workspace = {
         }
       }
 
-      const sessions = patchActiveSession(prev, { root, focusedLeafId });
-      const tabs = gcTabs({ ...prev, sessions });
+      const intermediate = patchActiveSession(prev, { root, focusedLeafId });
+      const { tabs, removed } = gcTabs({ ...prev, sessions: intermediate });
+      const sessions = patchActiveSession(
+        { ...prev, sessions: intermediate },
+        { closedTabs: pushClosed(active.closedTabs, removed) },
+      );
       return { sessions, tabs };
     });
   },
@@ -787,9 +875,54 @@ export const workspace = {
       const root = replaceNode(active.root, parentInfo.parent, sibling);
       const focusedLeafId =
         active.focusedLeafId === leafId ? getAllLeaves(sibling)[0].id : active.focusedLeafId;
-      const sessions = patchActiveSession(prev, { root, focusedLeafId });
-      const tabs = gcTabs({ ...prev, sessions });
+      const intermediate = patchActiveSession(prev, { root, focusedLeafId });
+      const { tabs, removed } = gcTabs({ ...prev, sessions: intermediate });
+      const sessions = patchActiveSession(
+        { ...prev, sessions: intermediate },
+        { closedTabs: pushClosed(active.closedTabs, removed) },
+      );
       return { sessions, tabs };
+    });
+  },
+
+  /** Toggle "zoom this pane to full window". When called with no
+   *  argument, targets the focused leaf. Calling it again (with the
+   *  same or any leaf) un-maximizes the session. The pane tree is
+   *  never mutated — only the session-level `maximizedLeafId` flag
+   *  changes — so toggling off restores the exact split layout. */
+  /** Pop the most-recently-closed tab off the closed-tabs stack and
+   *  return it. The action layer (`reopenLastClosedTab`) handles the
+   *  actual re-creation since it already knows how to dispatch by
+   *  TabKind to the right opener (file / folder / url / singleton). */
+  popClosedTab(): ClosedTab | null {
+    let popped: ClosedTab | null = null;
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      const stack = active.closedTabs ?? [];
+      if (stack.length === 0) return prev;
+      popped = stack[0];
+      return {
+        sessions: patchActiveSession(prev, { closedTabs: stack.slice(1) }),
+      };
+    });
+    return popped;
+  },
+
+  toggleMaximizePane(leafId?: string) {
+    setState((prev) => {
+      const active = getActiveSession(prev);
+      const target = leafId ?? active.focusedLeafId;
+      const next = active.maximizedLeafId === target ? null : target;
+      return {
+        sessions: patchActiveSession(prev, {
+          maximizedLeafId: next,
+          // Maximizing implies focusing — otherwise the focused leaf
+          // would be hidden and shortcuts that act on it would feel
+          // disconnected.
+          focusedLeafId: next ?? active.focusedLeafId,
+        }),
+        focusToken: prev.focusToken + 1,
+      };
     });
   },
 
@@ -880,7 +1013,11 @@ export const workspace = {
       const sessions = prev.sessions.filter((s) => s.id !== sessionId);
       const activeSessionId =
         prev.activeSessionId === sessionId ? sessions[0].id : prev.activeSessionId;
-      const tabs = gcTabs({ ...prev, sessions });
+      // Tabs referenced only by the destroyed session get GC'd here.
+      // We deliberately do NOT push them into a surviving session's
+      // closed-tab history — closing a workspace is a "throw it all
+      // away" gesture, not a "move history elsewhere" one.
+      const { tabs } = gcTabs({ ...prev, sessions });
       return { sessions, activeSessionId, tabs };
     });
   },
@@ -1370,6 +1507,12 @@ export async function hydrateFromSnapshot(snapshot: Snapshot): Promise<void> {
       typeof sess.outlineVisible === 'boolean'
         ? sess.outlineVisible
         : (legacyOutline ?? false),
+    // Maximized state is purely transient UI — never persisted, even
+    // if a snapshot happened to carry it. Always start un-maximized.
+    maximizedLeafId: null,
+    // Closed-tabs history is per-session; default to empty for any
+    // pre-migration snapshot that didn't carry it.
+    closedTabs: Array.isArray(sess.closedTabs) ? sess.closedTabs : [],
   }));
 
   // Apply the stub state synchronously so the window paints immediately.

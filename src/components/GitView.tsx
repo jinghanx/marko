@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace, getActiveSession } from '../state/workspace';
 import type {
   GitStatusInfo,
   GitFileEntry,
   GitBranchInfo,
   GitStashEntry,
+  GhPr,
+  GhIssue,
+  GhRun,
 } from '../types/marko';
 import {
   parseUnifiedDiff,
@@ -90,6 +93,20 @@ export function GitView() {
    *  this, otherwise the diff would flash every few seconds. */
   const [diffVersion, setDiffVersion] = useState(0);
 
+  // ---------- GitHub-aware extras (RepoBar parity) ----------
+  // owner/repo + web URL when the origin remote is on github.com.
+  // Used by the "Open on GitHub" actions and to gate the gh CLI calls
+  // (no point asking gh about a non-GitHub repo).
+  const [githubInfo, setGithubInfo] = useState<{ owner: string; repo: string; web: string } | null>(null);
+  // gh CLI capability — null while probing.
+  const [ghStatus, setGhStatus] = useState<{ available: boolean; authed: boolean } | null>(null);
+  const [prs, setPrs] = useState<GhPr[] | null>(null);
+  const [issues, setIssues] = useState<GhIssue[] | null>(null);
+  const [latestRun, setLatestRun] = useState<GhRun | null>(null);
+  const [showGhDetails, setShowGhDetails] = useState(false);
+  const [changelog, setChangelog] = useState<{ heading: string; body: string; filename: string } | null>(null);
+  const [showChangelog, setShowChangelog] = useState(false);
+
   const refresh = useCallback(async () => {
     if (!rootDir) {
       setStatus(null);
@@ -157,6 +174,72 @@ export function GitView() {
     const id = setInterval(refresh, REFRESH_MS);
     return () => clearInterval(id);
   }, [refresh]);
+
+  // GitHub remote + CHANGELOG: probed once per rootDir change. The gh
+  // CLI capability check is a separate useEffect because it doesn't
+  // depend on rootDir (it's machine-wide).
+  useEffect(() => {
+    if (!rootDir) {
+      setGithubInfo(null);
+      setChangelog(null);
+      return;
+    }
+    let cancelled = false;
+    void window.marko.gitGithubRemote(rootDir).then((r) => {
+      if (cancelled) return;
+      setGithubInfo(r.ok && r.owner && r.repo && r.web ? { owner: r.owner, repo: r.repo, web: r.web } : null);
+    });
+    void window.marko.gitChangelogTop(rootDir).then((r) => {
+      if (cancelled) return;
+      setChangelog(r.ok && r.heading && r.filename ? { heading: r.heading, body: r.body ?? '', filename: r.filename } : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [rootDir]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.marko.ghCheck().then((r) => {
+      if (cancelled) return;
+      setGhStatus({ available: r.available, authed: r.authed });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Pull PRs / issues / latest run only when the cheap preconditions
+  // line up (GitHub remote AND gh authed). Branch-scoped run is keyed
+  // off the current branch so it refreshes when the user switches.
+  const currentBranch = status?.branch ?? null;
+  useEffect(() => {
+    if (!rootDir || !githubInfo || !ghStatus?.authed) {
+      setPrs(null);
+      setIssues(null);
+      setLatestRun(null);
+      return;
+    }
+    let cancelled = false;
+    void window.marko.ghPrList(rootDir).then((r) => {
+      if (!cancelled && r.ok) setPrs(r.prs ?? []);
+    });
+    void window.marko.ghIssueList(rootDir).then((r) => {
+      if (!cancelled && r.ok) setIssues(r.issues ?? []);
+    });
+    if (currentBranch) {
+      void window.marko.ghRunLatest(rootDir, currentBranch).then((r) => {
+        if (!cancelled && r.ok) setLatestRun(r.run ?? null);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [rootDir, githubInfo, ghStatus?.authed, currentBranch]);
+
+  const openExt = useCallback((url: string) => {
+    void window.marko.shellOpenExternal(url);
+  }, []);
 
   // Load diff when the selected file changes.
   const lastDiffKey = useRef<string | null>(null);
@@ -632,6 +715,30 @@ export function GitView() {
 
   return (
     <div className="git-view">
+      {githubInfo && (
+        <GitHubCard
+          web={githubInfo.web}
+          owner={githubInfo.owner}
+          repo={githubInfo.repo}
+          branch={currentBranch}
+          ghStatus={ghStatus}
+          prs={prs}
+          issues={issues}
+          run={latestRun}
+          expanded={showGhDetails}
+          onToggle={() => setShowGhDetails((v) => !v)}
+          onOpen={openExt}
+        />
+      )}
+      {changelog && (
+        <ChangelogCard
+          heading={changelog.heading}
+          body={changelog.body}
+          filename={changelog.filename}
+          expanded={showChangelog}
+          onToggle={() => setShowChangelog((v) => !v)}
+        />
+      )}
       <div className="git-toolbar">
         <span className="git-branch">
           <BranchGlyph />
@@ -690,6 +797,15 @@ export function GitView() {
             Tag
           </button>
           {busy && <span className="git-busy">working…</span>}
+          {githubInfo && (
+            <button
+              className="git-btn"
+              onClick={() => openExt(githubInfo.web)}
+              title={`Open ${githubInfo.owner}/${githubInfo.repo} on GitHub`}
+            >
+              Open ↗
+            </button>
+          )}
           <button
             className="git-btn git-btn--icon"
             onClick={() => void refresh()}
@@ -979,6 +1095,9 @@ export function GitView() {
                 text={diff ?? ''}
                 loading={diffLoading}
                 staged={selected.staged}
+                isUntracked={selected.isUntracked}
+                repoDir={rootDir}
+                relPath={selected.path}
                 onApplyHunk={(hunk, parsed, op) => void applyHunk(hunk, parsed, op)}
                 hunkSelection={hunkSelection}
                 onToggleLine={toggleHunkLine}
@@ -1266,10 +1385,27 @@ function FileStatusBadge({
   return <span className={`git-badge ${cls}`}>{ch === ' ' ? '·' : ch}</span>;
 }
 
+/** Per-gap reveal state — how many lines have been loaded from the
+ *  top of the gap (going down) vs the bottom (going up). `total` is
+ *  the post-image file length once discovered (only matters for the
+ *  trailing gap; for inter-hunk gaps the bound comes from the next
+ *  hunk's start). */
+interface GapState {
+  topLines: string[];
+  bottomLines: string[];
+  total: number | null;
+  loadingTop: boolean;
+  loadingBottom: boolean;
+}
+const EXPAND_STEP = 10;
+
 function DiffWithHunks({
   text,
   loading,
   staged,
+  isUntracked,
+  repoDir,
+  relPath,
   onApplyHunk,
   hunkSelection,
   onToggleLine,
@@ -1280,6 +1416,9 @@ function DiffWithHunks({
   text: string;
   loading: boolean;
   staged: boolean;
+  isUntracked: boolean;
+  repoDir: string | null;
+  relPath: string;
   onApplyHunk: (
     hunk: DiffHunk,
     parsed: { fileHeader: string[]; hunks: DiffHunk[] },
@@ -1296,6 +1435,39 @@ function DiffWithHunks({
   onClearSelection: () => void;
 }) {
   const parsed = useMemo(() => parseUnifiedDiff(text), [text]);
+  // Per-gap reveal state. Reset when the file or its diff changes —
+  // a different file's hunk indices have nothing to do with this map.
+  const [gaps, setGaps] = useState<Map<number, GapState>>(new Map());
+  useEffect(() => {
+    setGaps(new Map());
+  }, [text, relPath]);
+
+  // Source for context-line reads: working tree for unstaged, index
+  // for staged. (Untracked files don't have any context to expand into
+  // — the diff already contains every line.)
+  const source: 'work' | 'index' = staged ? 'index' : 'work';
+  const canExpand = !isUntracked && !!repoDir;
+
+  /** Fetch a slice of lines from the chosen source, handling errors
+   *  gracefully (failed expand → leave state unchanged). */
+  const fetchLines = useCallback(
+    async (start: number, end: number): Promise<{ lines: string[]; total: number } | null> => {
+      if (!repoDir || start > end) return null;
+      const r = await window.marko.gitFileLines(repoDir, source, relPath, start, end);
+      if (!r.ok || !r.lines) return null;
+      return { lines: r.lines, total: r.total ?? 0 };
+    },
+    [repoDir, source, relPath],
+  );
+
+  /** Hunk header parser: extracts the post-image (new file) line
+   *  range. `@@ -a,b +c,d @@` → { start: c, count: d }. `d` is
+   *  optional; defaults to 1 when the hunk affects exactly one line. */
+  const newRangeOf = useCallback((header: string): { start: number; count: number } => {
+    const m = /\+(\d+)(?:,(\d+))?/.exec(header);
+    if (!m) return { start: 1, count: 0 };
+    return { start: parseInt(m[1], 10), count: m[2] ? parseInt(m[2], 10) : 1 };
+  }, []);
   /** Anchor for shift-click range selection. Updated on every plain click;
    *  reset when the parent clears the selection (effect below). */
   const [anchor, setAnchor] = useState<{ hunkIdx: number; lineIdx: number } | null>(null);
@@ -1309,6 +1481,130 @@ function DiffWithHunks({
     }
     if (!any) setAnchor(null);
   }, [hunkSelection]);
+
+  /** Gap bounds in post-image (new file) line numbers, indexed by
+   *  gapIdx 0..hunks.length. The leading gap (gi=0) sits before the
+   *  first hunk; the trailing gap (gi=hunks.length) sits after the
+   *  last. For inter-hunk gaps both bounds are known from the headers;
+   *  the trailing gap's `bottom` is null until we discover EOF on the
+   *  first expand click. */
+  const gapBounds = useMemo(() => {
+    if (!parsed) return [] as { top: number; bottom: number | null }[];
+    const out: { top: number; bottom: number | null }[] = [];
+    for (let gi = 0; gi <= parsed.hunks.length; gi++) {
+      const prev = gi === 0 ? null : newRangeOf(parsed.hunks[gi - 1].header);
+      const next = gi === parsed.hunks.length ? null : newRangeOf(parsed.hunks[gi].header);
+      const top = prev ? prev.start + prev.count : 1;
+      const bottom = next ? next.start - 1 : null;
+      out.push({ top, bottom });
+    }
+    return out;
+  }, [parsed, newRangeOf]);
+
+  /** Mutate one gap's state via a producer so hooks-rules-friendly
+   *  React updates flow through a single setter. */
+  const updateGap = useCallback((gi: number, fn: (g: GapState) => GapState) => {
+    setGaps((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(gi) ?? {
+        topLines: [],
+        bottomLines: [],
+        total: null,
+        loadingTop: false,
+        loadingBottom: false,
+      };
+      next.set(gi, fn(cur));
+      return next;
+    });
+  }, []);
+
+  /** Append `count` more lines at the top of gap `gi` (going down). */
+  const expandTop = useCallback(
+    async (gi: number, count: number) => {
+      const bounds = gapBounds[gi];
+      if (!bounds) return;
+      const cur = gaps.get(gi);
+      const topRevealed = cur?.topLines.length ?? 0;
+      const bottomRevealed = cur?.bottomLines.length ?? 0;
+      const total = cur?.total ?? null;
+      const start = bounds.top + topRevealed;
+      // Don't run past the bottom edge of the gap (or the file's EOF
+      // for the trailing gap once total is known).
+      const hardStop =
+        bounds.bottom != null
+          ? bounds.bottom - bottomRevealed
+          : total != null
+            ? total - bottomRevealed
+            : start + count - 1;
+      const end = Math.min(start + count - 1, hardStop);
+      if (start > end) return;
+      updateGap(gi, (g) => ({ ...g, loadingTop: true }));
+      const res = await fetchLines(start, end);
+      updateGap(gi, (g) => ({
+        ...g,
+        loadingTop: false,
+        topLines: [...g.topLines, ...(res?.lines ?? [])],
+        total: res?.total ?? g.total,
+      }));
+    },
+    [gapBounds, gaps, fetchLines, updateGap],
+  );
+
+  /** Prepend `count` more lines at the bottom of gap `gi` (going up).
+   *  Only meaningful when we know where the bottom is — for the
+   *  trailing gap, the user has to click expand-top first to learn
+   *  the file's total length. */
+  const expandBottom = useCallback(
+    async (gi: number, count: number) => {
+      const bounds = gapBounds[gi];
+      if (!bounds) return;
+      const cur = gaps.get(gi);
+      const topRevealed = cur?.topLines.length ?? 0;
+      const bottomRevealed = cur?.bottomLines.length ?? 0;
+      const bottom = bounds.bottom != null ? bounds.bottom : cur?.total;
+      if (bottom == null) return;
+      const end = bottom - bottomRevealed;
+      const start = Math.max(end - count + 1, bounds.top + topRevealed);
+      if (start > end) return;
+      updateGap(gi, (g) => ({ ...g, loadingBottom: true }));
+      const res = await fetchLines(start, end);
+      updateGap(gi, (g) => ({
+        ...g,
+        loadingBottom: false,
+        bottomLines: [...(res?.lines ?? []), ...g.bottomLines],
+        total: res?.total ?? g.total,
+      }));
+    },
+    [gapBounds, gaps, fetchLines, updateGap],
+  );
+
+  /** Reveal everything between the current top and bottom revealed
+   *  edges of gap `gi`. Cheap when the gap is small; when the gap is
+   *  huge (e.g., expanding a big file's tail), the IPC handler caps
+   *  at the file's actual length. */
+  const expandAll = useCallback(
+    async (gi: number) => {
+      const bounds = gapBounds[gi];
+      if (!bounds) return;
+      const cur = gaps.get(gi);
+      const topRevealed = cur?.topLines.length ?? 0;
+      const bottomRevealed = cur?.bottomLines.length ?? 0;
+      const bottom = bounds.bottom != null ? bounds.bottom : cur?.total;
+      if (bottom == null) return;
+      const start = bounds.top + topRevealed;
+      const end = bottom - bottomRevealed;
+      if (start > end) return;
+      updateGap(gi, (g) => ({ ...g, loadingTop: true }));
+      const res = await fetchLines(start, end);
+      updateGap(gi, (g) => ({
+        ...g,
+        loadingTop: false,
+        topLines: [...g.topLines, ...(res?.lines ?? [])],
+        total: res?.total ?? g.total,
+      }));
+    },
+    [gapBounds, gaps, fetchLines, updateGap],
+  );
 
   if (loading) return <div className="git-diff-loading">Loading…</div>;
   if (!text || !parsed) return <div className="git-diff-loading">No changes</div>;
@@ -1357,8 +1653,23 @@ function DiffWithHunks({
       {parsed.hunks.map((hunk, hi) => {
         const selectedLines = hunkSelection.get(hi);
         const hasLineSelection = !!selectedLines && selectedLines.size > 0;
+        const gap = gaps.get(hi);
+        const bounds = gapBounds[hi];
+        const showLeadingGap = canExpand && bounds && (bounds.bottom == null || bounds.bottom >= bounds.top);
         return (
-          <div key={hi} className="git-hunk">
+          <React.Fragment key={hi}>
+            {showLeadingGap && (
+              <DiffGap
+                gi={hi}
+                top={bounds.top}
+                bottom={bounds.bottom}
+                state={gap}
+                onExpandTop={() => void expandTop(hi, EXPAND_STEP)}
+                onExpandBottom={() => void expandBottom(hi, EXPAND_STEP)}
+                onExpandAll={() => void expandAll(hi)}
+              />
+            )}
+            <div className="git-hunk">
             <div className="git-hunk-header-row">
               <span className="git-diff-line git-diff-line--hunk git-hunk-header">
                 {hunk.header}
@@ -1437,9 +1748,109 @@ function DiffWithHunks({
                 </div>
               );
             })}
-          </div>
+            </div>
+          </React.Fragment>
         );
       })}
+      {canExpand && parsed.hunks.length > 0 && gapBounds.length > parsed.hunks.length && (
+        <DiffGap
+          gi={parsed.hunks.length}
+          top={gapBounds[parsed.hunks.length].top}
+          bottom={gapBounds[parsed.hunks.length].bottom}
+          state={gaps.get(parsed.hunks.length)}
+          onExpandTop={() => void expandTop(parsed.hunks.length, EXPAND_STEP)}
+          onExpandBottom={() => void expandBottom(parsed.hunks.length, EXPAND_STEP)}
+          onExpandAll={() => void expandAll(parsed.hunks.length)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** GitHub-style expand-context bar between hunks. Renders as a single
+ *  thin line that mimics the diff's hunk-header styling — same blue
+ *  tint, same monospace, no chunky pill buttons. Three compact icon
+ *  buttons:
+ *    ↑ N   reveal the N lines just after the previous hunk (display
+ *          above the bar)
+ *    ⇕ all reveal everything between the two reveal pointers
+ *    ↓ N   reveal the N lines just before the next hunk (display
+ *          below the bar)
+ *  Suppressed entirely once the gap is fully revealed. */
+function DiffGap({
+  gi,
+  top,
+  bottom,
+  state,
+  onExpandTop,
+  onExpandBottom,
+  onExpandAll,
+}: {
+  gi: number;
+  top: number;
+  bottom: number | null;
+  state: GapState | undefined;
+  onExpandTop: () => void;
+  onExpandBottom: () => void;
+  onExpandAll: () => void;
+}) {
+  const topLines = state?.topLines ?? [];
+  const bottomLines = state?.bottomLines ?? [];
+  const total = state?.total ?? null;
+
+  // Effective bottom — the inter-hunk case knows it from the next
+  // hunk header; the trailing case learns it from the IPC's `total`.
+  const effBottom = bottom ?? total;
+  const fullyRevealed =
+    effBottom != null && top + topLines.length > effBottom - bottomLines.length;
+  const knowsBottom = effBottom != null;
+  const remaining =
+    effBottom != null
+      ? Math.max(0, effBottom - (top + topLines.length) + 1 - bottomLines.length)
+      : null;
+
+  return (
+    <div className="git-diff-gap" data-gap-idx={gi}>
+      {topLines.map((line, i) => (
+        <div key={`top-${i}`} className="git-diff-line git-diff-line--context">
+          {' ' + (line || '')}
+        </div>
+      ))}
+      {!fullyRevealed && (
+        <div className="git-diff-gap-bar">
+          <button
+            className="git-diff-gap-btn"
+            onClick={onExpandTop}
+            disabled={state?.loadingTop || remaining === 0}
+            title="Reveal more lines after the previous hunk"
+            aria-label="Expand up"
+          >
+            ↑ {EXPAND_STEP}
+          </button>
+          <button
+            className="git-diff-gap-btn git-diff-gap-btn--all"
+            onClick={onExpandAll}
+            disabled={!knowsBottom || state?.loadingTop || remaining === 0}
+            title={knowsBottom ? `Reveal all ${remaining} lines` : 'Click ↑ first to discover EOF'}
+          >
+            {knowsBottom && remaining != null ? `Expand all (${remaining})` : 'Expand all'}
+          </button>
+          <button
+            className="git-diff-gap-btn"
+            onClick={onExpandBottom}
+            disabled={!knowsBottom || state?.loadingBottom || remaining === 0}
+            title={knowsBottom ? 'Reveal more lines before the next hunk' : 'Trailing gap — click ↑ first to discover EOF'}
+            aria-label="Expand down"
+          >
+            ↓ {EXPAND_STEP}
+          </button>
+        </div>
+      )}
+      {bottomLines.map((line, i) => (
+        <div key={`bot-${i}`} className="git-diff-line git-diff-line--context">
+          {' ' + (line || '')}
+        </div>
+      ))}
     </div>
   );
 }
@@ -1640,4 +2051,257 @@ function formatRelative(date: Date): string {
   const days = Math.floor(hr / 24);
   if (days < 14) return `${days}d ago`;
   return date.toLocaleDateString();
+}
+
+/** RepoBar-inspired strip below the toolbar — owner/repo, PR/issue
+ *  counts, and CI badge for the current branch. Click any chip to
+ *  open the corresponding GitHub page externally. Expands into a
+ *  short list of PRs + issues so the most common "what's open right
+ *  now?" question is answerable without context-switching. */
+function GitHubCard({
+  web,
+  owner,
+  repo,
+  branch,
+  ghStatus,
+  prs,
+  issues,
+  run,
+  expanded,
+  onToggle,
+  onOpen,
+}: {
+  web: string;
+  owner: string;
+  repo: string;
+  branch: string | null;
+  ghStatus: { available: boolean; authed: boolean } | null;
+  prs: GhPr[] | null;
+  issues: GhIssue[] | null;
+  run: GhRun | null;
+  expanded: boolean;
+  onToggle: () => void;
+  onOpen: (url: string) => void;
+}) {
+  // Open PRs/issues only — gh's default `pr list` already filters
+  // closed, but the JSON includes state for safety. Drafts stay
+  // counted because users still want to see them as "in flight".
+  const openPrs = useMemo(() => prs?.filter((p) => p.state === 'OPEN') ?? null, [prs]);
+  const openIssues = useMemo(() => issues?.filter((i) => i.state === 'OPEN') ?? null, [issues]);
+
+  const ciBadge = ciBadgeFor(run);
+
+  return (
+    <div className="git-gh-card">
+      <button
+        className="git-gh-card-row"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        title={`Toggle ${owner}/${repo} GitHub details`}
+      >
+        <span className="git-section-arrow">{expanded ? '▼' : '▶'}</span>
+        <a
+          className="git-gh-card-slug"
+          href={web}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpen(web);
+          }}
+        >
+          {owner}/{repo}
+        </a>
+        {ghStatus && !ghStatus.available && (
+          <span className="git-gh-card-hint" title="Install: brew install gh">
+            install gh CLI for PRs/issues
+          </span>
+        )}
+        {ghStatus?.available && !ghStatus.authed && (
+          <span className="git-gh-card-hint" title="Run: gh auth login">
+            run `gh auth login` for PRs/issues
+          </span>
+        )}
+        {ghStatus?.authed && (
+          <>
+            <span
+              className="git-gh-card-chip"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpen(`${web}/pulls`);
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              {openPrs == null ? '…' : openPrs.length} PR{openPrs?.length === 1 ? '' : 's'}
+            </span>
+            <span
+              className="git-gh-card-chip"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpen(`${web}/issues`);
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              {openIssues == null ? '…' : openIssues.length} issue
+              {openIssues?.length === 1 ? '' : 's'}
+            </span>
+            {branch && (
+              <span
+                className={`git-gh-card-chip git-gh-card-chip--ci git-gh-card-chip--ci-${ciBadge.kind}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (run?.url) onOpen(run.url);
+                  else onOpen(`${web}/actions?query=branch%3A${encodeURIComponent(branch)}`);
+                }}
+                role="button"
+                tabIndex={0}
+                title={ciBadge.title}
+              >
+                {ciBadge.glyph} {ciBadge.label}
+              </span>
+            )}
+          </>
+        )}
+      </button>
+      {expanded && ghStatus?.authed && (
+        <div className="git-gh-card-body">
+          <GhList
+            label="Open Pull Requests"
+            empty="No open PRs."
+            items={openPrs}
+            onOpen={onOpen}
+            renderItem={(p) => (
+              <span>
+                <span className="git-gh-num">#{p.number}</span> {p.title}
+                <span className="git-gh-meta">
+                  {' '}
+                  · {p.headRefName}
+                  {p.isDraft && ' · draft'}
+                </span>
+              </span>
+            )}
+            urlOf={(p) => p.url}
+          />
+          <GhList
+            label="Open Issues"
+            empty="No open issues."
+            items={openIssues}
+            onOpen={onOpen}
+            renderItem={(i) => (
+              <span>
+                <span className="git-gh-num">#{i.number}</span> {i.title}
+              </span>
+            )}
+            urlOf={(i) => i.url}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GhList<T>({
+  label,
+  empty,
+  items,
+  onOpen,
+  renderItem,
+  urlOf,
+}: {
+  label: string;
+  empty: string;
+  items: T[] | null;
+  onOpen: (url: string) => void;
+  renderItem: (item: T) => React.ReactNode;
+  urlOf: (item: T) => string;
+}) {
+  return (
+    <div className="git-gh-list">
+      <div className="git-gh-list-label">{label}</div>
+      {items == null ? (
+        <div className="git-gh-list-empty">Loading…</div>
+      ) : items.length === 0 ? (
+        <div className="git-gh-list-empty">{empty}</div>
+      ) : (
+        items.slice(0, 8).map((it, idx) => (
+          <button key={idx} className="git-gh-list-row" onClick={() => onOpen(urlOf(it))}>
+            {renderItem(it)}
+          </button>
+        ))
+      )}
+    </div>
+  );
+}
+
+/** Map a workflow run into a small badge. Status precedes conclusion
+ *  because a run can be in_progress with conclusion: null — that's the
+ *  "running" indicator, not a failure. */
+function ciBadgeFor(
+  run: GhRun | null,
+): { kind: 'ok' | 'fail' | 'run' | 'none'; glyph: string; label: string; title: string } {
+  if (!run) return { kind: 'none', glyph: '·', label: 'no CI', title: 'No workflow runs found' };
+  if (run.status !== 'completed') {
+    return {
+      kind: 'run',
+      glyph: '⊙',
+      label: run.status.replace('_', ' '),
+      title: `${run.workflowName} — ${run.status}`,
+    };
+  }
+  if (run.conclusion === 'success') {
+    return { kind: 'ok', glyph: '✓', label: 'CI', title: `${run.workflowName} — success` };
+  }
+  if (run.conclusion === 'failure' || run.conclusion === 'cancelled') {
+    return {
+      kind: 'fail',
+      glyph: '✗',
+      label: run.conclusion ?? 'failed',
+      title: `${run.workflowName} — ${run.conclusion}`,
+    };
+  }
+  return {
+    kind: 'none',
+    glyph: '·',
+    label: run.conclusion ?? '—',
+    title: `${run.workflowName} — ${run.conclusion ?? 'unknown'}`,
+  };
+}
+
+/** Collapsed: heading + filename. Expanded: body in a scrollable
+ *  block. The body is rendered as <pre> to preserve markdown's
+ *  intentional whitespace without pulling in the full Crepe renderer
+ *  for what's usually a short release note. Only rendered when a
+ *  release-notes file actually exists. */
+function ChangelogCard({
+  heading,
+  body,
+  filename,
+  expanded,
+  onToggle,
+}: {
+  heading: string;
+  body: string;
+  filename: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="git-changelog-card">
+      <button
+        className="git-changelog-row"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        title={`From ${filename}`}
+      >
+        <span className="git-section-arrow">{expanded ? '▼' : '▶'}</span>
+        <span className="git-changelog-label">{filename}</span>
+        <span className="git-changelog-heading">{heading}</span>
+      </button>
+      {expanded && body && <pre className="git-changelog-body">{body}</pre>}
+    </div>
+  );
 }

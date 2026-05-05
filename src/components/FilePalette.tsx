@@ -36,12 +36,19 @@ export function FilePalette({ open, replace = false, onClose }: Props) {
     lastWalkedDir.current = null;
   }, [rootDir]);
 
-  // Walk directory the first time the palette opens (or when rootDir changes).
+  // Re-walk every time the palette opens. Files added since the last
+  // open (git pull, terminal mkdir, etc.) need to surface immediately,
+  // and walkDir is fast even on largish projects. The "Indexing…" UI
+  // only shows on the very first walk for this rootDir — subsequent
+  // re-walks display the stale-but-likely-correct cached items while
+  // the fresh list is computed in the background.
   useEffect(() => {
     if (!open || !rootDir) return;
-    if (lastWalkedDir.current === rootDir && items) return;
-    setLoading(true);
-    setItems(null);
+    const isFirstWalk = lastWalkedDir.current !== rootDir;
+    if (isFirstWalk) {
+      setLoading(true);
+      setItems(null);
+    }
     let cancelled = false;
     window.marko
       .walkDir(rootDir)

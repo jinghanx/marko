@@ -6,7 +6,8 @@ type UIEvent =
   | 'open-path'
   | 'open-shortcuts'
   | 'focus-address'
-  | 'reload-page';
+  | 'reload-page'
+  | 'find-on-page';
 
 const listeners = new Map<UIEvent, Set<() => void>>();
 

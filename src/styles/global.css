@@ -204,6 +204,13 @@ button {
   padding: 0 12px 0 100px;
   gap: 8px;
 }
+/* Zoom mode: the titlebar collapses to a bare drag region so only the
+ * traffic lights remain visible. Background blends with the pane below
+ * (no visible bar, just space for the macOS chrome to sit in). */
+.titlebar--zoom {
+  background: transparent;
+  border-bottom: 0;
+}
 
 /* Now-playing pill(s) live in the titlebar's right side. The titlebar is
  *  itself a drag region; we re-enable clicks for the pills. */
@@ -256,15 +263,17 @@ button {
   50% { transform: scaleY(1.05); }
 }
 
-/* Session strip — top-level tab bar for tmux-style sessions. Lives inside
- *  the titlebar (same row as traffic lights + now-playing pill). Styled
- *  with the same bubble language as the file-tab bar. */
+/* Session strip — workspace switcher in the titlebar. Designed to
+ *  feel like a quiet macOS-native control: flat, text-first, with a
+ *  small accent dot marking the active workspace and close × that
+ *  fades in on hover. Sits next to the traffic lights with enough
+ *  breathing room to not feel crowded. */
 .session-strip {
   flex: 1 1 auto;
   display: flex;
   align-items: stretch;
-  gap: 5px;
-  padding: 9px 0 7px;
+  gap: 2px;
+  padding: 8px 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -281,52 +290,49 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px 0 14px;
+  /* No close button by default — when it appears on hover it pushes
+   *  the right padding tighter, so reserve a stable layout via
+   *  padding-right instead of letting width jump. */
+  padding: 4px 10px 4px 11px;
   margin: 0;
-  /* Pill-shaped sessions vs rounded-rectangle file tabs — the shape
-   *  alone signals which row you're acting on, so we don't need
-   *  bubble fills on inactive ones to communicate "tab". Transparent
-   *  inactive + clear active accent matches the file-tab treatment
-   *  but the pill silhouette keeps the two rows distinct. */
-  border-radius: 999px;
-  /* The strip is a drag region; tabs opt out so clicks still register. */
+  border-radius: 7px;
   -webkit-app-region: no-drag;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
   min-width: 0;
-  max-width: 200px;
+  max-width: 220px;
   background: transparent;
-  transition: background 80ms ease-out, color 80ms ease-out;
+  transition: background 120ms ease, color 120ms ease;
+}
+.session-tab::before {
+  /* Tiny dot prefix — visible only on the active workspace. The dot
+   * carries the accent color, so the active state is communicated
+   * without an opinionated bg fill that fights with the titlebar. */
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background 120ms ease, transform 120ms ease;
 }
 .session-tab:hover {
   color: var(--text);
-  /* Sessions have no icon to anchor inactive ones the way file tabs
-   *  do, so the hover fill is a touch more present (8% vs 6%) to
-   *  make the pill silhouette readable on first click attempt. */
-  background: color-mix(in srgb, var(--text) 8%, transparent);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
-/* Active session: solid theme-accent fill on the pill — same color
- *  family as the file-tab top stripe so both bars track the active
- *  color theme together. Pill shape reads cleaner with a uniform
- *  fill than with a top stripe, so we don't mirror the file-tab
- *  gradient here. */
+/* Active workspace: subtle elevated background + accent text +
+ *  accent dot. Reads as "selected" without shouting like a button. */
 .session-tab--active,
 .session-tab--active:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+.session-tab--active::before {
   background: var(--accent);
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent);
-}
-.session-tab--active .session-tab-close {
-  color: rgba(255, 255, 255, 0.7);
-}
-.session-tab--active .session-tab-close:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
 }
 .session-tab-name {
   white-space: nowrap;
@@ -336,10 +342,13 @@ button {
   min-width: 0;
 }
 .session-tab-close {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  font-size: 14px;
+  /* Hidden until the tab is hovered (or active). Keeps the strip
+   *  visually quiet — close is a destructive action you reach for
+   *  intentionally, not something that needs to be ambient. */
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 13px;
   line-height: 1;
   color: var(--text-muted);
   display: inline-flex;
@@ -347,9 +356,15 @@ button {
   justify-content: center;
   border: 0;
   background: transparent;
+  opacity: 0;
+  transition: opacity 100ms ease, background 100ms ease, color 100ms ease;
+}
+.session-tab:hover .session-tab-close,
+.session-tab--active .session-tab-close {
+  opacity: 1;
 }
 .session-tab-close:hover {
-  background: var(--border);
+  background: color-mix(in srgb, var(--text) 14%, transparent);
   color: var(--text);
 }
 .session-tab-rename {
@@ -359,7 +374,7 @@ button {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--accent);
-  border-radius: 5px;
+  border-radius: 4px;
   padding: 1px 6px;
   outline: none;
   min-width: 0;
@@ -368,20 +383,19 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  margin: 0;
-  /* Pill shape to match session tabs. */
-  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  margin: 0 0 0 4px;
+  align-self: center;
+  border-radius: 6px;
   font-size: 14px;
   line-height: 1;
   color: var(--text-subtle, var(--text-muted));
   border: 0;
   cursor: pointer;
   -webkit-app-region: no-drag;
-  /* Ghost button — transparent at rest, subtle fill on hover. Matches
-   *  the demoted bubble treatment of inactive session tabs. */
   background: transparent;
-  transition: background 80ms ease-out, color 80ms ease-out;
+  transition: background 120ms ease, color 120ms ease;
 }
 .session-tab-new:hover {
   color: var(--text);
@@ -817,6 +831,14 @@ button {
 .session-stack--multi .pane--focused .tabbar {
   background: color-mix(in srgb, var(--accent) 14%, var(--tab-bg));
 }
+/* Pane Zoom (⌘⇧↩): the active session's session-stack gets the
+ * --zoom modifier when one of its panes is maximized to full window.
+ * Hide the tab bar so only the tab content shows. Sidebar and outline
+ * are hidden at the App.tsx level (not rendered) so they reclaim
+ * their space; the pane fills the entire viewport horizontally. */
+.session-stack--zoom .tabbar {
+  display: none;
+}
 .pane:not(.pane--focused) .tab--active {
   /* Unfocused panes dim the active-tab accent stripe so attention stays
    *  on the focused pane's active tab. No opacity/saturation tricks on
@@ -1196,6 +1218,7 @@ button {
 
 /* Embedded webview tab */
 .webview-host {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -1297,10 +1320,87 @@ button {
   flex: 1;
   min-height: 0;
 }
+/* Active when an element inside the page is in HTML fullscreen.
+ * The position-sync loop reads this slot's bounding rect — taking
+ * over the whole viewport here makes the webview fill the screen
+ * with the video. Highest z-index so any leftover Marko chrome
+ * (titlebar, sidebar, splitters) is covered. */
+.webview-frame-host--fs {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #000;
+}
 .webview-frame {
   border: 0;
   background: white;
 }
+/* Find-on-page floating pill — Chrome-style. Anchored to the
+ * top-right of the web content area, sits above the page via
+ * z-index. Layout: borderless input, match count, prev/next/close
+ * buttons, all inline. */
+.webview-find {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 4px 10px;
+  width: min(360px, calc(100% - 24px));
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--text) 12%, transparent),
+              0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+.webview-find-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 5px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+}
+.webview-find-input::placeholder {
+  color: var(--text-muted);
+}
+.webview-find-count {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 6px;
+  white-space: nowrap;
+}
+/* Override the toolbar-button defaults so the find buttons are
+ * compact icon squares matching Chrome's row of three. */
+.webview-find-btn {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.webview-find-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.webview-find-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 .webview-status {
   flex: 0 0 auto;
   font-family: var(--font-mono);
@@ -3392,6 +3492,178 @@ button {
   font-size: 11.5px;
   font-family: var(--font-mono);
 }
+
+/* GitHub strip (RepoBar parity). Lives below the toolbar; one-line
+ * collapsed (slug + chips), expandable to a short PR / issue list. */
+.git-gh-card {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-muted) 50%, var(--bg));
+}
+.git-gh-card-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.git-gh-card-row:hover {
+  background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg));
+}
+.git-gh-card-slug {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+.git-gh-card-slug:hover {
+  color: var(--accent);
+}
+.git-gh-card-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.git-gh-card-chip {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+.git-gh-card-chip:first-of-type {
+  margin-left: auto;
+}
+.git-gh-card-chip:hover {
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+  color: var(--text);
+}
+/* CI badge color encodes status. Borders not backgrounds so the badge
+ * stays readable on every theme. */
+.git-gh-card-chip--ci-ok {
+  color: #2ea44f;
+  background: color-mix(in srgb, #2ea44f 14%, transparent);
+}
+.git-gh-card-chip--ci-fail {
+  color: #d1383b;
+  background: color-mix(in srgb, #d1383b 14%, transparent);
+}
+.git-gh-card-chip--ci-run {
+  color: #c97e1f;
+  background: color-mix(in srgb, #c97e1f 14%, transparent);
+}
+.git-gh-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 8px 14px 12px;
+  border-top: 1px dashed var(--border);
+}
+/* Dotted vertical divider between the PR list (col 1) and the issue
+ * list (col 2). Sits inside the second column's left edge. */
+.git-gh-card-body > .git-gh-list + .git-gh-list {
+  padding-left: 16px;
+  border-left: 1px dotted var(--border);
+}
+.git-gh-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.git-gh-list-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 2px 4px;
+}
+.git-gh-list-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-gh-list-row:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+.git-gh-list-empty {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 4px 6px;
+  font-style: italic;
+}
+.git-gh-num {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+.git-gh-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* CHANGELOG card — same vibe as the GitHub card but a single column
+ * preview body. */
+.git-changelog-card {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-muted) 50%, var(--bg));
+}
+.git-changelog-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.git-changelog-row:hover {
+  background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg));
+}
+.git-changelog-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.git-changelog-heading {
+  font-weight: 600;
+}
+.git-changelog-body {
+  margin: 0;
+  padding: 10px 18px 14px 36px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--text);
+  max-height: 220px;
+  overflow: auto;
+  border-top: 1px dashed var(--border);
+}
 .git-body {
   flex: 1;
   min-height: 0;
@@ -3616,6 +3888,56 @@ button {
 .git-diff-line--removed { background: color-mix(in srgb, #d1383b 14%, transparent); }
 .git-diff-line--hunk { color: #2d6cdf; background: color-mix(in srgb, #2d6cdf 8%, transparent); }
 .git-diff-line--meta { color: var(--text-muted); }
+/* Context lines pulled in via "Expand context" buttons — rendered
+ * with the neutral page background so they're visually separable
+ * from the +/- change lines but still flow as code. */
+.git-diff-line--context {
+  background: transparent;
+  color: var(--text);
+}
+
+/* Expand-context bar between hunks (GitHub parity). Slim single-line
+ * bar that visually echoes the existing hunk header line — same blue
+ * tint, monospace font, no chunky borders. Three compact buttons sit
+ * on the left; the rest of the row is empty space the user can click
+ * past harmlessly. */
+.git-diff-gap {
+  display: flex;
+  flex-direction: column;
+}
+.git-diff-gap-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  height: 22px;
+  background: color-mix(in srgb, #2d6cdf 8%, transparent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: color-mix(in srgb, #2d6cdf 70%, var(--text));
+}
+.git-diff-gap-btn {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  transition: background 100ms ease;
+}
+.git-diff-gap-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, #2d6cdf 18%, transparent);
+}
+.git-diff-gap-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.git-diff-gap-btn--all {
+  font-variant-numeric: tabular-nums;
+}
 
 /* Diff lines: clickable change lines for line-level staging. */
 .git-diff-line--clickable {
@@ -6210,16 +6532,129 @@ button {
 
 /* Player bar — Spotify's bottom playback bar. Sticks to the bottom of
  * the music tab regardless of scroll, holds now-playing art + info on
- * the left, transport in the middle, volume on the right. */
+ * the left, transport in the middle, volume on the right. The right-
+ * most column reserves space for the expand-video button so the
+ * volume slider doesn't shift when it appears. */
 .music-player {
+  position: relative;
   flex: 0 0 auto;
   display: grid;
+  /* Track on the left, play button centered, equal-width spacer on
+   * the right so the play button stays in the middle. The expand
+   * button is position:absolute and doesn't participate. */
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 24px;
   padding: 14px 22px;
   border-top: 1px solid var(--border);
   background: var(--bg-elev);
+  /* Animate height/padding when entering/leaving idle, and the
+   * geometry change when toggling expanded mode. */
+  transition:
+    padding 220ms ease,
+    background 220ms ease,
+    border-radius 220ms ease;
+}
+/* Idle (no track loaded): the bar shrinks to a thin hint strip. The
+ * 240×135 art tile, transport, and volume slider are all unmounted
+ * (see MusicView.tsx) so there's nothing left but the placeholder. */
+.music-player--idle {
+  display: flex;
+  justify-content: center;
+  padding: 8px 22px;
+}
+/* Expanded (video full-page): the bar overlays the whole .music
+ * container so the iframe can stretch to cover most of the tab.
+ * The grid restructures via flex so the art tile gets all available
+ * space, with controls pinned to the bottom. */
+.music-player--expanded {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 22px 18px;
+  border-top: 0;
+  border-radius: 0;
+  background: var(--bg);
+}
+.music-player--expanded .music-player-track {
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
+  width: 100%;
+}
+/* The wrap is just a centering box; the iframe inside picks its own
+ * 16:9 size (see below). No fixed background/shadow here — they'd
+ * just frame the empty space outside the video. */
+.music-player--expanded .music-player-art-wrap {
+  width: 100%;
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+/* Lock the iframe to 16:9 so YouTube's video fills it edge-to-edge
+ * with no letterbox bars. width/height: auto + max-* + aspect-ratio
+ * is the "fit-in-box, keep aspect" idiom — the browser shrinks
+ * whichever side is tighter against the wrap. */
+.music-player--expanded .music-player-art {
+  aspect-ratio: 16 / 9;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--text) 18%, transparent);
+}
+.music-player--expanded .music-player-info {
+  text-align: center;
+  align-items: center;
+}
+.music-player--expanded .music-player-title {
+  font-size: 15px;
+  white-space: normal;
+  text-overflow: clip;
+  overflow: visible;
+}
+.music-player--expanded .music-player-controls {
+  flex: 0 0 auto;
+  align-self: center;
+}
+/* Top-right round button to enter/leave expanded mode. Floats above
+ * the bar contents in normal mode and over the iframe in expanded
+ * mode. Only rendered when a track is loaded. */
+.music-player-expand {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 0;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, transform 100ms ease;
+}
+.music-player-expand:hover {
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+}
+.music-player-expand:active {
+  transform: scale(0.94);
 }
 .music-player-track {
   display: flex;
@@ -6274,9 +6709,10 @@ button {
   text-overflow: ellipsis;
 }
 .music-player-empty {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
+  letter-spacing: 0.02em;
 }
 .music-player-controls {
   display: flex;
@@ -6313,54 +6749,6 @@ button {
   box-shadow: none;
 }
 
-.music-player-volume {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  color: var(--text-muted);
-}
-/* Filled-track volume slider. The :before-current portion uses
- * --accent, the :after-current portion fades into a track tint.
- * `--vol-pct` is set inline by React so the gradient stays in sync. */
-.music-player-volume input[type='range'] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 140px;
-  height: 4px;
-  border-radius: 999px;
-  cursor: pointer;
-  outline: none;
-  background: linear-gradient(
-    to right,
-    var(--accent) 0,
-    var(--accent) var(--vol-pct, 60%),
-    color-mix(in srgb, var(--text) 14%, transparent) var(--vol-pct, 60%),
-    color-mix(in srgb, var(--text) 14%, transparent) 100%
-  );
-}
-.music-player-volume input[type='range']::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--text);
-  cursor: pointer;
-  border: 0;
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--text) 28%, transparent);
-  transition: transform 100ms ease-out;
-}
-.music-player-volume input[type='range']:hover::-webkit-slider-thumb {
-  transform: scale(1.2);
-}
-.music-player-volume-readout {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
-  min-width: 24px;
-  text-align: right;
-}
 
 /* Add-link modal — sits on top of the standard modal-backdrop. */
 .music-add-modal {

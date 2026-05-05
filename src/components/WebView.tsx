@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useWorkspace,
   workspace,
@@ -6,7 +7,8 @@ import {
   getActiveSession,
   subscribeWorkspace,
 } from '../state/workspace';
-import { normalizeUrl } from '../lib/actions';
+import { normalizeUrl, openUrlInTab } from '../lib/actions';
+import { settings, buildSearchUrl } from '../state/settings';
 import { uiBus } from '../lib/uiBus';
 import { useGlideCaret } from '../lib/useGlideCaret';
 import { saveForLater, isYoutubeUrl } from '../lib/laterStore';
@@ -28,6 +30,8 @@ type WebviewEl = HTMLElement & {
   loadURL(u: string): void;
   getURL(): string;
   executeJavaScript(code: string): Promise<unknown>;
+  findInPage(text: string, options?: { forward?: boolean; findNext?: boolean; matchCase?: boolean }): number;
+  stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection'): void;
 };
 
 /** Body-level overlay container that holds every web tab's <webview>.
@@ -157,6 +161,31 @@ export function WebView({ tabId, url }: Props) {
   // for ~1.5s so the user sees feedback without a toast or modal.
   const [savedToLater, setSavedToLater] = useState(false);
   const [savedToMusic, setSavedToMusic] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [findMatch, setFindMatch] = useState<{ ordinal: number; total: number } | null>(null);
+  const findInputRef = useRef<HTMLInputElement | null>(null);
+  /** True while a video / element inside the page is in HTML
+   *  fullscreen. Drives the slot's `--fs` class so its bounds (and
+   *  therefore the position-loop-driven webview) fill the entire
+   *  window; we also tell the main process to take the BrowserWindow
+   *  into native fullscreen so the menu bar / dock get out of the
+   *  way on macOS. */
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  /** Right-click context-menu state — populated when the webview's
+   *  `context-menu` event fires, with details about whatever the
+   *  user clicked (link URL, selection text, image source, etc.). */
+  const [contextMenu, setContextMenu] = useState<
+    | {
+        x: number;
+        y: number;
+        linkURL?: string;
+        srcURL?: string;
+        selectionText?: string;
+        mediaType?: string;
+      }
+    | null
+  >(null);
   const addressRef = useRef<HTMLInputElement | null>(null);
   const { mirrorRef: addrMirrorRef, caretRef: addrCaretRef, bumpInput: addrBump, recompute: addrRecompute } =
     useGlideCaret(addressRef, addressBar);
@@ -189,6 +218,110 @@ export function WebView({ tabId, url }: Props) {
       }
     });
   }, [isActive]);
+
+  // Cmd+F — open the find-on-page bar. The actual focus happens in
+  // the effect below once React has mounted the input; on first
+  // open the input doesn't exist yet, so a same-tick `.focus()`
+  // would no-op against a null ref.
+  useEffect(() => {
+    if (!isActive) return;
+    return uiBus.on('find-on-page', () => setFindOpen(true));
+  }, [isActive]);
+  // Whenever the bar opens, focus + select the input. Runs after
+  // mount, so even the first ⌘F press lands the cursor properly.
+  useEffect(() => {
+    if (!findOpen) return;
+    findInputRef.current?.focus();
+    findInputRef.current?.select();
+  }, [findOpen]);
+
+  // HTML-fullscreen handling. The webview tag dispatches these
+  // events when a `<video>` (or any element) inside the page calls
+  // requestFullscreen. Without handling them, the body-level
+  // overlay positioning holds the webview at its slot size while
+  // Chromium thinks the video is fullscreen — the page appears to
+  // vanish. We toggle a CSS class on the slot so it takes the full
+  // viewport. We deliberately do NOT touch the BrowserWindow:
+  // calling setFullScreen in `accessory` activation policy makes the
+  // window vanish (Space allocation fails), and even simpleFullScreen
+  // collides with Electron's own auto-fullscreen path. Just letting
+  // the slot fill the existing window is the only reliable path.
+  useEffect(() => {
+    const wv = wvRef.current;
+    if (!wv) return;
+    const onEnter = () => setIsFullscreen(true);
+    const onLeave = () => setIsFullscreen(false);
+    wv.addEventListener('enter-html-full-screen', onEnter);
+    wv.addEventListener('leave-html-full-screen', onLeave);
+    return () => {
+      wv.removeEventListener('enter-html-full-screen', onEnter);
+      wv.removeEventListener('leave-html-full-screen', onLeave);
+    };
+  }, []);
+
+  // Mirror the webview's `found-in-page` event into our match counter
+  // so the bar can show "n / total".
+  useEffect(() => {
+    const wv = wvRef.current;
+    if (!wv) return;
+    const onFound = (e: Event) => {
+      const r = (e as unknown as { result: { activeMatchOrdinal: number; matches: number } }).result;
+      if (!r) return;
+      setFindMatch({ ordinal: r.activeMatchOrdinal, total: r.matches });
+    };
+    wv.addEventListener('found-in-page', onFound);
+    return () => wv.removeEventListener('found-in-page', onFound);
+  }, []);
+
+  // Right-click context menu — intercept the webview's `context-menu`
+  // event and render our own Marko-aware menu (Open in New Tab, Save
+  // Link to Later, Search Selection, etc.) instead of letting the
+  // guest show its default. Coordinates are page-relative; we add
+  // the webview element's viewport offset before positioning.
+  useEffect(() => {
+    const wv = wvRef.current;
+    if (!wv) return;
+    const onContextMenu = (e: Event) => {
+      const params = (e as unknown as {
+        params: {
+          x: number;
+          y: number;
+          linkURL?: string;
+          srcURL?: string;
+          selectionText?: string;
+          mediaType?: string;
+        };
+      }).params;
+      if (!params) return;
+      const r = (wv as HTMLElement).getBoundingClientRect();
+      setContextMenu({
+        x: r.left + params.x,
+        y: r.top + params.y,
+        linkURL: params.linkURL || undefined,
+        srcURL: params.srcURL || undefined,
+        selectionText: params.selectionText || undefined,
+        mediaType: params.mediaType || undefined,
+      });
+    };
+    wv.addEventListener('context-menu', onContextMenu);
+    return () => wv.removeEventListener('context-menu', onContextMenu);
+  }, []);
+  // Close the context menu on outside click or any keypress.
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onMouse = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest('.webview-ctx-menu')) return;
+      setContextMenu(null);
+    };
+    const onKey = () => setContextMenu(null);
+    document.addEventListener('mousedown', onMouse, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onMouse, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [contextMenu]);
 
   // History navigation triggers — fire from any of three sources:
   //   1. MX-style mouse side buttons (button 3 / 4) outside the webview
@@ -396,6 +529,61 @@ export function WebView({ tabId, url }: Props) {
     }));
   }, [pageTitle, tabId]);
 
+  /** Run / step a find-on-page search. The first call (or after the
+   *  query changes) does a fresh search via `findNext: false`; arrow
+   *  keys / next-prev buttons step through with `findNext: true`. */
+  const runFind = (forward: boolean = true, fresh: boolean = false) => {
+    const wv = wvRef.current;
+    if (!wv || !findQuery) return;
+    try {
+      wv.findInPage(findQuery, { forward, findNext: !fresh });
+    } catch {
+      /* webview not ready */
+    }
+  };
+  const closeFind = () => {
+    setFindOpen(false);
+    setFindMatch(null);
+    try {
+      wvRef.current?.stopFindInPage('clearSelection');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  /** Debounced live search — coalesces rapid keystrokes so
+   *  Chromium's findInPage gets one settled query rather than a
+   *  flurry that races against itself (rapid back-to-back calls
+   *  cause the search to ignore later text). 50ms is short enough
+   *  to feel instant while reliably letting the previous request
+   *  resolve. We do NOT call stopFindInPage between calls — that
+   *  drops the "active match" highlight (orange in Chrome) and
+   *  leaves only the dim "all matches" yellow. */
+  const findTimerRef = useRef<number | null>(null);
+  const runLiveFind = (next: string) => {
+    if (findTimerRef.current !== null) {
+      window.clearTimeout(findTimerRef.current);
+      findTimerRef.current = null;
+    }
+    if (!next) {
+      setFindMatch(null);
+      try {
+        wvRef.current?.stopFindInPage('clearSelection');
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    findTimerRef.current = window.setTimeout(() => {
+      findTimerRef.current = null;
+      try {
+        wvRef.current?.findInPage(next);
+      } catch {
+        /* webview not ready */
+      }
+    }, 50);
+  };
+
   /** Save the current page into ~/.marko/later.json so the user can
    *  read it from the Later tab later on. The bookmark icon flips to
    *  a check for ~1.5s as visual feedback. */
@@ -529,21 +717,232 @@ export function WebView({ tabId, url }: Props) {
           {savedToLater ? <CheckGlyph /> : <BookmarkGlyph />}
         </button>
       </div>
+      {/* Find-on-page bar — shows when ⌘F is hit. Live matches the
+        * query against the page via the webview's findInPage API and
+        * mirrors the result count back here. */}
+      {findOpen && (
+        <div className="webview-find">
+          <input
+            ref={findInputRef}
+            className="webview-find-input"
+            value={findQuery}
+            onChange={(e) => {
+              const next = e.target.value;
+              setFindQuery(next);
+              // Search synchronously on every keystroke — matches
+              // Chrome's "live" find behaviour. Enter / Shift+Enter
+              // step through results without re-running the search.
+              runLiveFind(next);
+            }}
+            placeholder="Find on page"
+            spellCheck={false}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                closeFind();
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (e.shiftKey) runFind(false);
+                else runFind(true);
+              }
+            }}
+          />
+          <span className="webview-find-count">
+            {findQuery
+              ? findMatch && findMatch.total > 0
+                ? `${findMatch.ordinal}/${findMatch.total}`
+                : '0/0'
+              : ''}
+          </span>
+          <button
+            className="webview-btn webview-find-btn"
+            onClick={() => runFind(false)}
+            title="Previous match (Shift+Enter)"
+            aria-label="Previous match"
+            disabled={!findQuery}
+          >
+            <Chev dir="up" />
+          </button>
+          <button
+            className="webview-btn webview-find-btn"
+            onClick={() => runFind(true)}
+            title="Next match (Enter)"
+            aria-label="Next match"
+            disabled={!findQuery}
+          >
+            <Chev dir="down" />
+          </button>
+          <button
+            className="webview-btn webview-find-btn"
+            onClick={closeFind}
+            title="Close (Esc)"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {/* The actual <webview> lives in webviewSessions (module scope) and
           is appended into this host imperatively by the mount effect.
           Lifting it out of React's tree lets it survive component
           unmounts during pane splits without reloading. */}
-      <div ref={frameHostRef} className="webview-frame-host" />
+      <div
+        ref={frameHostRef}
+        className={
+          'webview-frame-host' + (isFullscreen ? ' webview-frame-host--fs' : '')
+        }
+      />
       <div className="webview-status">{currentUrl}</div>
+
+      {/* Right-click context menu — rendered at body level via portal
+        * so it sits above the webview overlay. */}
+      {contextMenu &&
+        createPortal(
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            linkURL={contextMenu.linkURL}
+            srcURL={contextMenu.srcURL}
+            selectionText={contextMenu.selectionText}
+            mediaType={contextMenu.mediaType}
+            onClose={() => setContextMenu(null)}
+            onSaveLinkLater={async (u) => {
+              await saveForLater({
+                url: u,
+                title: u,
+              });
+            }}
+            onOpenLinkInTab={(u) => openUrlInTab(u)}
+            onCopy={(text) => void navigator.clipboard.writeText(text)}
+            onSearch={(q) => {
+              const { url } = buildSearchUrl(settings.get(), q);
+              openUrlInTab(url);
+            }}
+            onReload={() => wvRef.current?.reload()}
+            onSavePageLater={async () => {
+              await saveForLater({
+                url: currentUrl,
+                title: pageTitle ?? currentUrl,
+                favicon: pageFavicon ?? undefined,
+              });
+            }}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
 
-function Chev({ dir }: { dir: 'left' | 'right' }) {
+function ContextMenu({
+  x,
+  y,
+  linkURL,
+  srcURL,
+  selectionText,
+  mediaType,
+  onClose,
+  onSaveLinkLater,
+  onOpenLinkInTab,
+  onCopy,
+  onSearch,
+  onReload,
+  onSavePageLater,
+}: {
+  x: number;
+  y: number;
+  linkURL?: string;
+  srcURL?: string;
+  selectionText?: string;
+  mediaType?: string;
+  onClose: () => void;
+  onSaveLinkLater: (url: string) => Promise<void>;
+  onOpenLinkInTab: (url: string) => void;
+  onCopy: (text: string) => void;
+  onSearch: (query: string) => void;
+  onReload: () => void;
+  onSavePageLater: () => Promise<void>;
+}) {
+  const wrap = (fn: () => void | Promise<void>) => () => {
+    onClose();
+    void fn();
+  };
+  const sel = selectionText?.trim() ?? '';
+  const truncatedSel =
+    sel.length > 28 ? `${sel.slice(0, 28).trim()}…` : sel;
+  return (
+    <div
+      className="ctx-menu webview-ctx-menu"
+      style={{ position: 'fixed', left: x, top: y }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {linkURL && (
+        <>
+          <button
+            className="ctx-menu-item"
+            onClick={wrap(() => onOpenLinkInTab(linkURL))}
+          >
+            Open Link in New Tab
+          </button>
+          <button className="ctx-menu-item" onClick={wrap(() => onCopy(linkURL))}>
+            Copy Link
+          </button>
+          <button
+            className="ctx-menu-item"
+            onClick={wrap(() => onSaveLinkLater(linkURL))}
+          >
+            Save Link to Later
+          </button>
+          <div className="ctx-menu-sep" />
+        </>
+      )}
+      {srcURL && mediaType === 'image' && (
+        <>
+          <button className="ctx-menu-item" onClick={wrap(() => onCopy(srcURL))}>
+            Copy Image URL
+          </button>
+          <button
+            className="ctx-menu-item"
+            onClick={wrap(() => onOpenLinkInTab(srcURL))}
+          >
+            Open Image in New Tab
+          </button>
+          <div className="ctx-menu-sep" />
+        </>
+      )}
+      {sel && (
+        <>
+          <button className="ctx-menu-item" onClick={wrap(() => onCopy(sel))}>
+            Copy
+          </button>
+          <button className="ctx-menu-item" onClick={wrap(() => onSearch(sel))}>
+            Search “{truncatedSel}”
+          </button>
+          <div className="ctx-menu-sep" />
+        </>
+      )}
+      <button className="ctx-menu-item" onClick={wrap(onSavePageLater)}>
+        Save Page to Later
+      </button>
+      <button className="ctx-menu-item" onClick={wrap(onReload)}>
+        Reload
+      </button>
+    </div>
+  );
+}
+
+function Chev({ dir }: { dir: 'left' | 'right' | 'up' | 'down' }) {
+  const path =
+    dir === 'left'
+      ? 'M10 3 L5 8 L10 13'
+      : dir === 'right'
+        ? 'M6 3 L11 8 L6 13'
+        : dir === 'up'
+          ? 'M3 10 L8 5 L13 10'
+          : 'M3 6 L8 11 L13 6';
   return (
     <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden>
       <path
-        d={dir === 'left' ? 'M10 3 L5 8 L10 13' : 'M6 3 L11 8 L6 13'}
+        d={path}
         fill="none"
         stroke="currentColor"
         strokeWidth="1.8"

@@ -1,4 +1,4 @@
-import { workspace, getActiveSession, type TabKind } from '../state/workspace';
+import { workspace, getActiveSession, type TabKind, type ClosedTab } from '../state/workspace';
 import { settings } from '../state/settings';
 import { detectKind, looksBinary } from './fileType';
 
@@ -341,4 +341,39 @@ export function closeActiveTab() {
     if (!confirmClose) return;
   }
   workspace.closeTab(tab.id);
+}
+
+/** Reopen the most recently closed tab (⌘⇧T). Pops one entry from the
+ *  workspace's closed-tabs stack and dispatches by kind to the right
+ *  opener. Pinned/unpinned, dirty (snapshotted-at-close), and
+ *  active-pane state are not preserved — the tab is recreated as if
+ *  freshly opened in the focused pane. Repeated invocations walk back
+ *  through the close history, browser-style. */
+export async function reopenLastClosedTab() {
+  const popped: ClosedTab | null = workspace.popClosedTab();
+  if (!popped) return;
+
+  if (popped.kind === 'web' && popped.filePath) {
+    openUrlInTab(popped.filePath);
+    return;
+  }
+  if (popped.kind === 'folder' && popped.filePath) {
+    await openFolderInEditor(popped.filePath, { focus: true });
+    return;
+  }
+  if (popped.filePath) {
+    await openFileFromPath(popped.filePath, { focus: true });
+    return;
+  }
+  // Singleton-view tabs (settings, shortcuts, clipboard, music, later,
+  // git, excalidraw with no path) — recreate via their dedicated opener.
+  switch (popped.kind) {
+    case 'settings': openSettingsTab(); return;
+    case 'shortcuts': openShortcutsTab(); return;
+    case 'clipboard': openClipboardTab(); return;
+    case 'music': openMusicTab(); return;
+    case 'later': openLaterTab(); return;
+    case 'git': openGitTab(); return;
+    case 'excalidraw': openExcalidrawTab(); return;
+  }
 }

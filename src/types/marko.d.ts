@@ -69,6 +69,34 @@ export interface GitLogEntry {
   parents: string[];
 }
 
+/** GitHub PR / issue / workflow-run payloads — the fields we ask gh
+ *  for in --json mode. The shapes deliberately mirror what `gh` emits
+ *  so downstream code can pass them straight through. */
+export interface GhPr {
+  number: number;
+  title: string;
+  state: string;
+  isDraft: boolean;
+  headRefName: string;
+  url: string;
+  author?: { login: string };
+}
+export interface GhIssue {
+  number: number;
+  title: string;
+  state: string;
+  url: string;
+  author?: { login: string };
+}
+export interface GhRun {
+  status: string;
+  conclusion: string | null;
+  headSha: string;
+  workflowName: string;
+  url: string;
+  createdAt: string;
+}
+
 export interface AiProvider {
   id: string;
   name: string;
@@ -213,6 +241,10 @@ export interface MarkoApi {
    *  music library. */
   laterRead(): Promise<string | null>;
   laterWrite(json: string): Promise<{ ok: boolean }>;
+  /** Toggle the main BrowserWindow's native fullscreen. Used by the
+   *  WebView when a video inside the page enters / leaves HTML
+   *  fullscreen so the whole window goes fullscreen with it. */
+  setWindowFullscreen(fs: boolean): Promise<{ ok: boolean }>;
   /** Settings JSON blob from ~/.marko/settings.json, read
    *  synchronously by preload at boot so settings.ts can hydrate
    *  without becoming async. `null` if the file doesn't exist or
@@ -308,6 +340,57 @@ export interface MarkoApi {
   gitTags(repoDir: string): Promise<{ ok: boolean; tags?: string[]; error?: string }>;
   gitCreateTag(repoDir: string, name: string, message: string): Promise<{ ok: boolean; error?: string }>;
   gitDeleteTag(repoDir: string, name: string): Promise<{ ok: boolean; error?: string }>;
+
+  /** Reads a 1-indexed inclusive line range from a chosen version of
+   *  the file: `work` (working tree), `index` (staged), or `HEAD`
+   *  (last commit). Used by the diff viewer's expand-context buttons.
+   *  Result is clipped to the file's actual length, and `total` is
+   *  the post-clip line count so the caller can stop expanding. */
+  gitFileLines(
+    repoDir: string,
+    source: 'work' | 'index' | 'HEAD',
+    relPath: string,
+    startLine: number,
+    endLine: number,
+  ): Promise<{ ok: boolean; lines?: string[]; total?: number; error?: string }>;
+  /** Parses `git remote get-url origin` and reports the GitHub
+   *  owner/repo plus an https web URL for the renderer to deep-link. */
+  gitGithubRemote(repoDir: string): Promise<{
+    ok: boolean;
+    owner?: string;
+    repo?: string;
+    web?: string;
+    error?: string;
+  }>;
+  /** Returns the topmost section of CHANGELOG.md (or peers) — the
+   *  heading text and the body markdown beneath it. */
+  gitChangelogTop(repoDir: string): Promise<{
+    ok: boolean;
+    heading?: string;
+    body?: string;
+    filename?: string;
+    error?: string;
+  }>;
+  /** Opens an http/https URL in the user's default browser. Throws
+   *  for non-web schemes. */
+  shellOpenExternal(url: string): Promise<{ ok: boolean; error?: string }>;
+  /** Probe whether the gh CLI is installed and authed against
+   *  github.com. The renderer gates GitHub-only UI on this. */
+  ghCheck(): Promise<{ available: boolean; authed: boolean; error?: string }>;
+  ghPrList(repoDir: string): Promise<{
+    ok: boolean;
+    prs?: GhPr[];
+    error?: string;
+  }>;
+  ghIssueList(repoDir: string): Promise<{
+    ok: boolean;
+    issues?: GhIssue[];
+    error?: string;
+  }>;
+  ghRunLatest(
+    repoDir: string,
+    branch: string,
+  ): Promise<{ ok: boolean; run?: GhRun | null; error?: string }>;
   onMenu(channel: string, handler: () => void): () => void;
   onWebviewOpenUrl(handler: (url: string) => void): () => void;
   trayPushState(state: { recentFiles: string[]; bookmarks: { name: string; path: string }[] }): void;

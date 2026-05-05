@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LayoutGroup } from 'framer-motion';
-import { useWorkspace, workspace, getActiveSession, getAllLeaves } from './state/workspace';
+import { useWorkspace, workspace, getActiveSession, getAllLeaves, findLeaf } from './state/workspace';
 import { Sidebar } from './components/Sidebar';
 import { PaneNode } from './components/PaneNode';
 import { Outline } from './components/Outline';
@@ -9,7 +9,7 @@ import { NewFilePicker } from './components/NewFilePicker';
 import { PathInput } from './components/PathInput';
 import { SessionStrip } from './components/SessionStrip';
 import { NowPlaying } from './components/NowPlaying';
-import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab, openClipboardTab, openSettingsTab, openShortcutsTab, openUrlInTab, openFileFromPath } from './lib/actions';
+import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab, openClipboardTab, openSettingsTab, openShortcutsTab, openUrlInTab, openFileFromPath, reopenLastClosedTab } from './lib/actions';
 import { uiBus } from './lib/uiBus';
 import { resetWorkspaceAndReload } from './lib/persistence';
 import { runLauncherAction } from './lib/runLauncherAction';
@@ -35,6 +35,9 @@ function gotoTabInFocused(idx: number) {
 export function App() {
   const sidebarVisible = useWorkspace((s) => getActiveSession(s).sidebarVisible);
   const outlineVisible = useWorkspace((s) => getActiveSession(s).outlineVisible);
+  // True when the active session has a pane maximized to full window.
+  // Suppresses sidebar, outline, and (via CSS) the in-pane tab bar.
+  const zoomed = useWorkspace((s) => !!getActiveSession(s).maximizedLeafId);
   const rootDir = useWorkspace((s) => getActiveSession(s).rootDir);
   const sessions = useWorkspace((s) => s.sessions);
   const activeSessionId = useWorkspace((s) => s.activeSessionId);
@@ -130,11 +133,14 @@ export function App() {
       window.marko.onMenu('menu:quick-open-replace', () => setModal({ kind: 'palette', replace: true })),
       window.marko.onMenu('menu:goto-path', () => setModal({ kind: 'path', replace: false })),
       window.marko.onMenu('menu:goto-path-replace', () => setModal({ kind: 'path', replace: true })),
+      window.marko.onMenu('menu:reopen-closed-tab', () => void reopenLastClosedTab()),
       window.marko.onMenu('menu:new-terminal', () => openTerminalTab()),
       window.marko.onMenu('menu:focus-address', () => uiBus.emit('focus-address')),
       // ⌘R: only the active web tab listens — non-web tabs no-op so the
       // keystroke can never reload the whole BrowserWindow by accident.
       window.marko.onMenu('menu:reload-page', () => uiBus.emit('reload-page')),
+      // ⌘F — find-on-page in the active web tab. Non-web tabs no-op.
+      window.marko.onMenu('menu:find-on-page', () => uiBus.emit('find-on-page')),
       window.marko.onMenu('menu:process-viewer', () => openProcessTab()),
       window.marko.onMenu('menu:open-clipboard', () => openClipboardTab()),
       window.marko.onMenu('menu:show-shortcuts', () => openShortcutsTab()),
@@ -142,6 +148,7 @@ export function App() {
       window.marko.onMenu('menu:split-down', () => workspace.splitFocused('vertical')),
       window.marko.onMenu('menu:close-pane', () => workspace.closePane(workspace.getFocusedLeaf().id)),
       window.marko.onMenu('menu:cycle-layout', () => workspace.cycleLayout()),
+      window.marko.onMenu('menu:toggle-pane-zoom', () => workspace.toggleMaximizePane()),
       window.marko.onMenu('menu:new-session', () => workspace.newSession()),
       window.marko.onMenu('menu:close-session', () => {
         const id = workspace.getState().activeSessionId;
@@ -182,14 +189,21 @@ export function App() {
 
   return (
     <div className="app">
-      <div className="titlebar">
-        <SessionStrip />
-        <NowPlaying />
+      {/* In zoom mode, the titlebar is reduced to an empty drag
+        * region — the traffic-light area stays (macOS draws those over
+        * the window chrome), but the session strip and now-playing pill
+        * are hidden. The bar itself is kept so its height still spaces
+        * the pane content away from the traffic lights. */}
+      <div className={`titlebar${zoomed ? ' titlebar--zoom' : ''}`}>
+        {!zoomed && <SessionStrip />}
+        {!zoomed && <NowPlaying />}
       </div>
-      <div className="app-body">
-        <aside className={`sidebar ${sidebarVisible ? '' : 'sidebar--hidden'}`}>
-          <Sidebar />
-        </aside>
+      <div className={`app-body${zoomed ? ' app-body--zoom' : ''}`}>
+        {!zoomed && (
+          <aside className={`sidebar ${sidebarVisible ? '' : 'sidebar--hidden'}`}>
+            <Sidebar />
+          </aside>
+        )}
         <div className="panes">
           {/* LayoutGroup connects every <Reorder.Item> across panes
             * so a tab moving between strips animates from its old
@@ -198,20 +212,29 @@ export function App() {
           <LayoutGroup>
             {sessions.map((session) => {
               const multi = getAllLeaves(session.root).length > 1;
+              // When a leaf is "maximized", render it alone instead of
+              // walking the whole tree. Defensive lookup — if the leaf
+              // was destroyed (closed tab path) we silently fall back
+              // to the full tree, so stale state never shows a blank.
+              const maximized =
+                session.maximizedLeafId
+                  ? findLeaf(session.root, session.maximizedLeafId)
+                  : null;
+              const renderRoot = maximized ?? session.root;
               return (
                 <div
                   key={session.id}
-                  className={`session-stack${multi ? ' session-stack--multi' : ''}`}
+                  className={`session-stack${multi ? ' session-stack--multi' : ''}${maximized ? ' session-stack--zoom' : ''}`}
                   data-session-id={session.id}
                   style={{ display: session.id === activeSessionId ? 'flex' : 'none' }}
                 >
-                  <PaneNode node={session.root} sessionId={session.id} />
+                  <PaneNode node={renderRoot} sessionId={session.id} />
                 </div>
               );
             })}
           </LayoutGroup>
         </div>
-        {outlineVisible && (
+        {outlineVisible && !zoomed && (
           <aside className="outline">
             <Outline />
           </aside>

@@ -19,10 +19,10 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { keys: '⌘O', label: 'open file' },
       { keys: '⌘⇧O', label: 'open folder' },
       { keys: '⌘P', label: 'quick open' },
-      { keys: '⌘⇧P', label: 'quick open (replace tab)' },
+      { keys: '⌘⌥P', label: 'quick open (replace tab)' },
       { keys: '⌘⇧F', label: 'find in files' },
       { keys: '⌘T', label: 'go to path / command' },
-      { keys: '⌘⇧T', label: 'go to path (replace tab)' },
+      { keys: '⌘⌥T', label: 'go to path (replace tab)' },
       { keys: '⌘S', label: 'save' },
       { keys: '⌘⇧S', label: 'save as' },
     ],
@@ -31,6 +31,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
     title: 'Tabs',
     items: [
       { keys: '⌘W', label: 'close tab' },
+      { keys: '⌘⇧T', label: 'reopen closed tab' },
       { keys: '⌘⇧[', label: 'previous tab' },
       { keys: '⌘⇧]', label: 'next tab' },
     ],
@@ -53,6 +54,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { keys: '⌘`', label: 'next pane' },
       { keys: '⌘⇧`', label: 'previous pane' },
       { keys: '⌘⇧␣', label: 'cycle layouts' },
+      { keys: '⌘⇧⏎', label: 'zoom pane' },
     ],
   },
   {

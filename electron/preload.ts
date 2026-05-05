@@ -67,6 +67,8 @@ const api = {
   laterRead: (): Promise<string | null> => ipcRenderer.invoke('later:read'),
   laterWrite: (json: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('later:write', json),
+  setWindowFullscreen: (fs: boolean): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('window:set-fullscreen', fs),
   /** Initial settings blob — read synchronously by preload from
    *  ~/.marko/settings.json so settings.ts can hydrate without
    *  becoming async. `null` on first run / unreadable file. */
@@ -254,6 +256,23 @@ const api = {
     ipcRenderer.invoke('git:createTag', repoDir, name, message),
   gitDeleteTag: (repoDir: string, name: string) =>
     ipcRenderer.invoke('git:deleteTag', repoDir, name),
+
+  // GitHub-aware extensions (see RepoBar parity in GitView).
+  gitFileLines: (
+    repoDir: string,
+    source: 'work' | 'index' | 'HEAD',
+    relPath: string,
+    startLine: number,
+    endLine: number,
+  ) => ipcRenderer.invoke('git:fileLines', repoDir, source, relPath, startLine, endLine),
+  gitGithubRemote: (repoDir: string) => ipcRenderer.invoke('git:githubRemote', repoDir),
+  gitChangelogTop: (repoDir: string) => ipcRenderer.invoke('git:changelogTop', repoDir),
+  shellOpenExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+  ghCheck: () => ipcRenderer.invoke('gh:check'),
+  ghPrList: (repoDir: string) => ipcRenderer.invoke('gh:prList', repoDir),
+  ghIssueList: (repoDir: string) => ipcRenderer.invoke('gh:issueList', repoDir),
+  ghRunLatest: (repoDir: string, branch: string) =>
+    ipcRenderer.invoke('gh:runLatest', repoDir, branch),
 
   onMenu: (channel: string, handler: () => void) => {
     const listener = () => handler();

@@ -2697,30 +2697,52 @@ button {
   color: var(--text);
 }
 /* Token colors — driven by the active color theme's ANSI palette.
-   `!important` overrides CodeMirror's default-highlight-style inline colors. */
-.codemirror-host .cm-editor .tok-keyword { color: var(--tok-keyword) !important; }
+   `!important` overrides CodeMirror's default-highlight-style inline colors.
+   The same selectors apply inside `.md-preview-inner pre code` so split-view
+   markdown previews stay visually coherent with the editor. */
+.codemirror-host .cm-editor .tok-keyword,
+.md-preview-inner pre code .tok-keyword { color: var(--tok-keyword) !important; }
 .codemirror-host .cm-editor .tok-string,
-.codemirror-host .cm-editor .tok-string2 { color: var(--tok-string) !important; }
-.codemirror-host .cm-editor .tok-comment {
+.codemirror-host .cm-editor .tok-string2,
+.md-preview-inner pre code .tok-string,
+.md-preview-inner pre code .tok-string2 { color: var(--tok-string) !important; }
+.codemirror-host .cm-editor .tok-comment,
+.md-preview-inner pre code .tok-comment {
   color: var(--tok-comment) !important;
   font-style: italic;
 }
 .codemirror-host .cm-editor .tok-number,
 .codemirror-host .cm-editor .tok-bool,
-.codemirror-host .cm-editor .tok-atom { color: var(--tok-number) !important; }
-.codemirror-host .cm-editor .tok-variableName { color: var(--tok-variable) !important; }
+.codemirror-host .cm-editor .tok-atom,
+.md-preview-inner pre code .tok-number,
+.md-preview-inner pre code .tok-bool,
+.md-preview-inner pre code .tok-atom { color: var(--tok-number) !important; }
+.codemirror-host .cm-editor .tok-variableName,
+.md-preview-inner pre code .tok-variableName { color: var(--tok-variable) !important; }
 .codemirror-host .cm-editor .tok-typeName,
 .codemirror-host .cm-editor .tok-className,
-.codemirror-host .cm-editor .tok-namespace { color: var(--tok-class) !important; }
-.codemirror-host .cm-editor .tok-propertyName { color: var(--tok-property) !important; }
+.codemirror-host .cm-editor .tok-namespace,
+.md-preview-inner pre code .tok-typeName,
+.md-preview-inner pre code .tok-className,
+.md-preview-inner pre code .tok-namespace { color: var(--tok-class) !important; }
+.codemirror-host .cm-editor .tok-propertyName,
+.md-preview-inner pre code .tok-propertyName { color: var(--tok-property) !important; }
 .codemirror-host .cm-editor .tok-function,
-.codemirror-host .cm-editor .tok-macroName { color: var(--tok-function) !important; }
-.codemirror-host .cm-editor .tok-operator { color: var(--tok-operator) !important; }
-.codemirror-host .cm-editor .tok-tagName { color: var(--tok-tag) !important; }
-.codemirror-host .cm-editor .tok-attributeName { color: var(--tok-attr) !important; }
-.codemirror-host .cm-editor .tok-punctuation { color: var(--tok-punctuation) !important; }
+.codemirror-host .cm-editor .tok-macroName,
+.md-preview-inner pre code .tok-function,
+.md-preview-inner pre code .tok-macroName { color: var(--tok-function) !important; }
+.codemirror-host .cm-editor .tok-operator,
+.md-preview-inner pre code .tok-operator { color: var(--tok-operator) !important; }
+.codemirror-host .cm-editor .tok-tagName,
+.md-preview-inner pre code .tok-tagName { color: var(--tok-tag) !important; }
+.codemirror-host .cm-editor .tok-attributeName,
+.md-preview-inner pre code .tok-attributeName { color: var(--tok-attr) !important; }
+.codemirror-host .cm-editor .tok-punctuation,
+.md-preview-inner pre code .tok-punctuation { color: var(--tok-punctuation) !important; }
 .codemirror-host .cm-editor .tok-meta,
-.codemirror-host .cm-editor .tok-labelName { color: var(--tok-property) !important; }
+.codemirror-host .cm-editor .tok-labelName,
+.md-preview-inner pre code .tok-meta,
+.md-preview-inner pre code .tok-labelName { color: var(--tok-property) !important; }
 
 /* Folder view (Finder-like grid) */
 .folder-view {

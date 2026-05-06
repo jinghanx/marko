@@ -34,6 +34,22 @@ function gotoTabInFocused(idx: number) {
   workspace.requestEditorFocus();
 }
 
+/** After cycling pane focus via the keyboard, reach into the new pane's
+ *  DOM and focus the first editable inside it. Mirrors the belt-and-
+ *  suspenders path in Pane.tsx's onMouseDown — without it, the React
+ *  focusToken effect only covers CodeEditor/CrepeEditor, and Terminal /
+ *  other tab kinds keep DOM focus in the previous pane. */
+function focusEditableInLeaf(leafId: string) {
+  requestAnimationFrame(() => {
+    const paneEl = document.querySelector<HTMLElement>(
+      `[data-leaf-id="${CSS.escape(leafId)}"]`,
+    );
+    paneEl
+      ?.querySelector<HTMLElement>('.ProseMirror, .cm-content, .xterm-helper-textarea')
+      ?.focus();
+  });
+}
+
 export function App() {
   const sidebarVisible = useWorkspace((s) => getActiveSession(s).sidebarVisible);
   const outlineVisible = useWorkspace((s) => getActiveSession(s).outlineVisible);
@@ -173,6 +189,7 @@ export function App() {
         const idx = leaves.findIndex((l) => l.id === session.focusedLeafId);
         const next = (idx + 1) % leaves.length;
         workspace.setFocusedPane(leaves[next].id);
+        focusEditableInLeaf(leaves[next].id);
       }),
       window.milu.onMenu('menu:focus-pane-prev', () => {
         const s = workspace.getState();
@@ -182,6 +199,7 @@ export function App() {
         const idx = leaves.findIndex((l) => l.id === session.focusedLeafId);
         const prev = (idx - 1 + leaves.length) % leaves.length;
         workspace.setFocusedPane(leaves[prev].id);
+        focusEditableInLeaf(leaves[prev].id);
       }),
     ];
     return () => {

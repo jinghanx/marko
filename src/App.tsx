@@ -8,6 +8,7 @@ import { FilePalette } from './components/FilePalette';
 import { NewFilePicker } from './components/NewFilePicker';
 import { Onboarding } from './components/Onboarding';
 import { PathInput } from './components/PathInput';
+import { UpdateBanner } from './components/UpdateBanner';
 import { SessionStrip } from './components/SessionStrip';
 import { NowPlaying } from './components/NowPlaying';
 import { saveActive, saveActiveAs, openFileViaDialog, openFolderViaDialog, closeActiveTab, openTerminalTab, openProcessTab, openSearchTab, openClipboardTab, openSettingsTab, openShortcutsTab, openUrlInTab, openFileFromPath, reopenLastClosedTab } from './lib/actions';
@@ -253,6 +254,7 @@ export function App() {
         onClose={close}
       />
       <Onboarding />
+      <UpdateBanner />
     </div>
   );
 }

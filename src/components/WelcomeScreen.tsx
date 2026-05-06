@@ -1,4 +1,5 @@
 import { uiBus } from '../lib/uiBus';
+import { settings } from '../state/settings';
 
 interface QuickAction {
   keys: string;
@@ -23,6 +24,13 @@ export function WelcomeScreen() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          className="welcome-tour"
+          onClick={() => settings.update({ hasSeenOnboarding: false })}
+        >
+          Take the tour →
+        </button>
       </div>
     </div>
   );

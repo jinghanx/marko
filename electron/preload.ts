@@ -320,6 +320,18 @@ const api = {
     return () => ipcRenderer.removeListener(channel, listener);
   },
 
+  /** Update-check pings from main → renderer. The payload carries the
+   *  newer version's tag and the GitHub release URL so the banner can
+   *  link out without round-tripping through main. */
+  onUpdateAvailable: (
+    handler: (data: { version: string; url: string }) => void,
+  ) => {
+    const listener = (_e: unknown, data: { version: string; url: string }) =>
+      handler(data);
+    ipcRenderer.on('update:available', listener);
+    return () => ipcRenderer.removeListener('update:available', listener);
+  },
+
   // Plain new-tab links inside a <webview> are forwarded here from
   // main so the renderer can open them as Milu web tabs.
   onWebviewOpenUrl: (handler: (url: string) => void) => {

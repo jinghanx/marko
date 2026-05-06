@@ -186,6 +186,48 @@ let cachedDockIcon: Electron.NativeImage | null = null;
 /** Pre-rendered tray icons for the two main-window states. */
 let trayIconActive: Electron.NativeImage | null = null;
 let trayIconDormant: Electron.NativeImage | null = null;
+/** ─── Auto-update check ──────────────────────────────────────────────
+ *  We hit GitHub's releases API, compare `tag_name` against
+ *  `app.getVersion()`, and ping the renderer when there's a newer
+ *  version. We don't try to *install* updates — the DMG is unsigned, so
+ *  Squirrel/electron-updater would fail at the "stage updated app"
+ *  step. Instead the renderer shows a banner with a "Download" link
+ *  that opens the release page; the user grabs the new DMG manually. */
+const UPDATE_REPO = 'jinghanx/milu';
+let lastNotifiedVersion: string | null = null;
+
+function semverCompare(a: string, b: string): number {
+  const parse = (v: string) => v.split('.').map((n) => parseInt(n, 10) || 0);
+  const [a1 = 0, a2 = 0, a3 = 0] = parse(a);
+  const [b1 = 0, b2 = 0, b3 = 0] = parse(b);
+  if (a1 !== b1) return a1 - b1;
+  if (a2 !== b2) return a2 - b2;
+  return a3 - b3;
+}
+
+async function checkForUpdates() {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`,
+      { headers: { Accept: 'application/vnd.github+json' } },
+    );
+    if (!res.ok) return;
+    const data = (await res.json()) as { tag_name?: string; html_url?: string };
+    const tag = (data.tag_name ?? '').replace(/^v/, '');
+    if (!tag) return;
+    const current = app.getVersion();
+    if (semverCompare(tag, current) <= 0) return;
+    if (lastNotifiedVersion === tag) return; // already notified this session
+    lastNotifiedVersion = tag;
+    mainWindow?.webContents.send('update:available', {
+      version: tag,
+      url: data.html_url ?? `https://github.com/${UPDATE_REPO}/releases/latest`,
+    });
+  } catch {
+    // network blip, stale cache, etc. — silent; the next interval will retry.
+  }
+}
+
 /** Renderer-pushed snapshot of tray-relevant state. The tray menu
  *  reads this directly instead of trying to access localStorage from
  *  the main process. Renderer pushes via 'tray:push-state' IPC on
@@ -362,6 +404,15 @@ function buildTrayMenu(): Menu {
       click: () => {
         bringMainForward();
         mainWindow?.webContents.send('menu:show-onboarding');
+      },
+    },
+    {
+      label: 'Check for Updates…',
+      click: () => {
+        // Reset the per-session de-dup so the banner re-appears even if
+        // we already announced this version earlier in the session.
+        lastNotifiedVersion = null;
+        void checkForUpdates();
       },
     },
     { type: 'separator' },
@@ -1278,6 +1329,12 @@ app.whenReady().then(async () => {
     applyRegularActivationPolicy();
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  // Update probe: 30s after boot (so the renderer is ready to receive
+  // the banner event), then every 4 hours. GitHub's unauthenticated API
+  // limit is 60 req/hr per IP — once every 4 hours is well under that.
+  setTimeout(() => void checkForUpdates(), 30_000);
+  setInterval(() => void checkForUpdates(), 4 * 60 * 60 * 1000);
 });
 
 app.on('will-quit', () => {

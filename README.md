@@ -54,7 +54,7 @@ Internal commands wake Milu's main window when needed; external apps and the cal
 | **HTTP client** | Postman-lite: method · URL · headers (with per-row enable) · body · response with status pill, time, size, JSON pretty-print, headers viewer |
 | **Excalidraw** | Embedded whiteboard · canvas bg follows the active theme · `.excalidraw` files round-trip · cross-pane sync |
 | **AI Chat** | Streaming · markdown-rendered replies (with copy-code buttons on every block) · workspace context injection (attach files via dialog, open-tab picker, or drag-drop) · per-chat system prompt · token estimate · OpenAI-compat (so OpenAI / OpenRouter / Anthropic / Ollama / LM Studio all work) · API keys encrypted via Electron `safeStorage` (macOS Keychain) · history sidebar · auto-naming chat tabs from the first message · export to markdown |
-| **Welcome / WelcomeScreen** | ASCII logo + cheatsheet on empty leaves |
+| **Welcome screen** | Subtle dot-grid backdrop · ⌘P / ⌘T quick actions · "Take the tour" link to replay the onboarding |
 
 ### Workspace
 
@@ -69,6 +69,9 @@ Internal commands wake Milu's main window when needed; external apps and the cal
 - **Now-Playing pill** in the titlebar shows whichever tab is producing audio/video; click to jump to it
 - **Outline pane** adapts to tab kind: heading list for markdown, minimap for code, file preview for folder
 - **15 color themes** (5 light + 10 dark): GitHub, Tokyo Night, Catppuccin, Dracula, Gruvbox, One Dark, Nord, Solarized, Rosé Pine and more — token colours and the terminal palette are derived from each theme's ANSI palette
+- **First-run tour** — a 7-slide onboarding modal walks through the workspace mental model (workspace · pane · tab), splits, ⌘P, the global launcher, and ⌘T as the discoverability hub. Re-runnable from the welcome screen ("Take the tour") or the tray menu.
+- **Auto-update notifications** — checks GitHub releases on launch and every 4 hours; surfaces a bottom-right toast when a newer version is available, with a one-click link to the release page. (Install is manual since the DMG is unsigned.)
+- **Tab right-click menu** — Pin, Close (Other / To-Right / All), Copy Path, Reveal in Finder, Open Parent Folder (file tabs), Open as Workspace (folder tabs).
 
 ### macOS niceties
 
@@ -146,7 +149,25 @@ npm run package:mac:arm    # Apple Silicon only
 npm run package:mac:intel  # Intel only
 ```
 
-Output lands in `release/`. The DMG is unsigned, so first-launch users right-click → Open to bypass Gatekeeper.
+Output lands in `release/`. The DMG is unsigned, so on first launch users may see "Milu is damaged and can't be opened". Workaround:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Milu.app
+```
+
+(Re-run after each new download — fresh DMGs get re-quarantined.) The landing page surfaces this same instruction in a collapsible note so end-users see it.
+
+### Releasing
+
+```bash
+# bump package.json + package-lock.json version, then:
+git commit -am "release: vX.Y.Z"
+git push origin main
+npm run package:mac
+gh release create vX.Y.Z release/Milu-arm64.dmg release/Milu-x64.dmg --title "vX.Y.Z" --notes "…"
+```
+
+The landing page links to `releases/latest/download/Milu-{arm64,x64}.dmg` so it never needs editing at release time. Live Milu installs poll `api.github.com/repos/<owner>/milu/releases/latest` and surface a banner when a newer tag is published — no extra publish step needed.
 
 ## Architecture
 

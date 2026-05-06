@@ -467,6 +467,9 @@ export interface MiluApi {
   ): Promise<{ ok: boolean; run?: GhRun | null; error?: string }>;
   onMenu(channel: string, handler: () => void): () => void;
   onWebviewOpenUrl(handler: (url: string) => void): () => void;
+  onUpdateAvailable(
+    handler: (data: { version: string; url: string }) => void,
+  ): () => void;
   trayPushState(state: { recentFiles: string[]; bookmarks: { name: string; path: string }[] }): void;
   onTrayOpenPath(handler: (path: string) => void): () => void;
   onLauncherRun(handler: (action: unknown) => void): () => void;

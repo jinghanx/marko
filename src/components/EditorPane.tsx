@@ -1,34 +1,45 @@
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { useWorkspace, workspace, findLeaf, type Tab } from '../state/workspace';
+// Common tab kinds stay eager — they're on the hot path (every workspace
+// opens at least one of these on boot) and their bundles are modest.
 import { CrepeEditor } from './CrepeEditor';
 import { CodeEditor } from './CodeEditor';
 import { ImageViewer } from './ImageViewer';
 import { MediaViewer } from './MediaViewer';
-import { PdfViewer } from './PdfViewer';
-import { CsvViewer } from './CsvViewer';
-import { JsonViewer } from './JsonViewer';
-import { DiffViewer } from './DiffViewer';
-import { ExcalidrawViewer } from './ExcalidrawViewer';
-import { ChatView } from './ChatView';
-import { ClipboardView } from './ClipboardView';
-import { SettingsView } from './SettingsView';
-import { ShortcutsView } from './ShortcutsView';
-import { SqliteView } from './SqliteView';
-import { SearchView } from './SearchView';
-import { HttpClient } from './HttpClient';
 import { FolderView } from './FolderView';
 import { WebView } from './WebView';
 import { Terminal } from './Terminal';
-import { ProcessViewer } from './ProcessViewer';
-import { GitView } from './GitView';
-import { MusicView } from './MusicView';
-import { LaterView } from './LaterView';
-import { AgentView } from './AgentView';
-import { DiffReviewView } from './DiffReviewView';
-import { MarkdownSplitView } from './MarkdownSplitView';
 import { WelcomeScreen } from './WelcomeScreen';
+// Specialty tab kinds load lazily so their bundles aren't part of the
+// renderer's cold-start cost. Each is wrapped in <Suspense> below.
+const PdfViewer = lazy(() => import('./PdfViewer').then((m) => ({ default: m.PdfViewer })));
+const CsvViewer = lazy(() => import('./CsvViewer').then((m) => ({ default: m.CsvViewer })));
+const JsonViewer = lazy(() => import('./JsonViewer').then((m) => ({ default: m.JsonViewer })));
+const DiffViewer = lazy(() => import('./DiffViewer').then((m) => ({ default: m.DiffViewer })));
+const ExcalidrawViewer = lazy(() => import('./ExcalidrawViewer').then((m) => ({ default: m.ExcalidrawViewer })));
+const ChatView = lazy(() => import('./ChatView').then((m) => ({ default: m.ChatView })));
+const ClipboardView = lazy(() => import('./ClipboardView').then((m) => ({ default: m.ClipboardView })));
+const SettingsView = lazy(() => import('./SettingsView').then((m) => ({ default: m.SettingsView })));
+const ShortcutsView = lazy(() => import('./ShortcutsView').then((m) => ({ default: m.ShortcutsView })));
+const SqliteView = lazy(() => import('./SqliteView').then((m) => ({ default: m.SqliteView })));
+const SearchView = lazy(() => import('./SearchView').then((m) => ({ default: m.SearchView })));
+const HttpClient = lazy(() => import('./HttpClient').then((m) => ({ default: m.HttpClient })));
+const ProcessViewer = lazy(() => import('./ProcessViewer').then((m) => ({ default: m.ProcessViewer })));
+const GitView = lazy(() => import('./GitView').then((m) => ({ default: m.GitView })));
+const MusicView = lazy(() => import('./MusicView').then((m) => ({ default: m.MusicView })));
+const LaterView = lazy(() => import('./LaterView').then((m) => ({ default: m.LaterView })));
+const AgentView = lazy(() => import('./AgentView').then((m) => ({ default: m.AgentView })));
+const DiffReviewView = lazy(() => import('./DiffReviewView').then((m) => ({ default: m.DiffReviewView })));
+const MarkdownSplitView = lazy(() => import('./MarkdownSplitView').then((m) => ({ default: m.MarkdownSplitView })));
 import { acpReviews } from '../state/acpReviews';
 import { useSyncExternalStore } from 'react';
+
+/** Placeholder shown while a lazy tab kind's bundle is fetching. Brief
+ *  enough that the average opener won't notice; explicit enough that
+ *  it doesn't look like a hang on slow disks / cold caches. */
+function TabLoading() {
+  return <div className="tab-loading" aria-label="Loading…" />;
+}
 
 interface EditorPaneProps {
   paneId: string;
@@ -86,6 +97,7 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
           className="editor-host"
           style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
         >
+          <Suspense fallback={<TabLoading />}>
           {review && tab.filePath && (
             <DiffReviewView reviewId={review.id} filePath={tab.filePath} />
           )}
@@ -195,6 +207,7 @@ export function EditorPane({ paneId, sessionId }: EditorPaneProps) {
               {tab.filePath && <div className="binary-path">{tab.filePath}</div>}
             </div>
           )}
+          </Suspense>
         </div>
         );
       })}

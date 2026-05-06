@@ -90,7 +90,7 @@ export function PathInput({ open, replace = false, onClose }: Props) {
       return;
     }
     const trimmed = value.trim();
-    // Path autocomplete only kicks in for path-shaped input — anything that
+    // Path autocomplete kicks in for path-shaped input — anything that
     // contains a slash, starts with `~`, or starts with `.` / `/`.
     const looksPathy =
       !!trimmed &&
@@ -99,18 +99,33 @@ export function PathInput({ open, replace = false, onClose }: Props) {
         trimmed.startsWith('~') ||
         trimmed.startsWith('.') ||
         trimmed.startsWith('/'));
-    if (!looksPathy) {
+    // …or for plain-name input that prefix-matches an entry in the active
+    // workspace root. This lets the user type "landing" in ⌘T and pick the
+    // /…/landing folder directly, without remembering its absolute path.
+    const looksWorkspacey =
+      !looksPathy &&
+      !!trimmed &&
+      !looksLikeUrl(trimmed) &&
+      !!rootDir;
+    if (!looksPathy && !looksWorkspacey) {
       setPathChildren([]);
       return;
     }
-    const resolved = resolvePath(value);
-    const slash = resolved.lastIndexOf('/');
-    if (slash < 0) {
-      setPathChildren([]);
-      return;
+    let parent: string;
+    let prefix: string;
+    if (looksWorkspacey) {
+      parent = rootDir!;
+      prefix = trimmed;
+    } else {
+      const resolved = resolvePath(value);
+      const slash = resolved.lastIndexOf('/');
+      if (slash < 0) {
+        setPathChildren([]);
+        return;
+      }
+      parent = resolved.slice(0, slash) || '/';
+      prefix = resolved.slice(slash + 1);
     }
-    const parent = resolved.slice(0, slash) || '/';
-    const prefix = resolved.slice(slash + 1);
     let cancelled = false;
     window.milu
       .listDir(parent)
